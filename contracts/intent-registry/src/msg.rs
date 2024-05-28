@@ -3,6 +3,7 @@ use cosmwasm_std::Uint128;
 
 #[cw_serde]
 pub struct InstantiateMsg {
+    pub polytone_addr: String,
 }
 
 #[cw_serde]
