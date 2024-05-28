@@ -7,6 +7,7 @@ use cw2::set_contract_version;
 use crate::{
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    state::{Config, CONFIG},
 };
 
 const CONTRACT_NAME: &str = "crates.io:vesting";
@@ -20,6 +21,12 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    let config = Config {
+        polytone_addr: deps.api.addr_validate(&msg.polytone_addr)?,
+    };
+
+    CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new())
 }
