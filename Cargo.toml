@@ -1,0 +1,44 @@
+[workspace]
+members  = ["contracts/*"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+
+[profile.release]
+codegen-units    = 1
+opt-level        = 3
+debug            = false
+rpath            = false
+lto              = true
+debug-assertions = false
+panic            = 'abort'
+incremental      = false
+# Please do not disable these. Doing so will cause overflow checks in
+# all workspace members to stop working. Overflows should be errors.
+overflow-checks = true
+
+[workspace.dependencies]
+# common dependencies
+cosmwasm-schema  = "1.5"
+cosmwasm-std     = { version = "1.5.0", features = ["stargate", "cosmwasm_1_2"] }
+cosmwasm-storage = "1.5"
+cw-storage-plus  = "1.1"
+cw2              = "1.1"
+cw-utils         = "1.0"
+
+# extra
+schemars  = "0.8.11"
+url       = "2.3.1"
+serde     = { version = "1.0.145", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.37" }
+sha2      = "^0.10"
+
+# contracts
+vesting         = { path = "contracts/vesting", features = ["library"] }
+vesting-factory = { path = "contracts/vesting-factory", features = ["library"] }
+
+# dev dependencies
+cw-multi-test  = "0.18.0"
+assert_matches = "1.5.0"
+anyhow         = "1.0.65"
