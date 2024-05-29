@@ -200,7 +200,7 @@ fn main() {
         domain: OrbitalDomain::Juno,
         coin: Coin {
             denom: "ujuno".to_string(),
-            amount: Uint128::new(1_000),
+            amount: Uint128::new(1),
         },
         dest: MM_JUNO_ADDR.to_string(),
     };
@@ -264,6 +264,25 @@ fn main() {
         )
         .unwrap();
     println!("update auction response: {:?}", response);
+    std::thread::sleep(std::time::Duration::from_secs(5));
+    
+    let new_intent_msg = AccountExecute::NewIntent (orbital_utils::intent::Intent {
+        ask_domain: OrbitalDomain::Neutron,
+        ask_coin: coin(1_000, "untrn"),
+        offer_domain: OrbitalDomain::Juno,
+        offer_coin: coin(100, "ujuno"),
+        is_verified: false,
+    });
+
+    let response = account_cw
+        .execute(
+            "acc0",
+            &to_json_string(&new_intent_msg)
+            .unwrap(),
+            "",
+        )
+        .unwrap();
+    println!("create new intent response: {:?}", response);
 }
 
 // init an auction
