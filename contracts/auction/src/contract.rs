@@ -1,8 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, to_json_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-    WasmMsg,
+    ensure, to_json_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, WasmMsg
 };
 
 use cw2::set_contract_version;
@@ -55,7 +54,7 @@ pub fn execute(
             execute_new_intent(deps, info, new_intent, deposit_addr)
         }
         ExecuteMsg::AuctionTick {} => execute_auction_tick(deps, env),
-        ExecuteMsg::AuctionBid { bidder } => execute_auction_bid(deps, env, info, bidder),
+        ExecuteMsg::AuctionBid { bidder, bid } => execute_auction_bid(deps, env, info, bidder, bid),
         ExecuteMsg::Bond {} => {
             let config = CONFIG.load(deps.storage)?;
             let amount = must_pay(&info, &config.bond.denom)?;
@@ -128,6 +127,7 @@ pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, Con
                         original_intent: intent.clone(),
                         winning_bid: auction.highest_bid.amount,
                         bidder: auction.bidder.unwrap(),
+                        mm_addr: auction.mm_addr.unwrap(),
                     })?,
                     funds: vec![],
                 });
@@ -155,6 +155,7 @@ pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, Con
             end_time: config.duration.after(&env.block),
             highest_bid: next_intent.ask_coin,
             bidder: None,
+            mm_addr: None,
             intent_id: next_intent_id,
             verified: false,
         },
@@ -168,6 +169,7 @@ pub fn execute_auction_bid(
     env: Env,
     info: MessageInfo,
     bidder: String,
+    bid: Uint128,
 ) -> Result<Response, ContractError> {
     let mut auction = ACTIVE_AUCTION.load(deps.storage)?;
     let config = CONFIG.load(deps.storage)?;
@@ -183,9 +185,6 @@ pub fn execute_auction_bid(
         ContractError::NoBond
     );
 
-    // check for the bid amounts
-    let bid = must_pay(&info, &auction.highest_bid.denom)?;
-
     // make sure the bid is at least above the othere bid by the increment
     let min_bid = auction.highest_bid.amount.checked_add(
         Decimal::from_atomics(auction.highest_bid.amount, 0)?
@@ -198,6 +197,9 @@ pub fn execute_auction_bid(
     // if everything checks out then set it as the next winner
     auction.highest_bid.amount = bid;
     auction.bidder = Some(bidder);
+    auction.mm_addr = Some(info.sender.to_string());
+
+    ACTIVE_AUCTION.save(deps.storage, &auction)?;
 
     Ok(Response::default())
 }

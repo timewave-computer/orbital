@@ -8,7 +8,7 @@ use local_ictest_e2e::{
         file_system::{get_contract_path, read_json_file},
         test_context::TestContext,
     },
-    API_URL, CHAIN_CONFIG_PATH, JUNO_CHAIN, NEUTRON_CHAIN,
+    API_URL, CHAIN_CONFIG_PATH, JUNO_CHAIN, MM_KEY, NEUTRON_CHAIN,
 };
 use localic_std::{polling::poll_for_start, relayer::Relayer};
 use orbital_utils::domain::OrbitalDomain;
@@ -17,6 +17,7 @@ use reqwest::blocking::Client;
 use account::msg::ExecuteMsg as AccountExecute;
 use account::msg::QueryMsg as AccountQuery;
 
+use auction::msg::ExecuteMsg as AuctionExecute;
 use auction::msg::InstantiateMsg as AuctionInstantiate;
 
 pub const MM_JUNO_ADDR: &str = "juno1efd63aw40lxf3n4mhf7dzhjkr453axurv2zdzk";
@@ -225,8 +226,8 @@ fn main() {
                 account_addr: account_contract.address.clone(),
                 bond: coin(100, "untrn"),
                 increment_bps: 10,
-                duration: CwDuration::Time(60 * 5),
-                fulfillment_timeout: CwDuration::Time(60 * 5),
+                duration: CwDuration::Time(30),
+                fulfillment_timeout: CwDuration::Time(30),
             })
             .unwrap()
             .as_str(),
@@ -251,28 +252,40 @@ fn main() {
         .unwrap();
     println!("update auction response: {:?}", response);
     std::thread::sleep(std::time::Duration::from_secs(5));
-    
-    let new_intent_msg = AccountExecute::NewIntent (orbital_utils::intent::Intent {
+
+    let new_intent_msg = AccountExecute::NewIntent(orbital_utils::intent::Intent {
         ask_domain: OrbitalDomain::Neutron,
-        ask_coin: coin(1_000, "untrn"),
+        ask_coin: coin(10, "untrn"),
         offer_domain: OrbitalDomain::Juno,
         offer_coin: coin(100, "ujuno"),
         is_verified: false,
     });
 
     let response = account_cw
-        .execute(
-            "acc0",
-            &to_json_string(&new_intent_msg)
-            .unwrap(),
-            "",
-        )
+        .execute("acc0", &to_json_string(&new_intent_msg).unwrap(), "")
         .unwrap();
     println!("create new intent response: {:?}", response);
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
+    let new_tick_msg = AuctionExecute::AuctionTick {};
+    let response = account_cw
+        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
+        .unwrap();
+    println!("tick auction response: {:?}", response);
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
+    let bid_msg = AuctionExecute::AuctionBid {
+        bidder: MM_JUNO_ADDR.to_string(),
+        bid: Uint128::new(100),
+    };
+    let response = account_cw
+        .execute(MM_KEY, &to_json_string(&bid_msg).unwrap(), "")
+        .unwrap();
+    println!("bid response: {:?}", response);
 }
 
-// init an auction
-// start new intent
+// D init an auction
+// D start new intent
 // bid
 // sleep until auction ends
 // call auction tick
