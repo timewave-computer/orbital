@@ -61,10 +61,12 @@ dependencies = [
  "anyhow",
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-fifo",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
  "cw2",
+ "orbital-utils",
  "schemars",
  "serde",
  "sha2 0.10.8",
@@ -329,6 +331,16 @@ dependencies = [
  "rand_core 0.5.1",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "cw-fifo"
+version = "0.1.0"
+source = "git+https://github.com/timewave-computer/covenants.git?branch=main#d6ce0e9bd700a94b6bd07dc8e979a2611aece52d"
+dependencies = [
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "serde",
 ]
 
 [[package]]
