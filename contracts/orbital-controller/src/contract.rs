@@ -5,10 +5,11 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
 use cw2::set_contract_version;
+use orbital_utils::domain::OrbitalDomain;
 
 use crate::{
     error::ContractError,
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg}, state::{OrbitalDomain, UserConfig, POLYTONE_NOTES, USER_CONFIGS},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg}, state::{UserConfig, POLYTONE_NOTES, USER_CONFIGS},
 };
 
 const CONTRACT_NAME: &str = "crates.io:vesting";
@@ -47,6 +48,7 @@ pub fn execute_register_user(
     info: MessageInfo,
     domains: Vec<OrbitalDomain>,
 ) -> Result<Response, ContractError> {
+
     let mut registered_domains = HashMap::new();
 
     // this should submit a transaction to the polytone contract to create a new polytone for the user.

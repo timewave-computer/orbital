@@ -1,7 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
-
-use crate::state::OrbitalDomain;
+use orbital_utils::domain::OrbitalDomain;
 
 #[cw_serde]
 pub struct InstantiateMsg {

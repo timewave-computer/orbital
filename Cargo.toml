@@ -1,9 +1,13 @@
 [workspace]
-members  = ["contracts/*"]
+members  = [
+    "contracts/*",
+    "packages/*",
+]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
+version = "0.1.0"
 
 [profile.release]
 codegen-units    = 1
@@ -26,19 +30,28 @@ cosmwasm-storage = "1.5"
 cw-storage-plus  = "1.1"
 cw2              = "1.1"
 cw-utils         = "1.0"
-
-# extra
-schemars  = "0.8.11"
+getrandom       = { version = "0.2", features = ["js"] }
+serde           = { version = "1.0.145", default-features = false, features = ["derive"] }
+thiserror       = "1.0.31"
+schemars        = "0.8.10"
+cw20            = { version = "0.15.1" }
+cw20-base       = { version = "0.15.1" }
+proc-macro2     = "1"
+quote           = "1"
+syn             = "1"
 url       = "2.3.1"
-serde     = { version = "1.0.145", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.37" }
 sha2      = "^0.10"
-
-# contracts
-vesting         = { path = "contracts/vesting", features = ["library"] }
-vesting-factory = { path = "contracts/vesting-factory", features = ["library"] }
+neutron-sdk      = { git = "https://github.com/neutron-org/neutron-sdk", tag = "v0.8.0" }
+protobuf         = { version = "3.2.0", features = ["with-bytes"] }
+serde-json-wasm  = { version = "0.4.1" }
+base64           = "0.13.0"
+prost            = "0.11"
+prost-types      = "0.11"
+bech32           = "0.9.0"
 
 # dev dependencies
 cw-multi-test  = "0.18.0"
 assert_matches = "1.5.0"
 anyhow         = "1.0.65"
+
+orbital-utils = { path = "packages/orbital-utils" }
