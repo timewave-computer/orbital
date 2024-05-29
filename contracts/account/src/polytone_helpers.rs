@@ -1,8 +1,14 @@
 use std::collections::HashMap;
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{from_json, to_json_binary, Addr, Binary, CosmosMsg, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryRequest, Response, StdError, StdResult, Uint64, WasmMsg};
-use neutron_sdk::{bindings::{msg::NeutronMsg, query::NeutronQuery}, NeutronError, NeutronResult};
+use cosmwasm_std::{
+    from_json, to_json_binary, Addr, Binary, CosmosMsg, DepsMut, Empty, Env, MessageInfo,
+    QuerierWrapper, QueryRequest, Response, StdError, StdResult, Uint64, WasmMsg,
+};
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    NeutronError, NeutronResult,
+};
 use polytone::callbacks::{CallbackMessage, CallbackRequest, ErrorResponse};
 
 use crate::state::{LEDGER, REGISTERED_NOTES, USER_DOMAINS};
@@ -10,7 +16,6 @@ use crate::state::{LEDGER, REGISTERED_NOTES, USER_DOMAINS};
 use polytone::callbacks::{Callback as PolytoneCallback, ExecutionResponse};
 
 type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
-
 
 pub const REGISTER_DOMAIN_CALLBACK_ID: u8 = 1;
 
@@ -82,25 +87,24 @@ pub fn query_polytone_proxy_address(
     querier.query_wasm_smart(note_address, &remote_address_query)
 }
 
-
 fn process_query_callback(
-    env: Env,
-    deps: ExecuteDeps,
-    query_callback_result: Result<Vec<Binary>, ErrorResponse>,
+    _env: Env,
+    _deps: ExecuteDeps,
+    _query_callback_result: Result<Vec<Binary>, ErrorResponse>,
     initiator_msg: Binary,
 ) -> NeutronResult<Response<NeutronMsg>> {
     // decode the initiator message callback id into u8
-    let initiator_msg: u8 = from_json(initiator_msg)?;
+    let _initiator_msg: u8 = from_json(initiator_msg)?;
 
-    match initiator_msg {
-        _ => Err(NeutronError::Std(StdError::generic_err("unexpected callback id".to_string()))),
-    }
+    Err(NeutronError::Std(StdError::generic_err(
+        "unexpected callback id".to_string(),
+    )))
 }
 
 fn process_fatal_error_callback(
-    env: Env,
-    deps: ExecuteDeps,
-    response: String,
+    _env: Env,
+    _deps: ExecuteDeps,
+    _response: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     Ok(Response::default())
 }

@@ -6,12 +6,12 @@ use cosmwasm_std::{
 };
 
 use cw2::set_contract_version;
-use cw_utils::must_pay;
+
 
 use crate::{
     error::ContractError,
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg,},
-    state::{Config, CONFIG},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    state::{CONFIG},
 };
 
 const CONTRACT_NAME: &str = "crates.io:vesting";
@@ -20,9 +20,9 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    msg: InstantiateMsg,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 

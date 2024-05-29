@@ -9,7 +9,6 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     CreateNewIntent {},
-    
 }
 
 #[cw_serde]
