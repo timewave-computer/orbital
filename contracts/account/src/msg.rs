@@ -1,6 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
-use orbital_utils::{domain::OrbitalDomain, intent::Intent};
+use orbital_utils::{domain::OrbitalDomain, intent::{Intent, SavedIntent}};
 use polytone::callbacks::CallbackMessage;
 
 #[cw_serde]
@@ -17,12 +17,15 @@ pub enum ExecuteMsg {
     Sync {
         domain: OrbitalDomain,
     },
+    WithdraFunds {
+
+    },
     UpdateAuctionAddr {
         auction_addr: String,
     },
     NewIntent(Intent),
     VerifyAuction {
-        original_intent: Intent,
+        original_intent: SavedIntent,
         winning_bid: Uint128,
         bidder: String,
     },

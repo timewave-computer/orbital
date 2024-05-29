@@ -13,7 +13,7 @@ use neutron_sdk::{
 use orbital_utils::domain::OrbitalDomain;
 use polytone::callbacks::{CallbackMessage, CallbackRequest, ErrorResponse};
 
-use crate::state::{LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS};
+use crate::{state::{LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS}, types::QueryRecievedFundsOnDestDomain};
 
 use polytone::callbacks::{Callback as PolytoneCallback, ExecutionResponse};
 

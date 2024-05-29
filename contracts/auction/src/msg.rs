@@ -18,7 +18,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Bond {},
     Slash {},
-    NewIntent(Intent),
+    NewIntent(Intent, String),
     AuctionTick {},
     AuctionBid {
         // Address on the ask domain (can't be verified here most of the time)
