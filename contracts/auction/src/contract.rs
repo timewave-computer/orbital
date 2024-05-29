@@ -6,13 +6,14 @@ use cosmwasm_std::{
 };
 
 use cw2::set_contract_version;
+use cw_utils::must_pay;
 use orbital_utils::intent::Intent;
 
 use crate::{
     error::ContractError,
-    helpers::{add_intent, get_bid, remove_intent},
+    helpers::{add_intent, next_intent},
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
-    state::{ACTIVE_AUCTION, CONFIG, IDS, INTENTS},
+    state::{ACTIVE_AUCTION, BONDS, CONFIG, IDS, INTENTS, TO_VERIFY},
     types::{ActiveAuction, Config, TestAccountExecuteMsg},
 };
 
@@ -30,7 +31,7 @@ pub fn instantiate(
 
     let config = Config {
         account_addr: deps.api.addr_validate(&msg.account_addr)?,
-        bond_amount: msg.bond_amount,
+        bond: msg.bond,
         increment_decimal: Decimal::bps(msg.increment_bps),
         duration: msg.duration,
         fulfillment_timeout: msg.fulfillment_timeout,
@@ -53,6 +54,26 @@ pub fn execute(
         ExecuteMsg::NewIntent(new_intent) => execute_new_intent(deps, info, new_intent),
         ExecuteMsg::AuctionTick {} => execute_auction_tick(deps, env),
         ExecuteMsg::AuctionBid { bidder } => execute_auction_bid(deps, env, info, bidder),
+        ExecuteMsg::Bond {} => {
+            let config = CONFIG.load(deps.storage)?;
+            let amount = must_pay(&info, &config.bond.denom)?;
+            ensure!(
+                amount == config.bond.amount,
+                ContractError::BondMismatch(config.bond)
+            );
+            BONDS.save(deps.storage, info.sender, &info.funds[0])?;
+            Ok(Response::new())
+        }
+        ExecuteMsg::Slash {} => {
+            ensure!(
+                info.sender == CONFIG.load(deps.storage)?.account_addr,
+                ContractError::Unauthorized("Only account can slash".to_string())
+            );
+            BONDS.load(deps.storage, info.sender.clone())?;
+            BONDS.remove(deps.storage, info.sender);
+            Ok(Response::new())
+        }
+        ExecuteMsg::Fulfilled { id } => todo!(),
     }
 }
 
@@ -76,37 +97,50 @@ pub fn execute_new_intent(
 }
 
 pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, ContractError> {
-    let auction = ACTIVE_AUCTION.load(deps.storage)?;
     let config = CONFIG.load(deps.storage)?;
-    let curr_intent = INTENTS.load(deps.storage, auction.intent_id)?;
+    let mut msgs: Vec<WasmMsg> = Vec::with_capacity(1);
+
+    let curr_auction = ACTIVE_AUCTION.load(deps.storage)?;
 
     // ensure the auction is expired
     ensure!(
-        auction.end_time.is_expired(&env.block),
-        ContractError::AuctionExpired
+        curr_auction.end_time.is_expired(&env.block),
+        ContractError::AuctionNotExpired
     );
 
-    // If we have a bidder addr, meaning we have a winner, so send a msg to the account controller
-    if auction.bidder.is_some() {
-        // Send msg to the account controller, and tell him the auction is finished, and
-        let msg = WasmMsg::Execute {
-            contract_addr: config.account_addr.to_string(),
-            msg: to_json_binary(&TestAccountExecuteMsg::AuctionFinished {
-                original_intent: curr_intent,
-                id: auction.intent_id,
-                winning_bid: auction.highest_bid,
-                bidder: auction.bidder.clone(),
-            })?,
-            funds: vec![],
-        };
-
-        return Ok(Response::default().add_message(msg));
-    }
-
-    let Some(next_intent_id) = remove_intent(deps.branch())? else {
-        // If we don't have an id here, itm eans we have nothing in the queue
+    let Some(next_intent_id) = next_intent(deps.branch())? else {
+        // If we don't have an id here, it means we have nothing in the queue
         return Ok(Response::default());
     };
+
+    // If ive got something to verify, i verify it.
+    match TO_VERIFY.load(deps.storage) {
+        Ok(auction) => {
+            // if we have an auction to verify, we need to do that first
+            let mut intent = INTENTS.load(deps.storage, auction.intent_id)?;
+
+            if !intent.is_verified {
+                msgs.push(WasmMsg::Execute {
+                    contract_addr: config.account_addr.to_string(),
+                    msg: to_json_binary(&TestAccountExecuteMsg::VerifyAuction {
+                        original_intent: intent.clone(),
+                        winning_bid: auction.highest_bid.amount,
+                        bidder: auction.bidder.unwrap(),
+                    })?,
+                    funds: vec![],
+                });
+                intent.is_verified = true;
+                INTENTS.save(deps.storage, auction.intent_id, &intent)?;
+                TO_VERIFY.remove(deps.storage);
+            }
+        }
+        Err(_) => (),
+    };
+
+    if curr_auction.bidder.is_some() {
+        //we havea bidder, so add it to the verify storage
+        TO_VERIFY.save(deps.storage, &curr_auction)?;
+    }
 
     let next_intent = INTENTS
         .load(deps.storage, next_intent_id)
@@ -117,13 +151,14 @@ pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, Con
         deps.storage,
         &ActiveAuction {
             end_time: config.duration.after(&env.block),
-            highest_bid: next_intent.ask_coin.amount,
+            highest_bid: next_intent.ask_coin,
             bidder: None,
             intent_id: next_intent_id,
+            verified: false,
         },
     )?;
 
-    Ok(Response::default())
+    Ok(Response::default().add_messages(msgs))
 }
 
 pub fn execute_auction_bid(
@@ -138,23 +173,28 @@ pub fn execute_auction_bid(
     // ensure the auction is still active
     ensure!(
         !auction.end_time.is_expired(&env.block),
-        ContractError::AuctionExpired
+        ContractError::AuctionNotExpired
+    );
+    // make sure the sender has bond to bid
+    ensure!(
+        BONDS.has(deps.storage, info.sender.clone()),
+        ContractError::NoBond
     );
 
-    // check for the bid amounts, that it included the bond and what is the amount he bid
-    let bid = get_bid(&config, &info)?;
+    // check for the bid amounts
+    let bid = must_pay(&info, &auction.highest_bid.denom)?;
 
     // make sure the bid is at least above the othere bid by the increment
-    let min_bid = auction.highest_bid.checked_add(
-        Decimal::from_atomics(auction.highest_bid, 0)?
+    let min_bid = auction.highest_bid.amount.checked_add(
+        Decimal::from_atomics(auction.highest_bid.amount, 0)?
             .checked_mul(config.increment_decimal)?
             .to_uint_floor(),
     )?;
     // ensure the bid is higher then the previous bid plus the increment
-    ensure!(bid.amount >= min_bid, ContractError::BidTooLow(min_bid));
+    ensure!(bid >= min_bid, ContractError::BidTooLow(min_bid));
 
     // if everything checks out then set it as the next winner
-    auction.highest_bid = bid.amount;
+    auction.highest_bid.amount = bid;
     auction.bidder = Some(bidder);
 
     Ok(Response::default())

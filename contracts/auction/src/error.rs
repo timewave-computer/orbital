@@ -29,8 +29,8 @@ pub enum ContractError {
     #[error("Must send funds to start vesting")]
     NoFundsSent,
 
-    #[error("Auction is expired")]
-    AuctionExpired,
+    #[error("Auction is not expired yet")]
+    AuctionNotExpired,
 
     #[error("Invalid denom was provided: {0}")]
     InvalidDenom(String),
@@ -52,4 +52,10 @@ pub enum ContractError {
 
     #[error("Current intent wasn't found in the queue")]
     QueueIsEmpty,
+
+    #[error("Bond mismatch: {0}")]
+    BondMismatch(Coin),
+
+    #[error("address doesn't have a bond to bid")]
+    NoBond,
 }
