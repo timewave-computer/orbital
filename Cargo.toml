@@ -57,3 +57,5 @@ assert_matches = "1.5.0"
 anyhow         = "1.0.65"
 
 orbital-utils = { path = "packages/orbital-utils" }
+account = { path = "contracts/account" }
+auction = { path = "contracts/auction" }

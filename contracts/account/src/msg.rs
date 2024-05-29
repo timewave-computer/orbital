@@ -20,4 +20,19 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
-pub enum QueryMsg {}
+pub enum QueryMsg {
+    #[returns(String)]
+    QueryDomainAddr {
+        domain: String,
+    },
+    #[returns(String)]
+    QueryProxyAccount {
+        domain: String,
+    },
+    #[returns(String)]
+    QueryLedger {
+        domain: String,
+    },
+    #[returns(String)]
+    QueryAllDomains{},
+}

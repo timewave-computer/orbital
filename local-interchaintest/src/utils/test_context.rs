@@ -28,10 +28,8 @@ pub struct TestContext {
 
 impl From<ChainsVec> for TestContext {
     fn from(chains: ChainsVec) -> Self {
-        println!("chains: {:?}", chains);
         let mut chains_map = HashMap::new();
         for chain in chains.chains {
-            println!("processing chain: {:?}", chain.bech32_prefix);
             let rb = ChainRequestBuilder::new(
                 API_URL.to_string(),
                 chain.chain_id.clone(),
@@ -182,6 +180,15 @@ impl LocalChain {
 }
 
 impl TestContext {
+    pub fn get_cosmwasm_instance(&self, chain: &str) -> CosmWasm {
+        println!("getting cosmwasm instance for chain: {}", chain);
+        let rb = self
+            .get_request_builder()
+            .get_request_builder(chain);
+
+        CosmWasm::new(rb)
+    }
+
     pub fn get_transfer_channels(&self) -> TestContextQuery {
         TestContextQuery::new(self, QueryType::TransferChannel)
     }

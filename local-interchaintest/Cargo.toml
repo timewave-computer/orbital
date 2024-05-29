@@ -14,3 +14,10 @@ serde = { version = "1.0", features = ["derive"] }
 cosmwasm-schema = { workspace = true }
 sha2 = "0.10.8"
 hex = "0.4.3"
+
+
+
+# orbital stuff
+account = { workspace = true }
+auction = { workspace = true }
+orbital-utils = { workspace = true }

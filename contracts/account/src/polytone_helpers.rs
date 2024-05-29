@@ -91,9 +91,15 @@ fn process_execute_callback(
             if let Some(addr) = proxy_address {
                 USER_DOMAINS.save(deps.storage, note_domain.value(), &addr)?;
                 LEDGER.save(deps.storage, note_domain.value(), &HashMap::new())?;
+            } else {
+                let debug = format!("process_execute_callback [REGISTER_DOMAIN_CALLBACK_ID]: {:?}", proxy_address);
+                USER_DOMAINS.save(deps.storage, note_domain.value(), &debug)?;
             }
         }
-        _ => (),
+        _ => {
+            let debug = format!("process_execute_callback [_]: {:?}", _callback_result);
+            USER_DOMAINS.save(deps.storage, note_domain.value(), &debug)?;
+        },
     }
 
     Ok(Response::default())

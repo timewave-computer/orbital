@@ -1,6 +1,8 @@
 #![allow(dead_code, unused_must_use)]
 
-use cosmwasm_std::{coin, Coin, Uint128};
+use std::path::Path;
+
+use cosmwasm_std::{coin, to_json_string, Coin, Uint128};
 use local_ictest_e2e::{
     pretty_print, utils::{
         file_system::{
@@ -20,6 +22,9 @@ use localic_std::{
 };
 use reqwest::blocking::Client;
 
+use account::msg::QueryMsg as AccountQuery;
+use account::msg::ExecuteMsg as AccountExecute;
+
 // local-ic start neutron_gaia_juno
 fn main() {
 
@@ -35,34 +40,38 @@ fn main() {
     let contracts_path = get_contract_path();
     println!("main contracts path: {:?}", contracts_path);
 
+    let artifacts_path = get_local_interchain_dir().join("artifacts");
+    println!("main artifacts path: {:?}", artifacts_path);
+
     let polytone_path = contracts_path.join("polytone");
     let note_path = polytone_path.join("polytone_note.wasm");
     let voice_path = polytone_path.join("polytone_voice.wasm");
     let proxy_path = polytone_path.join("polytone_proxy.wasm");
 
     let orbital_contracts_path = contracts_path.join("orbital");
-    let auction_path = orbital_contracts_path.join("auction.wasm");
-    let account_path = orbital_contracts_path.join("account.wasm");
+    let auction_path = orbital_contracts_path.join("auction-aarch64.wasm");
+    let account_path = orbital_contracts_path.join("account-aarch64.wasm");
 
-    let neutron_rb = test_ctx
-        .get_request_builder()
-        .get_request_builder(NEUTRON_CHAIN);
+    let mut note_cw = test_ctx.get_cosmwasm_instance(NEUTRON_CHAIN);
+    let mut account_cw = test_ctx.get_cosmwasm_instance(NEUTRON_CHAIN);
+    let mut auction_cw = test_ctx.get_cosmwasm_instance(NEUTRON_CHAIN);
 
-    let juno_rb = test_ctx
-        .get_request_builder()
-        .get_request_builder(JUNO_CHAIN);
+    let mut voice_cw = test_ctx.get_cosmwasm_instance(JUNO_CHAIN);
+    let mut proxy_cw = test_ctx.get_cosmwasm_instance(JUNO_CHAIN);
 
+    let key = "acc0";
+    let neutron_rb = test_ctx.get_request_builder().get_request_builder(NEUTRON_CHAIN);
+    let juno_rb = test_ctx.get_request_builder().get_request_builder(JUNO_CHAIN);
+    
+    let neutron_relayer = Relayer::new(&neutron_rb);
+    let juno_relayer = Relayer::new(&juno_rb);
 
-    let mut neutron_cw = CosmWasm::new(neutron_rb);
+    let note_code_id = note_cw.store(key, &note_path).unwrap();
+    let account_code_id = account_cw.store(key, &account_path).unwrap();
+    let auction_code_id = auction_cw.store(key, &auction_path).unwrap();
 
-    let note_code_id = neutron_cw.store("acc0", &note_path).unwrap();
-    let account_code_id = neutron_cw.store("acc0", &account_path).unwrap();
-    let auction_code_id = neutron_cw.store("acc0", &auction_path).unwrap();
-
-    let mut juno_cw = CosmWasm::new(juno_rb);
-
-    let voice_code_id = juno_cw.store("acc0", &voice_path).unwrap();
-    let proxy_code_id = juno_cw.store("acc0", &proxy_path).unwrap();
+    let voice_code_id = voice_cw.store(key, &voice_path).unwrap();
+    let proxy_code_id = proxy_cw.store(key, &proxy_path).unwrap();
 
     println!("[NEUTRON] note code id: {:?}", note_code_id);
     println!("[NEUTRON] auction code id: {:?}", auction_code_id);
@@ -73,40 +82,72 @@ fn main() {
 
     std::thread::sleep(std::time::Duration::from_secs(5));
 
-    let mut note_contract = Contract {
-        address: String::default(),
-        tx_hash: String::default(),
-        admin: None,
-    };
-    match neutron_cw.instantiate(
+    let note_contract = note_cw.instantiate(
         "acc0",
         "{\"block_max_gas\":\"3010000\"}",
         "neutron_note",
         None,
         ""
-    ) {
-        Ok(contract) => note_contract = contract,
-        Err(e) => println!("note instantiation error: {:?}", e),
-    }
+    ).unwrap();
+    
     println!("note contract: {:?}", note_contract);
 
-    let mut voice_contract = Contract {
-        address: String::default(),
-        tx_hash: String::default(),
-        admin: None,
-    };
-    match juno_cw.instantiate(
+    let voice_contract = voice_cw.instantiate(
         "acc0",
-        format!("{{\"proxy_code_id\":{},\"block_max_gas\":{}}}", proxy_code_id, "3010000").as_str(),
+        format!("{{\"proxy_code_id\":\"{}\",\"block_max_gas\":\"{}\"}}", proxy_code_id, "3010000").as_str(),
         "juno_voice",
         None,
         "",
-    ) {
-        Ok(contract) => voice_contract = contract,
-        Err(e) => println!("error: {:?}", e),
-    };
+    ).unwrap();
     println!("voice contract: {:?}", voice_contract);
+    
+    let polytone_channel_init = juno_relayer.create_channel(
+        "neutron-juno",
+        format!("wasm.{}", &note_contract.address).as_str(),
+        format!("wasm.{}", &voice_contract.address).as_str(),
+        "unordered",
+        "polytone-1",
+    ).unwrap();
 
+    pretty_print(&polytone_channel_init);
+
+
+    let account_contract = account_cw.instantiate(
+        "acc0",
+        "{}",
+        "orbital_account",
+        None,
+        ""
+    ).unwrap();
+
+    println!("account contract: {:?}", account_contract);
+
+
+    let msg = AccountExecute::RegisterDomain {
+        domain: orbital_utils::domain::OrbitalDomain::Juno,
+        note_addr: note_contract.address,
+    };
+
+    let register_domain_msg_str = to_json_string(&msg).unwrap();
+
+    let resp = account_cw.execute(
+        "acc0",
+        &register_domain_msg_str,
+        "--gas 5502650"
+    ).unwrap();
+    println!("resp: {:?}", resp);
+
+    let query_domain_addr_msg = AccountQuery::QueryDomainAddr { domain: "juno".to_string() };
+    let query_domain_addr_msg_str = to_json_string(&query_domain_addr_msg).unwrap();
+
+    std::thread::sleep(std::time::Duration::from_secs(20));
+
+    let proxy_acc_query_msg_str = to_json_string(
+        &AccountQuery::QueryProxyAccount { domain: "juno".to_string() }
+    ).unwrap();
+    let resp = account_cw.query(&proxy_acc_query_msg_str);
+    let juno_proxy_address = resp["data"].as_str().unwrap();
+    println!("juno proxy account address: {}", juno_proxy_address);
 }
 
 fn test_ibc_transfer(test_ctx: &TestContext) {
