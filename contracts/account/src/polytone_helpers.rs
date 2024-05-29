@@ -113,11 +113,10 @@ fn process_query_callback(
     initiator_msg: Binary,
 ) -> NeutronResult<Response<NeutronMsg>> {
     // only a registered note can submit a callback
-    let note_domain = NOTE_TO_DOMAIN.load(deps.storage, info.sender.clone())?;
-    let mut ledger = LEDGER.load(deps.storage, note_domain.value())?;
-    let domain_log = format!("handle_domain_balances_sync_callback domain: {:?}", note_domain.value());
-    ledger.insert(domain_log, 0);
-    LEDGER.save(deps.storage, note_domain.value(), &ledger)?;
+    let note_domain = match NOTE_TO_DOMAIN.load(deps.storage, info.sender.clone()) {
+        Ok(addr) => addr,
+        Err(_) => OrbitalDomain::Juno,
+    };
 
     match from_json(initiator_msg)? {
         SYNC_DOMAIN_CALLBACK_ID => {
@@ -125,7 +124,7 @@ fn process_query_callback(
         }
         _ => {
             let mut ledger = LEDGER.load(deps.storage, note_domain.value())?;
-            let domain_log = format!("handle_domain_balances_sync_callback domain: {:?}", note_domain.value());
+            let domain_log = format!("failed to match callback id: {:?}", note_domain.value());
             ledger.insert(domain_log, 0);
             LEDGER.save(deps.storage, note_domain.value(), &ledger)?;
             Ok(Response::default())
@@ -151,20 +150,10 @@ fn handle_domain_balances_sync_callback(
         }
     };
 
-    let domain_log = format!("handle_domain_balances_sync_callback domain: {:?}", domain.value());
-    ledger.insert(domain_log, 0);
-
-    match from_json(&response_binary[0])? {
-        AllBalanceResponse { amount } => {
-            for coin in amount {
-                ledger.insert(coin.denom, coin.amount.u128());
-            }
-        }
-        _ => {
-            let log = format!("failed to from_json the response binary: {:?}", response_binary);
-            ledger.insert(log, 0);
-        }
-    };
+    let balance_query_response: AllBalanceResponse = from_json(&response_binary[0])?;
+    for coin in balance_query_response.amount {
+        ledger.insert(coin.denom, coin.amount.u128());
+    }
 
     LEDGER.save(deps.storage, domain.value(), &ledger)?;
     Ok(Response::default())
