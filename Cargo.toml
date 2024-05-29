@@ -43,11 +43,12 @@ url       = "2.3.1"
 sha2      = "^0.10"
 neutron-sdk      = { git = "https://github.com/neutron-org/neutron-sdk", tag = "v0.8.0" }
 protobuf         = { version = "3.2.0", features = ["with-bytes"] }
-serde-json-wasm  = { version = "0.4.1" }
+serde-json-wasm  = { version = "0.5.2" }
 base64           = "0.13.0"
 prost            = "0.11"
 prost-types      = "0.11"
 bech32           = "0.9.0"
+polytone = "1.0.0"
 
 # dev dependencies
 cw-multi-test  = "0.18.0"

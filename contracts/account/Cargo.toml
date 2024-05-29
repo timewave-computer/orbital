@@ -1,5 +1,5 @@
 [package]
-name    = "orbital-controller"
+name    = "account"
 version = "0.1.0"
 authors = ["bekauz <bekauz@protonmail.com>"]
 edition = "2021"
@@ -27,12 +27,15 @@ cosmwasm-schema = { workspace = true }
 cw-storage-plus = { workspace = true }
 cw-utils        = { workspace = true }
 cw2             = { workspace = true }
-orbital-utils   = { workspace = true }
 
 schemars  = { workspace = true }
 serde     = { workspace = true }
 thiserror = { workspace = true }
 sha2      = { workspace = true }
+
+orbital-utils = { workspace = true }
+polytone = { workspace = true }
+neutron-sdk = { workspace = true }
 
 [dev-dependencies]
 cw-multi-test = { workspace = true }
