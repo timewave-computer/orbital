@@ -2,14 +2,17 @@ use std::collections::HashMap;
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+};
 
 use cw2::set_contract_version;
 use orbital_utils::domain::OrbitalDomain;
 
 use crate::{
     error::ContractError,
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg}, state::{UserConfig, POLYTONE_NOTES, USER_CONFIGS},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    state::{UserConfig, POLYTONE_NOTES, USER_CONFIGS},
 };
 
 const CONTRACT_NAME: &str = "crates.io:vesting";
@@ -36,8 +39,12 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::RegisterUser { domains } => execute_register_user(deps, env, info, domains),
-        ExecuteMsg::RegisterUserDomain { domain } => execute_register_user_domain(deps, env, info, domain),
-        ExecuteMsg::RegisterDomain { domain, note_addr } => execute_register_domain(deps, env, info, domain, note_addr),
+        ExecuteMsg::RegisterUserDomain { domain } => {
+            execute_register_user_domain(deps, env, info, domain)
+        }
+        ExecuteMsg::RegisterDomain { domain, note_addr } => {
+            execute_register_domain(deps, env, info, domain, note_addr)
+        }
     }
 }
 
@@ -48,18 +55,18 @@ pub fn execute_register_user(
     info: MessageInfo,
     domains: Vec<OrbitalDomain>,
 ) -> Result<Response, ContractError> {
-
     let mut registered_domains = HashMap::new();
 
     // this should submit a transaction to the polytone contract to create a new polytone for the user.
     // polytone callback should update this value to the instantiated proxy address.
     for domain in domains {
-        registered_domains.insert(domain.value(), Addr::unchecked("unique user polytone".to_string()));
+        registered_domains.insert(
+            domain.value(),
+            Addr::unchecked("unique user polytone".to_string()),
+        );
     }
 
-    let user_config = UserConfig {
-        registered_domains,
-    };
+    let user_config = UserConfig { registered_domains };
 
     USER_CONFIGS.save(deps.storage, info.sender, &user_config)?;
 

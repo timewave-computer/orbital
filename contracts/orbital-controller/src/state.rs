@@ -18,7 +18,6 @@ pub struct Config {
     pub ibc_channel_id: Option<String>,
 }
 
-
 pub const POLYTONE_NOTES: Map<u8, Addr> = Map::new("polytone_notes");
 
 #[cw_serde]

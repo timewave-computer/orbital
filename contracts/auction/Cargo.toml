@@ -28,10 +28,12 @@ cw-storage-plus = { workspace = true }
 cw-utils        = { workspace = true }
 cw2             = { workspace = true }
 
-schemars  = { workspace = true }
-serde     = { workspace = true }
-thiserror = { workspace = true }
-sha2      = { workspace = true }
+schemars      = { workspace = true }
+serde         = { workspace = true }
+thiserror     = { workspace = true }
+sha2          = { workspace = true }
+orbital-utils = { workspace = true }
+cw-fifo      = { git = "https://github.com/timewave-computer/covenants.git", branch = "main", package = "cw-fifo"}
 
 [dev-dependencies]
 cw-multi-test = { workspace = true }

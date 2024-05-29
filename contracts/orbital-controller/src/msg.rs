@@ -3,13 +3,12 @@ use cosmwasm_std::Uint128;
 use orbital_utils::domain::OrbitalDomain;
 
 #[cw_serde]
-pub struct InstantiateMsg {
-}
+pub struct InstantiateMsg {}
 
 #[cw_serde]
 pub enum ExecuteMsg {
     // global configs
-    RegisterDomain { 
+    RegisterDomain {
         domain: OrbitalDomain,
         note_addr: String,
     },
