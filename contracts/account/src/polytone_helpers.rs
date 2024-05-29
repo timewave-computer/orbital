@@ -86,22 +86,19 @@ fn process_execute_callback(
         Err(e) => return Err(NeutronError::Std(StdError::generic_err(e.to_string()))),
     };
 
-    match from_json(initiator_msg.clone())? {
-        ExecuteReleaseFundsFromOrigin {
-            offer_coin,
-            origin_domain,
-        } => {
-            let mut ledger = LEDGER.load(deps.storage, origin_domain.value())?;
+    match from_json::<ExecuteReleaseFundsFromOrigin>(initiator_msg.clone()) {
+        Ok(res) => {
+            let mut ledger = LEDGER.load(deps.storage, res.origin_domain.value())?;
             let old_balance = *ledger
-                .get(offer_coin.denom.as_str())
+                .get(res.offer_coin.denom.as_str())
                 .expect("balance to exsts");
-            let new_balance = old_balance - offer_coin.amount.u128();
-            ledger.insert(offer_coin.denom, new_balance);
+            let new_balance = old_balance - res.offer_coin.amount.u128();
+            ledger.insert(res.offer_coin.denom, new_balance);
 
-            LEDGER.save(deps.storage, origin_domain.value(), &ledger)?;
+            LEDGER.save(deps.storage, res.origin_domain.value(), &ledger)?;
             return Ok(Response::default());
         }
-        _ => (),
+        Err(_) => (),
     };
 
     match from_json(initiator_msg)? {
@@ -146,22 +143,17 @@ fn process_query_callback(
         Err(_) => OrbitalDomain::Juno,
     };
 
-    match from_json(initiator_msg.clone())? {
-        QueryRecievedFundsOnDestDomain {
-            intent,
-            winning_bid,
-            bidder,
-            mm_addr,
-        } => {
+    match from_json::<QueryRecievedFundsOnDestDomain>(initiator_msg.clone()) {
+        Ok(receive_funds) => {
             // on callback make sure the balance that is expected is there
             let res = match query_callback_result.clone() {
                 Ok(vec) => match from_json::<BalanceResponse>(vec[0].clone()) {
                     Ok(balance) => {
                         let old_balance = *LEDGER
-                            .load(deps.storage, intent.ask_domain.value())?
-                            .get(intent.ask_coin.denom.as_str())
+                            .load(deps.storage, receive_funds.intent.ask_domain.value())?
+                            .get(receive_funds.intent.ask_coin.denom.as_str())
                             .unwrap();
-                        let new_balance = old_balance + winning_bid.u128();
+                        let new_balance = old_balance + receive_funds.winning_bid.u128();
 
                         ensure!(
                             balance.amount.amount.u128() >= new_balance,
@@ -176,18 +168,23 @@ fn process_query_callback(
 
             match res {
                 Ok(new_balance) => {
-                    let mut ledger = LEDGER.load(deps.storage, intent.ask_domain.value())?;
-                    ledger.insert(intent.ask_coin.denom, new_balance);
-                    LEDGER.save(deps.storage, intent.ask_domain.value(), &ledger)?;
+                    let mut ledger =
+                        LEDGER.load(deps.storage, receive_funds.intent.ask_domain.value())?;
+                    ledger.insert(receive_funds.intent.ask_coin.denom, new_balance);
+                    LEDGER.save(
+                        deps.storage,
+                        receive_funds.intent.ask_domain.value(),
+                        &ledger,
+                    )?;
 
                     // TODO:: Move funds from the origin domain of the account, to the bidder
                     // Do bank send over polytone to the origin domain bidder
-                    let note_origin_domain =
-                        DOMAIN_TO_NOTE.load(deps.storage, intent.offer_domain.value())?;
+                    let note_origin_domain = DOMAIN_TO_NOTE
+                        .load(deps.storage, receive_funds.intent.offer_domain.value())?;
                     let polytone_execute_msg = get_note_execute_neutron_msg(
                         vec![BankMsg::Send {
-                            to_address: bidder.clone(),
-                            amount: vec![intent.offer_coin.clone()],
+                            to_address: receive_funds.bidder.clone(),
+                            amount: vec![receive_funds.intent.offer_coin.clone()],
                         }
                         .into()],
                         Uint64::new(120),
@@ -195,8 +192,8 @@ fn process_query_callback(
                         Some(CallbackRequest {
                             receiver: env.contract.address.to_string(),
                             msg: to_json_binary(&ExecuteReleaseFundsFromOrigin {
-                                offer_coin: intent.offer_coin,
-                                origin_domain: intent.offer_domain,
+                                offer_coin: receive_funds.intent.offer_coin,
+                                origin_domain: receive_funds.intent.offer_domain,
                             })?,
                         }),
                     )?;
@@ -210,7 +207,9 @@ fn process_query_callback(
                     let auction_addr = AUCTION_ADDR.load(deps.storage)?;
                     let msg = WasmMsg::Execute {
                         contract_addr: auction_addr.to_string(),
-                        msg: to_json_binary(&AuctionExecuteMsg::Slash { mm_addr })?,
+                        msg: to_json_binary(&AuctionExecuteMsg::Slash {
+                            mm_addr: receive_funds.mm_addr,
+                        })?,
                         funds: vec![],
                     };
 
@@ -222,7 +221,7 @@ fn process_query_callback(
                 }
             }
         }
-        _ => (),
+        Err(_) => (),
     };
 
     match from_json(initiator_msg)? {
