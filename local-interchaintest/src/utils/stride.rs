@@ -33,8 +33,7 @@ pub struct StakeIbcVal {
 pub fn query_host_zone(rb: &ChainRequestBuilder, chain_id: &str) -> bool {
     let query_cmd = format!("stakeibc show-host-zone {chain_id} --output=json");
     let host_zone_query_response = rb.q(&query_cmd, false);
-    println!("\nhost_zone_query_response:\n");
-    pretty_print(&host_zone_query_response);
+    pretty_print("host_zone_query_response", &host_zone_query_response);
 
     host_zone_query_response["host_zone"].is_object()
 }
@@ -71,8 +70,7 @@ pub fn add_stakeibc_validator(
         "tx stakeibc add-validators {validator_chain_id} {config_path} --from=admin --gas auto --gas-adjustment 1.3 --output=json",
     );
     let add_vals_response = chain.tx(&add_vals_cmd, false).unwrap();
-    println!("\nadd_vals_response:\n");
-    pretty_print(&add_vals_response);
+    pretty_print("add_vals_response", &add_vals_response);
 }
 
 pub fn register_stride_host_zone(

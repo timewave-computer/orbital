@@ -130,7 +130,6 @@ fn process_query_callback(
             Ok(Response::default())
         },
     }
-
 }
 
 fn handle_domain_balances_sync_callback(

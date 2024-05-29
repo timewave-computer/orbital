@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_must_use)]
 
 use core::sync;
+use std::collections::HashMap;
 
 use auction::msg::ExecuteMsg;
 use cosmwasm_std::{coin, to_json_string, Coin, Uint128};
@@ -24,6 +25,7 @@ use reqwest::blocking::Client;
 
 use account::msg::QueryMsg as AccountQuery;
 use account::msg::ExecuteMsg as AccountExecute;
+use serde_json::Value;
 
 // local-ic start neutron_gaia_juno
 fn main() {
@@ -104,7 +106,7 @@ fn main() {
         "polytone-1",
     ).unwrap();
 
-    pretty_print(&polytone_channel_init);
+    pretty_print("polytone channel init response", &polytone_channel_init);
 
 
     let account_contract = account_cw.instantiate(
@@ -171,13 +173,13 @@ fn main() {
     println!("sync_juno_domain_msg_response: {:?}", resp);
     std::thread::sleep(std::time::Duration::from_secs(10));
 
-
     let proxy_acc_ledger_query_msg_str = to_json_string(
         &AccountQuery::QueryLedger { domain: "juno".to_string() }
     ).unwrap();
 
     let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
-    println!("juno proxy account ledger response: {:?}", resp);
+    pretty_print("ledger query response", &resp);
+
 }
 
 fn test_ibc_transfer(test_ctx: &TestContext) {

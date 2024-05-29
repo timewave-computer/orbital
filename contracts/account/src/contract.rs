@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, to_json_binary, Binary, Deps, DepsMut, Empty, Env, MessageInfo, QueryRequest, Response, StdError, StdResult, Uint64, WasmMsg
+    ensure, to_json_binary, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, QueryRequest, Response, StdError, StdResult, Uint64, WasmMsg
 };
 
 use auction::msg::ExecuteMsg as AuctionExecuteMsg;
@@ -117,7 +117,19 @@ pub fn execute(
             // if MM didn't fulfill, send a slash msg to the auction addr
             Ok(Response::new())
         }
+        ExecuteMsg::WithdrawFunds { domain, coin, dest } => execute_withdraw_funds(deps, env, info, domain, coin, dest),
     }
+}
+
+pub fn execute_withdraw_funds(
+    deps: ExecuteDeps,
+    env: Env,
+    info: MessageInfo,
+    domain: OrbitalDomain,
+    coin: Coin,
+    dest: String,
+) -> NeutronResult<Response<NeutronMsg>> {
+    Ok(Response::default())
 }
 
 pub fn try_sync_domain(
@@ -142,13 +154,6 @@ pub fn try_sync_domain(
             msg: to_json_binary(&SYNC_DOMAIN_CALLBACK_ID)?,
         },
     )?;
-
-    LEDGER.update(deps.storage, domain.value(), |ledger| -> StdResult<_> {
-        let mut ledger = ledger.unwrap_or_default();
-        let domain_log = format!("try_sync_domain: {:?}", domain.value());
-        ledger.insert(domain_log, 0);
-        Ok(ledger)
-    })?;
 
     Ok(Response::new().add_message(polytone_sync_balance_msg))
 }
@@ -213,22 +218,23 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
             let ledgers = LEDGER.load(deps.storage, domain.value())?;
 
-            let mut ledger_result = String::new();
-            for ledger in ledgers {
-                let result_entry = format!("{} : {}", ledger.0, ledger.1);
-                ledger_result = format!("{}\n{}", ledger_result, result_entry);
+            let mut ledger_result = vec![];
+            for (denom, bal) in ledgers {
+                ledger_result.push((denom, bal));
             }
             to_json_binary(&ledger_result)
         },
         QueryMsg::QueryAllLedgers {} => {
             let all_ledgers = LEDGER.range(deps.storage, None, None, cosmwasm_std::Order::Ascending);
-            let mut ledger_result = String::new();
+            let mut ledger_results = vec![];
+
             for ledger in all_ledgers {
                 let (domain, balances) = ledger?;
-                let result_entry = format!("{} : {}", domain, to_json_binary(&balances)?);
-                ledger_result = format!("{}\n{}", ledger_result, result_entry);
+                for (denom, bal) in balances {
+                    ledger_results.push((domain.to_string(), denom, bal));
+                }
             }
-            to_json_binary(&ledger_result)
+            to_json_binary(&ledger_results)
         }
     }
 }

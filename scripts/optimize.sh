@@ -8,4 +8,4 @@ docker run --rm -v "$(pwd)":/code \
 ls local-interchaintest/contracts/orbital/
 rm -r local-interchaintest/contracts/orbital/*
 ls local-interchaintest/contracts/orbital/
-cp -r artifacts/* local-interchaintest/contracts/orbital/*
+cp -r artifacts/* local-interchaintest/contracts/orbital
