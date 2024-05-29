@@ -17,7 +17,9 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     Bond {},
-    Slash {},
+    Slash {
+        mm_addr: String,
+    },
     NewIntent(Intent, String),
     AuctionTick {},
     AuctionBid {

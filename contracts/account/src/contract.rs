@@ -81,6 +81,7 @@ pub fn execute(
             original_intent,
             winning_bid,
             bidder,
+            mm_addr,
         } => {
             // Verify the sender is the auction address
             let auction_addr = AUCTION_ADDR.load(deps.storage)?;
@@ -106,14 +107,10 @@ pub fn execute(
                         intent: original_intent,
                         winning_bid,
                         bidder,
+                        mm_addr,
                     })?,
                 },
             )?;
-            // on callback make sure the balance that is expected is there
-            // and then update ledger to reflect the change on the "dest domain" of the intent
-
-            // Do bank send over polytone to the origin domain
-            // and on callback update ledger to move funds from the origin domain, to the MM address (bidder)
 
             // if MM didn't fulfill, send a slash msg to the auction addr
             Ok(Response::new().add_message(polytone_query_msg))
@@ -252,9 +249,10 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 ledger_result = format!("{}\n{}", ledger_result, result_entry);
             }
             to_json_binary(&ledger_result)
-        },
+        }
         QueryMsg::QueryAllLedgers {} => {
-            let all_ledgers = LEDGER.range(deps.storage, None, None, cosmwasm_std::Order::Ascending);
+            let all_ledgers =
+                LEDGER.range(deps.storage, None, None, cosmwasm_std::Order::Ascending);
             let mut ledger_result = String::new();
             for ledger in all_ledgers {
                 let (domain, balances) = ledger?;

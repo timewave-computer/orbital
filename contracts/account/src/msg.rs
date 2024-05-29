@@ -28,6 +28,7 @@ pub enum ExecuteMsg {
         original_intent: SavedIntent,
         winning_bid: Uint128,
         bidder: String,
+        mm_addr: String,
     },
 }
 

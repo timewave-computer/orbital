@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
+use auction::msg::ExecuteMsg as AuctionExecuteMsg;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{
-    ensure, from_json, to_json_binary, Addr, AllBalanceResponse, BankQuery, Binary, CosmosMsg,
-    DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryRequest, Response, StdError, StdResult,
-    Uint64, WasmMsg,
+    ensure, from_json, to_json_binary, Addr, AllBalanceResponse, BalanceResponse, BankMsg,
+    BankQuery, Binary, CosmosMsg, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryRequest,
+    Response, StdError, StdResult, Uint64, WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -13,7 +14,10 @@ use neutron_sdk::{
 use orbital_utils::domain::OrbitalDomain;
 use polytone::callbacks::{CallbackMessage, CallbackRequest, ErrorResponse};
 
-use crate::{state::{LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS}, types::QueryRecievedFundsOnDestDomain};
+use crate::{
+    state::{AUCTION_ADDR, DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
+    types::{ExecuteReleaseFundsFromOrigin, QueryRecievedFundsOnDestDomain},
+};
 
 use polytone::callbacks::{Callback as PolytoneCallback, ExecutionResponse};
 
@@ -80,6 +84,24 @@ fn process_execute_callback(
         Err(e) => return Err(NeutronError::Std(StdError::generic_err(e.to_string()))),
     };
 
+    match from_json(initiator_msg.clone())? {
+        ExecuteReleaseFundsFromOrigin {
+            offer_coin,
+            origin_domain,
+        } => {
+            let mut ledger = LEDGER.load(deps.storage, origin_domain.value())?;
+            let old_balance = *ledger
+                .get(offer_coin.denom.as_str())
+                .expect("balance to exsts");
+            let new_balance = old_balance - offer_coin.amount.u128();
+            ledger.insert(offer_coin.denom, new_balance);
+
+            LEDGER.save(deps.storage, origin_domain.value(), &ledger)?;
+            return Ok(Response::default());
+        }
+        _ => (),
+    };
+
     match from_json(initiator_msg)? {
         REGISTER_DOMAIN_CALLBACK_ID => {
             let proxy_address = query_polytone_proxy_address(
@@ -92,14 +114,17 @@ fn process_execute_callback(
                 USER_DOMAINS.save(deps.storage, note_domain.value(), &addr)?;
                 LEDGER.save(deps.storage, note_domain.value(), &HashMap::new())?;
             } else {
-                let debug = format!("process_execute_callback [REGISTER_DOMAIN_CALLBACK_ID]: {:?}", proxy_address);
+                let debug = format!(
+                    "process_execute_callback [REGISTER_DOMAIN_CALLBACK_ID]: {:?}",
+                    proxy_address
+                );
                 USER_DOMAINS.save(deps.storage, note_domain.value(), &debug)?;
             }
         }
         _ => {
             let debug = format!("process_execute_callback [_]: {:?}", _callback_result);
             USER_DOMAINS.save(deps.storage, note_domain.value(), &debug)?;
-        },
+        }
     }
 
     Ok(Response::default())
@@ -118,6 +143,85 @@ fn process_query_callback(
         Err(_) => OrbitalDomain::Juno,
     };
 
+    match from_json(initiator_msg.clone())? {
+        QueryRecievedFundsOnDestDomain {
+            intent,
+            winning_bid,
+            bidder,
+            mm_addr,
+        } => {
+            // on callback make sure the balance that is expected is there
+            let res = match query_callback_result.clone() {
+                Ok(vec) => match from_json::<BalanceResponse>(vec[0].clone()) {
+                    Ok(balance) => {
+                        let old_balance = *LEDGER
+                            .load(deps.storage, intent.ask_domain.value())?
+                            .get(intent.ask_coin.denom.as_str())
+                            .unwrap();
+                        let new_balance = old_balance + winning_bid.u128();
+
+                        ensure!(
+                            balance.amount.amount.u128() >= new_balance,
+                            NeutronError::Std(StdError::generic_err("Balance mismatch"))
+                        );
+                        Ok(new_balance)
+                    }
+                    Err(_) => Err(()),
+                },
+                Err(_) => Err(()),
+            };
+
+            match res {
+                Ok(new_balance) => {
+                    let mut ledger = LEDGER.load(deps.storage, intent.ask_domain.value())?;
+                    ledger.insert(intent.ask_coin.denom, new_balance);
+                    LEDGER.save(deps.storage, intent.ask_domain.value(), &ledger)?;
+
+                    // TODO:: Move funds from the origin domain of the account, to the bidder
+                    // Do bank send over polytone to the origin domain bidder
+                    let note_origin_domain =
+                        DOMAIN_TO_NOTE.load(deps.storage, intent.offer_domain.value())?;
+                    let polytone_execute_msg = get_note_execute_neutron_msg(
+                        vec![BankMsg::Send {
+                            to_address: bidder.clone(),
+                            amount: vec![intent.offer_coin.clone()],
+                        }
+                        .into()],
+                        Uint64::new(120),
+                        note_origin_domain,
+                        Some(CallbackRequest {
+                            receiver: env.contract.address.to_string(),
+                            msg: to_json_binary(&ExecuteReleaseFundsFromOrigin {
+                                offer_coin: intent.offer_coin,
+                                origin_domain: intent.offer_domain,
+                            })?,
+                        }),
+                    )?;
+
+                    // and on callback update ledger to move funds from the origin domain, to the MM address (bidder)
+
+                    return Ok(Response::default().add_message(polytone_execute_msg));
+                }
+                Err(_) => {
+                    // Something failed, so slash the MM
+                    let auction_addr = AUCTION_ADDR.load(deps.storage)?;
+                    let msg = WasmMsg::Execute {
+                        contract_addr: auction_addr.to_string(),
+                        msg: to_json_binary(&AuctionExecuteMsg::Slash { mm_addr })?,
+                        funds: vec![],
+                    };
+
+                    return Ok(Response::default().add_message(msg));
+                    // let domain_log = format!("failed to match callback id: {:?}", note_domain.value());
+                    // let mut ledger = LEDGER.load(deps.storage, note_domain.value())?;
+                    // ledger.insert(domain_log, 0);
+                    // LEDGER.save(deps.storage, note_domain.value(), &ledger)?;
+                }
+            }
+        }
+        _ => (),
+    };
+
     match from_json(initiator_msg)? {
         SYNC_DOMAIN_CALLBACK_ID => {
             handle_domain_balances_sync_callback(deps, env, query_callback_result, note_domain)
@@ -128,9 +232,8 @@ fn process_query_callback(
             ledger.insert(domain_log, 0);
             LEDGER.save(deps.storage, note_domain.value(), &ledger)?;
             Ok(Response::default())
-        },
+        }
     }
-
 }
 
 fn handle_domain_balances_sync_callback(
@@ -146,7 +249,7 @@ fn handle_domain_balances_sync_callback(
         Err(_) => {
             let domain_log = format!("query_callback_result {:?}", query_callback_result);
             ledger.insert(domain_log, 0);
-            return Ok(Response::default())
+            return Ok(Response::default());
         }
     };
 
