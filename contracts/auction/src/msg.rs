@@ -17,8 +17,10 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     Bond {},
-    Slash {},
-    NewIntent(Intent),
+    Slash {
+        mm_addr: String,
+    },
+    NewIntent(Intent, String),
     AuctionTick {},
     AuctionBid {
         // Address on the ask domain (can't be verified here most of the time)

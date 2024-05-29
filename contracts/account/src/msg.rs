@@ -1,6 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, Uint128};
-use orbital_utils::{domain::OrbitalDomain, intent::Intent};
+use orbital_utils::{domain::OrbitalDomain, intent::{Intent, SavedIntent}};
 use polytone::callbacks::CallbackMessage;
 
 #[cw_serde]
@@ -22,9 +22,10 @@ pub enum ExecuteMsg {
     },
     NewIntent(Intent),
     VerifyAuction {
-        original_intent: Intent,
+        original_intent: SavedIntent,
         winning_bid: Uint128,
         bidder: String,
+        mm_addr: String,
     },
     WithdrawFunds {
         domain: OrbitalDomain,

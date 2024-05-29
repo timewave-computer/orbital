@@ -1,10 +1,10 @@
 use cosmwasm_std::{DepsMut, StdResult};
-use orbital_utils::intent::Intent;
+use orbital_utils::intent::{Intent, SavedIntent};
 
 use crate::state::{next_id, IDS, INTENTS, QUEUE};
 
 /// Add the intent to out list and the queue
-pub fn add_intent(deps: DepsMut, intent: Intent) -> StdResult<()> {
+pub fn add_intent(deps: DepsMut, intent: SavedIntent) -> StdResult<()> {
     let id = next_id(deps.as_ref().storage)?;
 
     IDS.save(deps.storage, &id)?;

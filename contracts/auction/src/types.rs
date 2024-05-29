@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use cw_utils::{Duration, Expiration};
-use orbital_utils::{domain::OrbitalDomain, intent::Intent};
+use orbital_utils::{domain::OrbitalDomain, intent::{Intent, SavedIntent}};
 
 #[cw_serde]
 pub struct Config {
@@ -41,7 +41,7 @@ pub struct WaitingFulfillment {
 #[cw_serde]
 pub enum TestAccountExecuteMsg {
     VerifyAuction {
-        original_intent: Intent,
+        original_intent: SavedIntent,
         winning_bid: Uint128,
         bidder: String,
     },

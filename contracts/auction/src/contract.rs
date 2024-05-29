@@ -51,7 +51,9 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::NewIntent(new_intent) => execute_new_intent(deps, info, new_intent),
+        ExecuteMsg::NewIntent(new_intent, deposit_addr) => {
+            execute_new_intent(deps, info, new_intent, deposit_addr)
+        }
         ExecuteMsg::AuctionTick {} => execute_auction_tick(deps, env),
         ExecuteMsg::AuctionBid { bidder } => execute_auction_bid(deps, env, info, bidder),
         ExecuteMsg::Bond {} => {
@@ -64,13 +66,12 @@ pub fn execute(
             BONDS.save(deps.storage, info.sender, &info.funds[0])?;
             Ok(Response::new())
         }
-        ExecuteMsg::Slash {} => {
+        ExecuteMsg::Slash { mm_addr } => {
             ensure!(
                 info.sender == CONFIG.load(deps.storage)?.account_addr,
                 ContractError::Unauthorized("Only account can slash".to_string())
             );
-            BONDS.load(deps.storage, info.sender.clone())?;
-            BONDS.remove(deps.storage, info.sender);
+            BONDS.remove(deps.storage, deps.api.addr_validate(&mm_addr)?);
             Ok(Response::new())
         }
         ExecuteMsg::Fulfilled { id } => todo!(),
@@ -81,6 +82,7 @@ pub fn execute_new_intent(
     deps: DepsMut,
     info: MessageInfo,
     new_intent: Intent,
+    deposit_addr: String,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
 
@@ -91,7 +93,7 @@ pub fn execute_new_intent(
     );
 
     // add the intent to our system
-    add_intent(deps, new_intent)?;
+    add_intent(deps, new_intent.into_saved_intent(deposit_addr))?;
 
     Ok(Response::new())
 }
