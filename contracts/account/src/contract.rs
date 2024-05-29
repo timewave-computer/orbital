@@ -17,7 +17,8 @@ use polytone::callbacks::CallbackRequest;
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     polytone_helpers::{
-        get_note_execute_neutron_msg, get_proxy_query_balances_message, try_handle_callback, REGISTER_DOMAIN_CALLBACK_ID
+        get_note_execute_neutron_msg, get_proxy_query_balances_message, try_handle_callback,
+        REGISTER_DOMAIN_CALLBACK_ID,
     },
     state::{DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
 };
@@ -77,11 +78,8 @@ pub fn try_sync_domain(
     let note_addr = DOMAIN_TO_NOTE.load(deps.storage, domain.value())?;
     let proxy_addr = USER_DOMAINS.load(deps.storage, domain.value())?;
 
-    let proxy_query_balances_msg = get_proxy_query_balances_message(
-        env.clone(),
-        proxy_addr,
-        note_addr.to_string(),
-    )?;
+    let proxy_query_balances_msg =
+        get_proxy_query_balances_message(env.clone(), proxy_addr, note_addr.to_string())?;
 
     let polytone_init_msg = get_note_execute_neutron_msg(
         vec![proxy_query_balances_msg.into()],

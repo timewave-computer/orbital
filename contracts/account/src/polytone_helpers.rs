@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{
-    ensure, from_json, to_json_binary, Addr, AllBalanceResponse, BankQuery, Binary, CosmosMsg, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryRequest, Response, StdError, StdResult, Uint64, WasmMsg
+    ensure, from_json, to_json_binary, Addr, AllBalanceResponse, BankQuery, Binary, CosmosMsg,
+    DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryRequest, Response, StdError, StdResult,
+    Uint64, WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -17,8 +19,8 @@ use polytone::callbacks::{Callback as PolytoneCallback, ExecutionResponse};
 
 type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 
-pub const REGISTER_DOMAIN_CALLBACK_ID:  u8 = 1;
-pub const SYNC_DOMAIN_CALLBACK_ID:      u8 = 2;
+pub const REGISTER_DOMAIN_CALLBACK_ID: u8 = 1;
+pub const SYNC_DOMAIN_CALLBACK_ID: u8 = 2;
 
 pub fn try_handle_callback(
     env: Env,
@@ -27,7 +29,9 @@ pub fn try_handle_callback(
     msg: CallbackMessage,
 ) -> NeutronResult<Response<NeutronMsg>> {
     match msg.result {
-        PolytoneCallback::Query(resp) => process_query_callback(env, deps, info, resp, msg.initiator_msg),
+        PolytoneCallback::Query(resp) => {
+            process_query_callback(env, deps, info, resp, msg.initiator_msg)
+        }
         PolytoneCallback::Execute(resp) => {
             process_execute_callback(env, deps, resp, msg.initiator_msg, info)
         }
@@ -40,7 +44,10 @@ pub fn get_proxy_query_balances_message(
     proxy_address: String,
     note_address: String,
 ) -> StdResult<WasmMsg> {
-    let bal_query_request: QueryRequest<Empty> = BankQuery::AllBalances { address: proxy_address }.into();
+    let bal_query_request: QueryRequest<Empty> = BankQuery::AllBalances {
+        address: proxy_address,
+    }
+    .into();
 
     let query_msg = PolytoneExecuteMsg::Query {
         msgs: vec![bal_query_request],
@@ -92,7 +99,6 @@ fn process_execute_callback(
     Ok(Response::default())
 }
 
-
 fn process_query_callback(
     env: Env,
     deps: ExecuteDeps,
@@ -104,39 +110,50 @@ fn process_query_callback(
     let note_domain = NOTE_TO_DOMAIN.load(deps.storage, info.sender.clone())?;
 
     match from_json(initiator_msg)? {
-        SYNC_DOMAIN_CALLBACK_ID => handle_domain_balances_sync_callback(deps, env, query_callback_result, note_domain),
+        SYNC_DOMAIN_CALLBACK_ID => {
+            handle_domain_balances_sync_callback(deps, env, query_callback_result, note_domain)
+        }
         _ => Err(NeutronError::Std(StdError::generic_err(
             "unexpected callback id".to_string(),
-        )))
+        ))),
     }
-    
 }
 
 fn handle_domain_balances_sync_callback(
     deps: ExecuteDeps,
-    env: Env,
+    _env: Env,
     query_callback_result: Result<Vec<Binary>, ErrorResponse>,
     domain: OrbitalDomain,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let response_binary = match query_callback_result {
         Ok(val) => val,
-        Err(_) => return Err(NeutronError::Std(StdError::generic_err("failed to decode all balances query"))),
+        Err(_) => {
+            return Err(NeutronError::Std(StdError::generic_err(
+                "failed to decode all balances query",
+            )))
+        }
     };
 
     ensure!(
         response_binary.len() == 1,
-        NeutronError::Std(StdError::generic_err("expected one response from all balances query"))
+        NeutronError::Std(StdError::generic_err(
+            "expected one response from all balances query"
+        ))
     );
 
     let bank_query_response: AllBalanceResponse = from_json(&response_binary[0])?;
 
-    LEDGER.update(deps.storage, domain.value(), |domain_ledger| -> StdResult<_> {
-        let mut domain_ledger = domain_ledger.unwrap_or_default();
-        for coin_balance in bank_query_response.amount {
-            domain_ledger.insert(coin_balance.denom, coin_balance.amount.u128());
-        }
-        Ok(domain_ledger)
-    })?;
+    LEDGER.update(
+        deps.storage,
+        domain.value(),
+        |domain_ledger| -> StdResult<_> {
+            let mut domain_ledger = domain_ledger.unwrap_or_default();
+            for coin_balance in bank_query_response.amount {
+                domain_ledger.insert(coin_balance.denom, coin_balance.amount.u128());
+            }
+            Ok(domain_ledger)
+        },
+    )?;
 
     Ok(Response::default())
 }
