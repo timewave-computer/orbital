@@ -1,7 +1,10 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use cw_utils::{Duration, Expiration};
-use orbital_utils::{domain::OrbitalDomain, intent::{Intent, SavedIntent}};
+use orbital_utils::{
+    domain::OrbitalDomain,
+    intent::{Intent, SavedIntent},
+};
 
 #[cw_serde]
 pub struct Config {

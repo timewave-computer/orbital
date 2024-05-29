@@ -15,7 +15,9 @@ use orbital_utils::domain::OrbitalDomain;
 use polytone::callbacks::{CallbackMessage, CallbackRequest, ErrorResponse};
 
 use crate::{
-    contract::try_sync_domain, state::{AUCTION_ADDR, DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS}, types::{ExecuteReleaseFundsFromOrigin, QueryRecievedFundsOnDestDomain}
+    contract::try_sync_domain,
+    state::{AUCTION_ADDR, DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
+    types::{ExecuteReleaseFundsFromOrigin, QueryRecievedFundsOnDestDomain},
 };
 
 use polytone::callbacks::{Callback as PolytoneCallback, ExecutionResponse};
@@ -121,9 +123,7 @@ fn process_execute_callback(
                 USER_DOMAINS.save(deps.storage, note_domain.value(), &debug)?;
             }
         }
-        WITHDRAW_FUNDS_CALLBACK_ID => {
-            return try_sync_domain(deps, env, note_domain)
-        }
+        WITHDRAW_FUNDS_CALLBACK_ID => return try_sync_domain(deps, env, note_domain),
         _ => {
             let debug = format!("process_execute_callback [_]: {:?}", callback_result);
             USER_DOMAINS.save(deps.storage, note_domain.value(), &debug)?;

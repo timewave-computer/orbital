@@ -1,5 +1,5 @@
 use cosmwasm_std::{DepsMut, StdResult};
-use orbital_utils::intent::{Intent, SavedIntent};
+use orbital_utils::intent::SavedIntent;
 
 use crate::state::{next_id, IDS, INTENTS, QUEUE};
 

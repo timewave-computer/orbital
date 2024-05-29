@@ -1,36 +1,23 @@
 #![allow(dead_code, unused_must_use)]
 
-use core::sync;
-use std::{collections::HashMap, time::Duration};
-
 use cosmwasm_std::{coin, to_json_string, Coin, Uint128};
 use cw_utils::Duration as CwDuration;
 use local_ictest_e2e::{
     pretty_print,
     utils::{
-        file_system::{
-            get_contract_cache_path, get_contract_path, get_current_dir, get_local_interchain_dir,
-            read_json_file,
-        },
+        file_system::{get_contract_path, read_json_file},
         test_context::TestContext,
     },
-    ACC_0_KEY, API_URL, CHAIN_CONFIG_PATH, GAIA_CHAIN, JUNO_CHAIN, NEUTRON_CHAIN,
+    API_URL, CHAIN_CONFIG_PATH, JUNO_CHAIN, NEUTRON_CHAIN,
 };
-use localic_std::{
-    filesystem::get_files,
-    modules::bank::{get_balance, get_total_supply, send},
-    polling::poll_for_start,
-    relayer::Relayer,
-    transactions::ChainRequestBuilder,
-};
+use localic_std::{polling::poll_for_start, relayer::Relayer};
 use orbital_utils::domain::OrbitalDomain;
 use reqwest::blocking::Client;
 
 use account::msg::ExecuteMsg as AccountExecute;
 use account::msg::QueryMsg as AccountQuery;
-use auction::msg::ExecuteMsg as AuctionExecute;
+
 use auction::msg::InstantiateMsg as AuctionInstantiate;
-use auction::msg::QueryMsg as AuctionQuery;
 
 pub const MM_JUNO_ADDR: &str = "juno1efd63aw40lxf3n4mhf7dzhjkr453axurv2zdzk";
 pub const MM_NEUTRON_ADDR: &str = "neutron1efd63aw40lxf3n4mhf7dzhjkr453axur78g5ld";
@@ -42,7 +29,7 @@ fn main() {
     let client = Client::new();
     poll_for_start(&client, API_URL, 300);
 
-    let mut test_ctx = TestContext::from(configured_chains);
+    let test_ctx = TestContext::from(configured_chains);
 
     // store polytunesss
     let contracts_path = get_contract_path();
@@ -72,8 +59,8 @@ fn main() {
         .get_request_builder()
         .get_request_builder(JUNO_CHAIN);
 
-    let neutron_relayer = Relayer::new(&neutron_rb);
-    let juno_relayer = Relayer::new(&juno_rb);
+    let _neutron_relayer = Relayer::new(neutron_rb);
+    let juno_relayer = Relayer::new(juno_rb);
 
     let note_code_id = note_cw.store(key, &note_path).unwrap();
     let account_code_id = account_cw.store(key, &account_path).unwrap();
@@ -166,7 +153,7 @@ fn main() {
     let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
     println!("juno proxy account ledger response: {:?}", resp);
 
-    let fund_proxy = localic_std::modules::bank::send(
+    let _fund_proxy = localic_std::modules::bank::send(
         juno_rb,
         "acc0",
         juno_proxy_address,
@@ -205,7 +192,7 @@ fn main() {
         dest: MM_JUNO_ADDR.to_string(),
     };
 
-    let bal = localic_std::modules::bank::get_balance(&juno_rb, MM_JUNO_ADDR);
+    let bal = localic_std::modules::bank::get_balance(juno_rb, MM_JUNO_ADDR);
     println!("juno mm balance: {:?}", bal);
     println!("\n withdrawing funds from juno domain to mm address\n");
 
@@ -220,7 +207,7 @@ fn main() {
 
     std::thread::sleep(std::time::Duration::from_secs(15));
 
-    let bal = localic_std::modules::bank::get_balance(&juno_rb, MM_JUNO_ADDR);
+    let bal = localic_std::modules::bank::get_balance(juno_rb, MM_JUNO_ADDR);
     println!("juno mm balance: {:?}", bal);
 
     let proxy_acc_ledger_query_msg_str = to_json_string(&AccountQuery::QueryLedger {
@@ -230,7 +217,6 @@ fn main() {
 
     let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
     pretty_print("ledger query response", &resp);
-
 
     let auction_contract = auction_cw
         .instantiate(

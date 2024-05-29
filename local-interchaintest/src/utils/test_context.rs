@@ -8,7 +8,8 @@ use localic_std::{
 };
 
 use crate::{
-    utils, API_URL, GAIA_CHAIN, GAIA_CHAIN_ID, JUNO_CHAIN, JUNO_CHAIN_ID, NEUTRON_CHAIN, NEUTRON_CHAIN_ID, TRANSFER_PORT
+    utils, API_URL, GAIA_CHAIN, GAIA_CHAIN_ID, JUNO_CHAIN, JUNO_CHAIN_ID, NEUTRON_CHAIN,
+    NEUTRON_CHAIN_ID, TRANSFER_PORT,
 };
 
 use super::types::ChainsVec;
@@ -182,9 +183,7 @@ impl LocalChain {
 impl TestContext {
     pub fn get_cosmwasm_instance(&self, chain: &str) -> CosmWasm {
         println!("getting cosmwasm instance for chain: {}", chain);
-        let rb = self
-            .get_request_builder()
-            .get_request_builder(chain);
+        let rb = self.get_request_builder().get_request_builder(chain);
 
         CosmWasm::new(rb)
     }
