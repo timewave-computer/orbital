@@ -77,6 +77,5 @@ pub fn write_str_to_container_file(rb: &ChainRequestBuilder, container_path: &st
         &format!("/bin/sh -c echo '{}' > {}", content, container_path),
         true,
     );
-    println!("\nwrite str to container file response:\n");
-    pretty_print(&filewriting);
+    pretty_print("write str to container file response", &filewriting);
 }

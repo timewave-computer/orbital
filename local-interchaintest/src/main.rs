@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_must_use)]
 
 use core::sync;
+use std::collections::HashMap;
 
 use auction::msg::ExecuteMsg;
 use cosmwasm_std::{coin, to_json_string, Coin, Uint128};
@@ -24,6 +25,9 @@ use reqwest::blocking::Client;
 
 use account::msg::QueryMsg as AccountQuery;
 use account::msg::ExecuteMsg as AccountExecute;
+
+pub const MM_JUNO_ADDR: &str = "juno1efd63aw40lxf3n4mhf7dzhjkr453axurv2zdzk";
+pub const MM_NEUTRON_ADDR: &str = "neutron1efd63aw40lxf3n4mhf7dzhjkr453axur78g5ld";
 
 // local-ic start neutron_gaia_juno
 fn main() {
@@ -104,7 +108,7 @@ fn main() {
         "polytone-1",
     ).unwrap();
 
-    pretty_print(&polytone_channel_init);
+    pretty_print("polytone channel init response", &polytone_channel_init);
 
 
     let account_contract = account_cw.instantiate(
@@ -171,13 +175,38 @@ fn main() {
     println!("sync_juno_domain_msg_response: {:?}", resp);
     std::thread::sleep(std::time::Duration::from_secs(10));
 
-
     let proxy_acc_ledger_query_msg_str = to_json_string(
         &AccountQuery::QueryLedger { domain: "juno".to_string() }
     ).unwrap();
 
     let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
-    println!("juno proxy account ledger response: {:?}", resp);
+    pretty_print("ledger query response", &resp);
+
+    let withdraw_msg = AccountExecute::WithdrawFunds {
+        domain: OrbitalDomain::Juno,
+        coin: Coin {
+            denom: "ujuno".to_string(),
+            amount: Uint128::new(1_000),
+        },
+        dest: MM_JUNO_ADDR.to_string(),
+    };
+
+
+    let bal = localic_std::modules::bank::get_balance(&juno_rb, MM_JUNO_ADDR);
+    println!("juno mm balance: {:?}", bal);
+    println!("\n withdrawing funds from juno domain to mm address\n");
+    
+    let withdraw_funds_resp = account_cw.execute(
+        "acc0",
+        to_json_string(&withdraw_msg).unwrap().as_str(),
+        "--gas 5502650"
+    ).unwrap();
+    println!("withdraw_funds_resp: {:?}", withdraw_funds_resp);
+    
+    std::thread::sleep(std::time::Duration::from_secs(10));
+
+    let bal = localic_std::modules::bank::get_balance(&juno_rb, MM_JUNO_ADDR);
+    println!("juno mm balance: {:?}", bal);
 }
 
 fn test_ibc_transfer(test_ctx: &TestContext) {

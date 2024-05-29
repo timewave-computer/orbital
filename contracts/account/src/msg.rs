@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Uint128;
+use cosmwasm_std::{Coin, Uint128};
 use orbital_utils::{domain::OrbitalDomain, intent::{Intent, SavedIntent}};
 use polytone::callbacks::CallbackMessage;
 
@@ -17,9 +17,6 @@ pub enum ExecuteMsg {
     Sync {
         domain: OrbitalDomain,
     },
-    WithdraFunds {
-
-    },
     UpdateAuctionAddr {
         auction_addr: String,
     },
@@ -29,6 +26,11 @@ pub enum ExecuteMsg {
         winning_bid: Uint128,
         bidder: String,
         mm_addr: String,
+    },
+    WithdrawFunds {
+        domain: OrbitalDomain,
+        coin: Coin,
+        dest: String,
     },
 }
 
@@ -43,12 +45,12 @@ pub enum QueryMsg {
     QueryProxyAccount {
         domain: String,
     },
-    #[returns(String)]
+    #[returns(Vec<(String, u128)>)]
     QueryLedger {
         domain: String,
     },
     #[returns(String)]
     QueryAllDomains{},
-    #[returns(String)]
+    #[returns(Vec<(String, String, u128)>)]
     QueryAllLedgers{},
 }
