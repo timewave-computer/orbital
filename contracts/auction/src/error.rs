@@ -55,4 +55,7 @@ pub enum ContractError {
 
     #[error("Bond mismatch: {0}")]
     BondMismatch(Coin),
+
+    #[error("address doesn't have a bond to bid")]
+    NoBond,
 }

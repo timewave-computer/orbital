@@ -68,6 +68,7 @@ pub fn execute(
             Ok(Response::new())
         }
         ExecuteMsg::Unbond {} => {
+            // TODO: can unbond only if he is not in middle of fulfilling an auction
             let bond = BONDS.load(deps.storage, info.sender.clone())?;
 
             let bank_msg = BankMsg::Send {
@@ -78,8 +79,15 @@ pub fn execute(
             Ok(Response::new().add_message(bank_msg))
         }
         ExecuteMsg::Slash {} => {
+            // Make sure the account is calling it
+            ensure!(
+                info.sender == CONFIG.load(deps.storage)?.account_addr,
+                ContractError::Unauthorized("Only account can slash".to_string())
+            );
+            // Make sure the bond exists
             BONDS.load(deps.storage, info.sender.clone())?;
 
+            // Remove bond (so MM wont be able to bid anymore)
             BONDS.remove(deps.storage, info.sender);
 
             Ok(Response::new())
@@ -171,6 +179,11 @@ pub fn execute_auction_bid(
     ensure!(
         !auction.end_time.is_expired(&env.block),
         ContractError::AuctionExpired
+    );
+    // make sure the sender has bond to bid
+    ensure!(
+        BONDS.has(deps.storage, info.sender.clone()),
+        ContractError::NoBond
     );
 
     // check for the bid amounts

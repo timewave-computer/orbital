@@ -77,7 +77,13 @@ pub fn execute(
             // send new intent to the auction addr
             Ok(Response::new())
         }
-        ExecuteMsg::AuctionFinished { .. } => {
+        ExecuteMsg::AuctionFinished {
+            original_intent,
+            fulfillment_end,
+            id,
+            winning_bid,
+            bidder,
+        } => {
             // Verify the sender is the auction address
             // register the auction to be done and wait for ping from MM
             Ok(Response::new())
