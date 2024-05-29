@@ -113,7 +113,6 @@ impl From<ChainsVec> for TestContext {
             (NEUTRON_CHAIN.to_string(), GAIA_CHAIN.to_string()),
             ntrn_to_gaia_consumer_channel.channel_id,
         );
-        println!("this far");
         let mut ibc_denoms = HashMap::new();
         ibc_denoms.insert(
             (NEUTRON_CHAIN.to_string(), JUNO_CHAIN.to_string()),
@@ -131,7 +130,6 @@ impl From<ChainsVec> for TestContext {
             (GAIA_CHAIN.to_string(), NEUTRON_CHAIN.to_string()),
             utils::ibc::get_ibc_denom("uatom", &gaia_to_ntrn_transfer_channel.channel_id),
         );
-        println!("this far");
 
         Self {
             chains: chains_map,

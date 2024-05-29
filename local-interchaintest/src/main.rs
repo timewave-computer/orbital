@@ -13,10 +13,10 @@ use local_ictest_e2e::{
 };
 use localic_std::{
     filesystem::get_files,
-    modules::bank::{get_balance, get_total_supply, send},
+    modules::{bank::{get_balance, get_total_supply, send}, cosmwasm::CosmWasm},
     polling::poll_for_start,
     relayer::Relayer,
-    transactions::ChainRequestBuilder,
+    transactions::ChainRequestBuilder, types::Contract,
 };
 use reqwest::blocking::Client;
 
@@ -26,39 +26,87 @@ fn main() {
 
     let configured_chains = read_json_file(CHAIN_CONFIG_PATH).unwrap();
 
-    println!("configured chains: {:?}", configured_chains);
-
     let client = Client::new();
     poll_for_start(&client, API_URL, 300);
 
     let mut test_ctx = TestContext::from(configured_chains);
 
-    // transfer some atom to juno
-    ibc_send(
-        test_ctx
-            .get_request_builder()
-            .get_request_builder(NEUTRON_CHAIN),
-        ACC_0_KEY,
-        &test_ctx.get_admin_addr().src(JUNO_CHAIN).get(),
-        coin(10000, "untrn"),
-        coin(10000, "untrn"),
-        &test_ctx
-            .get_transfer_channels()
-            .src(NEUTRON_CHAIN)
-            .dest(JUNO_CHAIN)
-            .get(),
+    // store polytunesss
+    let contracts_path = get_contract_path();
+    println!("main contracts path: {:?}", contracts_path);
+
+    let polytone_path = contracts_path.join("polytone");
+    let note_path = polytone_path.join("polytone_note.wasm");
+    let voice_path = polytone_path.join("polytone_voice.wasm");
+    let proxy_path = polytone_path.join("polytone_proxy.wasm");
+
+    let orbital_contracts_path = contracts_path.join("orbital");
+    let auction_path = orbital_contracts_path.join("auction.wasm");
+    let account_path = orbital_contracts_path.join("account.wasm");
+
+    let neutron_rb = test_ctx
+        .get_request_builder()
+        .get_request_builder(NEUTRON_CHAIN);
+
+    let juno_rb = test_ctx
+        .get_request_builder()
+        .get_request_builder(JUNO_CHAIN);
+
+
+    let mut neutron_cw = CosmWasm::new(neutron_rb);
+
+    let note_code_id = neutron_cw.store("acc0", &note_path).unwrap();
+    let account_code_id = neutron_cw.store("acc0", &account_path).unwrap();
+    let auction_code_id = neutron_cw.store("acc0", &auction_path).unwrap();
+
+    let mut juno_cw = CosmWasm::new(juno_rb);
+
+    let voice_code_id = juno_cw.store("acc0", &voice_path).unwrap();
+    let proxy_code_id = juno_cw.store("acc0", &proxy_path).unwrap();
+
+    println!("[NEUTRON] note code id: {:?}", note_code_id);
+    println!("[NEUTRON] auction code id: {:?}", auction_code_id);
+    println!("[NEUTRON] account code id: {:?}", account_code_id);
+
+    println!("[JUNO]\t\tvoice code id: {:?}", voice_code_id);
+    println!("[JUNO]\t\tproxy code id: {:?}", proxy_code_id);
+
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
+    let mut note_contract = Contract {
+        address: String::default(),
+        tx_hash: String::default(),
+        admin: None,
+    };
+    match neutron_cw.instantiate(
+        "acc0",
+        "{\"block_max_gas\":\"3010000\"}",
+        "neutron_note",
         None,
-    )
-    .unwrap();
+        ""
+    ) {
+        Ok(contract) => note_contract = contract,
+        Err(e) => println!("note instantiation error: {:?}", e),
+    }
+    println!("note contract: {:?}", note_contract);
 
-    let admin_bal = get_balance(
-        test_ctx
-            .get_request_builder()
-            .get_request_builder(JUNO_CHAIN),
-        &test_ctx.get_admin_addr().src(JUNO_CHAIN).get(),
-    );
+    let mut voice_contract = Contract {
+        address: String::default(),
+        tx_hash: String::default(),
+        admin: None,
+    };
+    match juno_cw.instantiate(
+        "acc0",
+        format!("{{\"proxy_code_id\":{},\"block_max_gas\":{}}}", proxy_code_id, "3010000").as_str(),
+        "juno_voice",
+        None,
+        "",
+    ) {
+        Ok(contract) => voice_contract = contract,
+        Err(e) => println!("error: {:?}", e),
+    };
+    println!("voice contract: {:?}", voice_contract);
 
-    println!("admin balance: {:?}", admin_bal);
 }
 
 fn test_ibc_transfer(test_ctx: &TestContext) {

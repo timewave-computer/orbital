@@ -30,7 +30,8 @@ pub fn get_local_interchain_dir() -> path::PathBuf {
 /// local-interchain/contracts directory
 #[must_use]
 pub fn get_contract_path() -> path::PathBuf {
-    get_local_interchain_dir().join("contracts")
+    let dir = get_local_interchain_dir();
+    dir.join("local-interchaintest").join("contracts")
 }
 
 /// local-interchain/configs/contract.json file
