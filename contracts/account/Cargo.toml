@@ -1,5 +1,5 @@
 [package]
-name    = "observatory"
+name    = "account"
 version = "0.1.0"
 authors = ["bekauz <bekauz@protonmail.com>"]
 edition = "2021"
@@ -34,6 +34,8 @@ thiserror = { workspace = true }
 sha2      = { workspace = true }
 
 orbital-utils = { workspace = true }
+polytone = { workspace = true }
+neutron-sdk = { workspace = true }
 
 [dev-dependencies]
 cw-multi-test = { workspace = true }

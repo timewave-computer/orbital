@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use observatory::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use account::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {
