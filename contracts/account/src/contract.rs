@@ -3,13 +3,14 @@ use std::{collections::HashMap, str::FromStr};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint64,
+    ensure, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint64, WasmMsg
 };
 
+use auction::msg::ExecuteMsg as AuctionExecuteMsg;
 use cw2::set_contract_version;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronResult,
+    NeutronError, NeutronResult,
 };
 use orbital_utils::domain::OrbitalDomain;
 use polytone::callbacks::CallbackRequest;
@@ -17,7 +18,8 @@ use polytone::callbacks::CallbackRequest;
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     polytone_helpers::{
-        get_note_execute_neutron_msg, get_proxy_query_balances_message, query_polytone_proxy_address, try_handle_callback, REGISTER_DOMAIN_CALLBACK_ID
+        get_note_execute_neutron_msg, get_proxy_query_balances_message,
+        query_polytone_proxy_address, try_handle_callback, REGISTER_DOMAIN_CALLBACK_ID,
     },
     state::{ADMIN, AUCTION_ADDR, DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
 };
@@ -74,8 +76,26 @@ pub fn execute(
         }
         ExecuteMsg::NewIntent(new_intent) => {
             // send new intent to the auction addr
+            let auction_addr = AUCTION_ADDR.load(deps.storage)?;
+
             // Verify the funds are in the senders ledger
-            Ok(Response::new())
+            let ledger = LEDGER.load(deps.storage, new_intent.offer_domain.value())?;
+            let balance = *ledger.get(new_intent.offer_coin.denom.as_str()).unwrap();
+
+            if balance < new_intent.offer_coin.amount.u128() {
+                return Err(NeutronError::Std(StdError::generic_err(
+                    "Insufficient funds",
+                )));
+            }
+
+            // send message to add the intent to the queue
+            let msg = WasmMsg::Execute {
+                contract_addr: auction_addr.to_string(),
+                msg: to_json_binary(&AuctionExecuteMsg::NewIntent(new_intent))?,
+                funds: vec![],
+            };
+
+            Ok(Response::new().add_message(msg))
         }
         ExecuteMsg::VerifyAuction {
             original_intent,
@@ -83,9 +103,18 @@ pub fn execute(
             bidder,
         } => {
             // Verify the sender is the auction address
-            // load the intent from the id
-            // verify the MM deposited the funds into the account he was supposed to
+            let auction_addr = AUCTION_ADDR.load(deps.storage)?;
+
+            ensure!(
+                auction_addr == info.sender,
+                StdError::generic_err(
+                    "sender is not the auction addr",
+                )
+            );
+            
+            // TODO: verify the MM deposited the funds into the account he was supposed to
             // update ledger to reflect the change and unlock funds to the MM
+
             // if MM didn't fulfill, send a slash msg to the auction addr
             Ok(Response::new())
         }
@@ -149,9 +178,10 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             let domain = OrbitalDomain::from_str(domain.as_str())?;
             let user_remote_addr = USER_DOMAINS.load(deps.storage, domain.value())?;
             to_json_binary(&user_remote_addr)
-        },
-        QueryMsg::QueryAllDomains { } => {
-            let all_domains = USER_DOMAINS.range(deps.storage, None, None, cosmwasm_std::Order::Ascending);
+        }
+        QueryMsg::QueryAllDomains {} => {
+            let all_domains =
+                USER_DOMAINS.range(deps.storage, None, None, cosmwasm_std::Order::Ascending);
             let mut domain_result = String::new();
             for domain in all_domains {
                 let entry = domain?;
@@ -159,7 +189,7 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 domain_result = format!("{}\n{}", domain_result, result_entry);
             }
             to_json_binary(&domain_result)
-        },
+        }
         QueryMsg::QueryProxyAccount { domain } => {
             let domain = OrbitalDomain::from_str(domain.as_str())?;
             let note_addr = DOMAIN_TO_NOTE.load(deps.storage, domain.value())?;
@@ -169,13 +199,11 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 deps.querier,
             )?;
             to_json_binary(&proxy_address)
-        },
-        QueryMsg::QueryLedger {
-            domain
-        } => {
+        }
+        QueryMsg::QueryLedger { domain } => {
             let domain = OrbitalDomain::from_str(domain.as_str())?;
 
-            let ledgers =  LEDGER.load(deps.storage, domain.value())?;
+            let ledgers = LEDGER.load(deps.storage, domain.value())?;
 
             let mut ledger_result = String::new();
             for ledger in ledgers {

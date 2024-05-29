@@ -34,8 +34,9 @@ thiserror = { workspace = true }
 sha2      = { workspace = true }
 
 orbital-utils = { workspace = true }
-polytone = { workspace = true }
-neutron-sdk = { workspace = true }
+polytone      = { workspace = true }
+neutron-sdk   = { workspace = true }
+auction       = { path = "../auction", features = ["library"] }
 
 [dev-dependencies]
 cw-multi-test = { workspace = true }
