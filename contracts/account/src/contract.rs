@@ -252,6 +252,16 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 ledger_result = format!("{}\n{}", ledger_result, result_entry);
             }
             to_json_binary(&ledger_result)
+        },
+        QueryMsg::QueryAllLedgers {} => {
+            let all_ledgers = LEDGER.range(deps.storage, None, None, cosmwasm_std::Order::Ascending);
+            let mut ledger_result = String::new();
+            for ledger in all_ledgers {
+                let (domain, balances) = ledger?;
+                let result_entry = format!("{} : {}", domain, to_json_binary(&balances)?);
+                ledger_result = format!("{}\n{}", ledger_result, result_entry);
+            }
+            to_json_binary(&ledger_result)
         }
     }
 }

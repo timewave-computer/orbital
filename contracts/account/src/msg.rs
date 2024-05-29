@@ -48,4 +48,6 @@ pub enum QueryMsg {
     },
     #[returns(String)]
     QueryAllDomains{},
+    #[returns(String)]
+    QueryAllLedgers{},
 }
