@@ -134,37 +134,7 @@ fn main() {
         .instantiate("acc0", "{}", "orbital_account", None, "")
         .unwrap();
 
-    let auction_contract = auction_cw
-        .instantiate(
-            "acc0",
-            to_json_string(&AuctionInstantiate {
-                account_addr: account_contract.address.clone(),
-                bond: coin(100, "untrn"),
-                increment_bps: 10,
-                duration: CwDuration::Time(60 * 5),
-                fulfillment_timeout: CwDuration::Time(60 * 5),
-            })
-            .unwrap()
-            .as_str(),
-            "orbital_auction",
-            None,
-            "",
-        )
-        .unwrap();
-
-    account_cw
-        .execute(
-            "acc0",
-            &to_json_string(&AccountExecute::UpdateAuctionAddr {
-                auction_addr: auction_contract.address.clone(),
-            })
-            .unwrap(),
-            "",
-        )
-        .unwrap();
-
     println!("account contract: {:?}", account_contract);
-    println!("auction contract: {:?}", auction_contract);
 
     let msg = AccountExecute::RegisterDomain {
         domain: OrbitalDomain::Juno,
@@ -204,8 +174,6 @@ fn main() {
         &coin(1_000, "ujuno"),
     )
     .unwrap();
-
-    println!("fund proxy response: {:?}", fund_proxy);
 
     std::thread::sleep(std::time::Duration::from_secs(10));
 
@@ -262,6 +230,40 @@ fn main() {
 
     let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
     pretty_print("ledger query response", &resp);
+
+
+    let auction_contract = auction_cw
+        .instantiate(
+            "acc0",
+            to_json_string(&AuctionInstantiate {
+                account_addr: account_contract.address.clone(),
+                bond: coin(100, "untrn"),
+                increment_bps: 10,
+                duration: CwDuration::Time(60 * 5),
+                fulfillment_timeout: CwDuration::Time(60 * 5),
+            })
+            .unwrap()
+            .as_str(),
+            "orbital_auction",
+            None,
+            "",
+        )
+        .unwrap();
+
+    println!("auction contract: {:?}", auction_contract);
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
+    let response = account_cw
+        .execute(
+            "acc0",
+            &to_json_string(&AccountExecute::UpdateAuctionAddr {
+                auction_addr: auction_contract.address.clone(),
+            })
+            .unwrap(),
+            "",
+        )
+        .unwrap();
+    println!("update auction response: {:?}", response);
 }
 
 // init an auction
