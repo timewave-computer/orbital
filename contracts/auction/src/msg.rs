@@ -8,7 +8,7 @@ use crate::types::ActiveAuction;
 #[cw_serde]
 pub struct InstantiateMsg {
     pub account_addr: String,
-    pub bond_amount: Coin,
+    pub bond: Coin,
     pub increment_bps: u64, // bps
     pub duration: Duration,
     pub fulfillment_timeout: Duration,
@@ -16,12 +16,14 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
+    Bond {},
+    Unbond {},
+    Slash {},
     NewIntent(Intent),
     AuctionTick {},
     AuctionBid {
         // Address on the ask domain (can't be verified here most of the time)
         bidder: String,
-        // ask_amount: Uint128,
     },
 }
 

@@ -20,7 +20,7 @@ use crate::{
         get_note_execute_neutron_msg, get_proxy_query_balances_message, try_handle_callback,
         REGISTER_DOMAIN_CALLBACK_ID,
     },
-    state::{DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
+    state::{ADMIN, AUCTION_ADDR, DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
 };
 
 const CONTRACT_NAME: &str = "crates.io:account";
@@ -32,10 +32,12 @@ type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 pub fn instantiate(
     deps: ExecuteDeps,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     _msg: InstantiateMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    ADMIN.save(deps.storage, &info.sender)?;
 
     // we initialize an empty ledger for the user to enable fund deposits/withdrawals
     LEDGER.save(
@@ -67,6 +69,27 @@ pub fn execute(
         }
         ExecuteMsg::Callback(callback_msg) => try_handle_callback(env, deps, info, callback_msg),
         ExecuteMsg::Sync { domain } => try_sync_domain(deps, env, domain),
+        ExecuteMsg::UpdateAuctionAddr { auction_addr } => {
+            AUCTION_ADDR.save(deps.storage, &deps.api.addr_validate(&auction_addr)?)?;
+            Ok(Response::new())
+        }
+        ExecuteMsg::NewIntent(_) => {
+            // send new intent to the auction addr
+            Ok(Response::new())
+        }
+        ExecuteMsg::AuctionFinished { .. } => {
+            // Verify the sender is the auction address
+            // register the auction to be done and wait for ping from MM
+            Ok(Response::new())
+        }
+        ExecuteMsg::VerifyAuction { id } => {
+            // Verify the sender is the auction address
+            // load the intent from the id
+            // verify the MM deposited the funds into the account he was supposed to
+            // update ledger to reflect the change and unlock funds to the MM
+            // if MM didn't fulfill, send a slash msg to the auction addr
+            Ok(Response::new())
+        }
     }
 }
 

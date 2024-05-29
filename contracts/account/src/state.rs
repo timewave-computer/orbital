@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
 use cosmwasm_std::Addr;
-use cw_storage_plus::Map;
+use cw_storage_plus::{Item, Map};
 use orbital_utils::domain::OrbitalDomain;
+
+pub const ADMIN: Item<Addr> = Item::new("admin");
+pub const AUCTION_ADDR: Item<Addr> = Item::new("auctoin_addr");
 
 /// double accounting system
 pub const LEDGER: Map<u8, HashMap<String, u128>> = Map::new("ledger");

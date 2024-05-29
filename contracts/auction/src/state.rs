@@ -1,4 +1,4 @@
-use cosmwasm_std::{StdResult, Storage};
+use cosmwasm_std::{Addr, Coin,  StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 use orbital_utils::intent::Intent;
 
@@ -6,6 +6,7 @@ use crate::types::{ActiveAuction, Config};
 
 /// Config holds the configuration of the contract
 pub const CONFIG: Item<Config> = Item::new("config");
+pub const BONDS: Map<Addr, Coin> = Map::new("bonds");
 /// Active auction state
 pub const ACTIVE_AUCTION: Item<ActiveAuction> = Item::new("auction");
 /// FIFO queue of intents to be auctioned

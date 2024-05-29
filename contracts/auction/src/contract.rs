@@ -1,18 +1,19 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, to_json_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-    WasmMsg,
+    ensure, to_json_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, WasmMsg,
 };
 
 use cw2::set_contract_version;
+use cw_utils::must_pay;
 use orbital_utils::intent::Intent;
 
 use crate::{
     error::ContractError,
-    helpers::{add_intent, get_bid, remove_intent},
+    helpers::{add_intent, remove_intent},
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
-    state::{ACTIVE_AUCTION, CONFIG, IDS, INTENTS},
+    state::{ACTIVE_AUCTION, BONDS, CONFIG, IDS, INTENTS},
     types::{ActiveAuction, Config, TestAccountExecuteMsg},
 };
 
@@ -30,7 +31,7 @@ pub fn instantiate(
 
     let config = Config {
         account_addr: deps.api.addr_validate(&msg.account_addr)?,
-        bond_amount: msg.bond_amount,
+        bond: msg.bond,
         increment_decimal: Decimal::bps(msg.increment_bps),
         duration: msg.duration,
         fulfillment_timeout: msg.fulfillment_timeout,
@@ -53,6 +54,36 @@ pub fn execute(
         ExecuteMsg::NewIntent(new_intent) => execute_new_intent(deps, info, new_intent),
         ExecuteMsg::AuctionTick {} => execute_auction_tick(deps, env),
         ExecuteMsg::AuctionBid { bidder } => execute_auction_bid(deps, env, info, bidder),
+        ExecuteMsg::Bond {} => {
+            let config = CONFIG.load(deps.storage)?;
+            let amount = must_pay(&info, &config.bond.denom)?;
+
+            ensure!(
+                amount == config.bond.amount,
+                ContractError::BondMismatch(config.bond)
+            );
+
+            BONDS.save(deps.storage, info.sender, &info.funds[0])?;
+
+            Ok(Response::new())
+        }
+        ExecuteMsg::Unbond {} => {
+            let bond = BONDS.load(deps.storage, info.sender.clone())?;
+
+            let bank_msg = BankMsg::Send {
+                to_address: info.sender.to_string(),
+                amount: vec![bond],
+            };
+
+            Ok(Response::new().add_message(bank_msg))
+        }
+        ExecuteMsg::Slash {} => {
+            BONDS.load(deps.storage, info.sender.clone())?;
+
+            BONDS.remove(deps.storage, info.sender);
+
+            Ok(Response::new())
+        }
     }
 }
 
@@ -93,6 +124,7 @@ pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, Con
             contract_addr: config.account_addr.to_string(),
             msg: to_json_binary(&TestAccountExecuteMsg::AuctionFinished {
                 original_intent: curr_intent,
+                fulfillment_end: config.fulfillment_timeout.after(&env.block),
                 id: auction.intent_id,
                 winning_bid: auction.highest_bid,
                 bidder: auction.bidder.clone(),
@@ -117,7 +149,7 @@ pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, Con
         deps.storage,
         &ActiveAuction {
             end_time: config.duration.after(&env.block),
-            highest_bid: next_intent.ask_coin.amount,
+            highest_bid: next_intent.ask_coin,
             bidder: None,
             intent_id: next_intent_id,
         },
@@ -141,20 +173,20 @@ pub fn execute_auction_bid(
         ContractError::AuctionExpired
     );
 
-    // check for the bid amounts, that it included the bond and what is the amount he bid
-    let bid = get_bid(&config, &info)?;
+    // check for the bid amounts
+    let bid = must_pay(&info, &auction.highest_bid.denom)?;
 
     // make sure the bid is at least above the othere bid by the increment
-    let min_bid = auction.highest_bid.checked_add(
-        Decimal::from_atomics(auction.highest_bid, 0)?
+    let min_bid = auction.highest_bid.amount.checked_add(
+        Decimal::from_atomics(auction.highest_bid.amount, 0)?
             .checked_mul(config.increment_decimal)?
             .to_uint_floor(),
     )?;
     // ensure the bid is higher then the previous bid plus the increment
-    ensure!(bid.amount >= min_bid, ContractError::BidTooLow(min_bid));
+    ensure!(bid >= min_bid, ContractError::BidTooLow(min_bid));
 
     // if everything checks out then set it as the next winner
-    auction.highest_bid = bid.amount;
+    auction.highest_bid.amount = bid;
     auction.bidder = Some(bidder);
 
     Ok(Response::default())

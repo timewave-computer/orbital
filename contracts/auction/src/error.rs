@@ -52,4 +52,7 @@ pub enum ContractError {
 
     #[error("Current intent wasn't found in the queue")]
     QueueIsEmpty,
+
+    #[error("Bond mismatch: {0}")]
+    BondMismatch(Coin),
 }
