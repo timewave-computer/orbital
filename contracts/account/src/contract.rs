@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint64,
+    to_json_binary, AllBalanceResponse, Binary, Deps, DepsMut, Empty, Env, MessageInfo, QueryRequest, Response, StdResult, Uint64
 };
 
 use cw2::set_contract_version;
@@ -17,7 +17,7 @@ use polytone::callbacks::CallbackRequest;
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     polytone_helpers::{
-        get_note_execute_neutron_msg, get_proxy_query_balances_message, query_polytone_proxy_address, try_handle_callback, REGISTER_DOMAIN_CALLBACK_ID
+        get_note_execute_neutron_msg, get_note_query_neutron_msg, get_proxy_query_balances_message, query_polytone_proxy_address, try_handle_callback, REGISTER_DOMAIN_CALLBACK_ID, SYNC_DOMAIN_CALLBACK_ID
     },
     state::{ADMIN, AUCTION_ADDR, DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
 };
@@ -100,20 +100,29 @@ pub fn try_sync_domain(
     let note_addr = DOMAIN_TO_NOTE.load(deps.storage, domain.value())?;
     let proxy_addr = USER_DOMAINS.load(deps.storage, domain.value())?;
 
-    let proxy_query_balances_msg =
-        get_proxy_query_balances_message(env.clone(), proxy_addr, note_addr.to_string())?;
+    let query_request: QueryRequest<Empty> = cosmwasm_std::BankQuery::AllBalances {
+        address: proxy_addr.to_string(),
+    }
+    .into();
 
-    let polytone_init_msg = get_note_execute_neutron_msg(
-        vec![proxy_query_balances_msg.into()],
+    let polytone_sync_balance_msg = get_note_query_neutron_msg(
+        vec![query_request],
         Uint64::new(120),
         note_addr,
-        Some(CallbackRequest {
+        CallbackRequest {
             receiver: env.contract.address.to_string(),
-            msg: to_json_binary(&REGISTER_DOMAIN_CALLBACK_ID)?,
-        }),
+            msg: to_json_binary(&SYNC_DOMAIN_CALLBACK_ID)?,
+        },
     )?;
 
-    Ok(Response::new().add_message(polytone_init_msg))
+    LEDGER.update(deps.storage, domain.value(), |ledger| -> StdResult<_> {
+        let mut ledger = ledger.unwrap_or_default();
+        let domain_log = format!("try_sync_domain: {:?}", domain.value());
+        ledger.insert(domain_log, 0);
+        Ok(ledger)
+    })?;
+
+    Ok(Response::new().add_message(polytone_sync_balance_msg))
 }
 
 pub fn execute_register_domain(

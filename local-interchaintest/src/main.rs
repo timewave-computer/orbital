@@ -1,25 +1,25 @@
 #![allow(dead_code, unused_must_use)]
 
-use std::path::Path;
+use core::sync;
 
+use auction::msg::ExecuteMsg;
 use cosmwasm_std::{coin, to_json_string, Coin, Uint128};
 use local_ictest_e2e::{
     pretty_print, utils::{
         file_system::{
-            get_contract_cache_path, get_contract_path, get_current_dir, get_local_interchain_dir,
-            read_json_file,
+            get_contract_cache_path, get_contract_path, get_current_dir, get_local_interchain_dir, read_json_file
         },
-        ibc::ibc_send,
         test_context::TestContext,
     }, ACC_0_KEY, API_URL, CHAIN_CONFIG_PATH, GAIA_CHAIN, JUNO_CHAIN, NEUTRON_CHAIN
 };
 use localic_std::{
     filesystem::get_files,
-    modules::{bank::{get_balance, get_total_supply, send}, cosmwasm::CosmWasm},
+    modules::bank::{get_balance, get_total_supply, send},
     polling::poll_for_start,
     relayer::Relayer,
-    transactions::ChainRequestBuilder, types::Contract,
+    transactions::ChainRequestBuilder,
 };
+use orbital_utils::domain::OrbitalDomain;
 use reqwest::blocking::Client;
 
 use account::msg::QueryMsg as AccountQuery;
@@ -27,8 +27,6 @@ use account::msg::ExecuteMsg as AccountExecute;
 
 // local-ic start neutron_gaia_juno
 fn main() {
-
-
     let configured_chains = read_json_file(CHAIN_CONFIG_PATH).unwrap();
 
     let client = Client::new();
@@ -39,9 +37,6 @@ fn main() {
     // store polytunesss
     let contracts_path = get_contract_path();
     println!("main contracts path: {:?}", contracts_path);
-
-    let artifacts_path = get_local_interchain_dir().join("artifacts");
-    println!("main artifacts path: {:?}", artifacts_path);
 
     let polytone_path = contracts_path.join("polytone");
     let note_path = polytone_path.join("polytone_note.wasm");
@@ -124,7 +119,7 @@ fn main() {
 
 
     let msg = AccountExecute::RegisterDomain {
-        domain: orbital_utils::domain::OrbitalDomain::Juno,
+        domain: OrbitalDomain::Juno,
         note_addr: note_contract.address,
     };
 
@@ -137,9 +132,6 @@ fn main() {
     ).unwrap();
     println!("resp: {:?}", resp);
 
-    let query_domain_addr_msg = AccountQuery::QueryDomainAddr { domain: "juno".to_string() };
-    let query_domain_addr_msg_str = to_json_string(&query_domain_addr_msg).unwrap();
-
     std::thread::sleep(std::time::Duration::from_secs(20));
 
     let proxy_acc_query_msg_str = to_json_string(
@@ -148,6 +140,44 @@ fn main() {
     let resp = account_cw.query(&proxy_acc_query_msg_str);
     let juno_proxy_address = resp["data"].as_str().unwrap();
     println!("juno proxy account address: {}", juno_proxy_address);
+
+    let proxy_acc_ledger_query_msg_str = to_json_string(
+        &AccountQuery::QueryLedger { domain: "juno".to_string() }
+    ).unwrap();
+
+    let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
+    println!("juno proxy account ledger response: {:?}", resp);
+
+    let fund_proxy = localic_std::modules::bank::send(
+        juno_rb,
+        "acc0",
+        juno_proxy_address,
+        &[coin(100_000, "ujuno")],
+        &coin(1_000, "ujuno"),
+    ).unwrap();
+
+    println!("fund proxy response: {:?}", fund_proxy);
+
+    std::thread::sleep(std::time::Duration::from_secs(10));
+
+    let sync_juno_domain_msg = AccountExecute::Sync { domain: OrbitalDomain::Juno };
+    let sync_juno_domain_msg_str = to_json_string(&sync_juno_domain_msg).unwrap();
+
+    let resp = account_cw.execute(
+        "acc0",
+        &sync_juno_domain_msg_str,
+        "--gas 5502650"
+    ).unwrap();
+    println!("sync_juno_domain_msg_response: {:?}", resp);
+    std::thread::sleep(std::time::Duration::from_secs(10));
+
+
+    let proxy_acc_ledger_query_msg_str = to_json_string(
+        &AccountQuery::QueryLedger { domain: "juno".to_string() }
+    ).unwrap();
+
+    let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
+    println!("juno proxy account ledger response: {:?}", resp);
 }
 
 fn test_ibc_transfer(test_ctx: &TestContext) {

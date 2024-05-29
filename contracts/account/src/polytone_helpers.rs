@@ -114,15 +114,24 @@ fn process_query_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     // only a registered note can submit a callback
     let note_domain = NOTE_TO_DOMAIN.load(deps.storage, info.sender.clone())?;
+    let mut ledger = LEDGER.load(deps.storage, note_domain.value())?;
+    let domain_log = format!("handle_domain_balances_sync_callback domain: {:?}", note_domain.value());
+    ledger.insert(domain_log, 0);
+    LEDGER.save(deps.storage, note_domain.value(), &ledger)?;
 
     match from_json(initiator_msg)? {
         SYNC_DOMAIN_CALLBACK_ID => {
             handle_domain_balances_sync_callback(deps, env, query_callback_result, note_domain)
         }
-        _ => Err(NeutronError::Std(StdError::generic_err(
-            "unexpected callback id".to_string(),
-        ))),
+        _ => {
+            let mut ledger = LEDGER.load(deps.storage, note_domain.value())?;
+            let domain_log = format!("handle_domain_balances_sync_callback domain: {:?}", note_domain.value());
+            ledger.insert(domain_log, 0);
+            LEDGER.save(deps.storage, note_domain.value(), &ledger)?;
+            Ok(Response::default())
+        },
     }
+
 }
 
 fn handle_domain_balances_sync_callback(
@@ -131,36 +140,33 @@ fn handle_domain_balances_sync_callback(
     query_callback_result: Result<Vec<Binary>, ErrorResponse>,
     domain: OrbitalDomain,
 ) -> NeutronResult<Response<NeutronMsg>> {
+    let mut ledger = LEDGER.load(deps.storage, domain.value())?;
+
     let response_binary = match query_callback_result {
         Ok(val) => val,
         Err(_) => {
-            return Err(NeutronError::Std(StdError::generic_err(
-                "failed to decode all balances query",
-            )))
+            let domain_log = format!("query_callback_result {:?}", query_callback_result);
+            ledger.insert(domain_log, 0);
+            return Ok(Response::default())
         }
     };
 
-    ensure!(
-        response_binary.len() == 1,
-        NeutronError::Std(StdError::generic_err(
-            "expected one response from all balances query"
-        ))
-    );
+    let domain_log = format!("handle_domain_balances_sync_callback domain: {:?}", domain.value());
+    ledger.insert(domain_log, 0);
 
-    let bank_query_response: AllBalanceResponse = from_json(&response_binary[0])?;
-
-    LEDGER.update(
-        deps.storage,
-        domain.value(),
-        |domain_ledger| -> StdResult<_> {
-            let mut domain_ledger = domain_ledger.unwrap_or_default();
-            for coin_balance in bank_query_response.amount {
-                domain_ledger.insert(coin_balance.denom, coin_balance.amount.u128());
+    match from_json(&response_binary[0])? {
+        AllBalanceResponse { amount } => {
+            for coin in amount {
+                ledger.insert(coin.denom, coin.amount.u128());
             }
-            Ok(domain_ledger)
-        },
-    )?;
+        }
+        _ => {
+            let log = format!("failed to from_json the response binary: {:?}", response_binary);
+            ledger.insert(log, 0);
+        }
+    };
 
+    LEDGER.save(deps.storage, domain.value(), &ledger)?;
     Ok(Response::default())
 }
 
@@ -199,6 +205,34 @@ pub fn get_note_execute_neutron_msg(
         msg: polytone_msg,
         funds: vec![],
     }))
+}
+
+pub fn get_note_query_neutron_msg(
+    msgs: Vec<QueryRequest<Empty>>,
+    ibc_timeout: Uint64,
+    note_address: Addr,
+    callback: CallbackRequest,
+) -> NeutronResult<CosmosMsg<NeutronMsg>> {
+    let polytone_msg = get_polytone_query_msg_binary(msgs, ibc_timeout, callback)?;
+
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: note_address.to_string(),
+        msg: polytone_msg,
+        funds: vec![],
+    }))
+}
+
+pub fn get_polytone_query_msg_binary(
+    msgs: Vec<QueryRequest<Empty>>,
+    timeout_seconds: Uint64,
+    callback: CallbackRequest,
+) -> StdResult<Binary> {
+    let query_msg = PolytoneExecuteMsg::Query {
+        msgs,
+        callback,
+        timeout_seconds,
+    };
+    to_json_binary(&query_msg)
 }
 
 pub fn get_polytone_execute_msg_binary(
