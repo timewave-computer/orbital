@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, to_json_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult, WasmMsg,
+    ensure, to_json_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -57,41 +57,23 @@ pub fn execute(
         ExecuteMsg::Bond {} => {
             let config = CONFIG.load(deps.storage)?;
             let amount = must_pay(&info, &config.bond.denom)?;
-
             ensure!(
                 amount == config.bond.amount,
                 ContractError::BondMismatch(config.bond)
             );
-
             BONDS.save(deps.storage, info.sender, &info.funds[0])?;
-
             Ok(Response::new())
         }
-        ExecuteMsg::Unbond {} => {
-            // TODO: can unbond only if he is not in middle of fulfilling an auction
-            let bond = BONDS.load(deps.storage, info.sender.clone())?;
-
-            let bank_msg = BankMsg::Send {
-                to_address: info.sender.to_string(),
-                amount: vec![bond],
-            };
-
-            Ok(Response::new().add_message(bank_msg))
-        }
         ExecuteMsg::Slash {} => {
-            // Make sure the account is calling it
             ensure!(
                 info.sender == CONFIG.load(deps.storage)?.account_addr,
                 ContractError::Unauthorized("Only account can slash".to_string())
             );
-            // Make sure the bond exists
             BONDS.load(deps.storage, info.sender.clone())?;
-
-            // Remove bond (so MM wont be able to bid anymore)
             BONDS.remove(deps.storage, info.sender);
-
             Ok(Response::new())
         }
+        ExecuteMsg::Fulfilled { id } => todo!(),
     }
 }
 

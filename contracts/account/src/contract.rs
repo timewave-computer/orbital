@@ -73,22 +73,16 @@ pub fn execute(
             AUCTION_ADDR.save(deps.storage, &deps.api.addr_validate(&auction_addr)?)?;
             Ok(Response::new())
         }
-        ExecuteMsg::NewIntent(_) => {
+        ExecuteMsg::NewIntent(new_intent) => {
             // send new intent to the auction addr
+            // Verify the funds are in the senders ledger
             Ok(Response::new())
         }
-        ExecuteMsg::AuctionFinished {
+        ExecuteMsg::VerifyAuction {
             original_intent,
-            fulfillment_end,
-            id,
             winning_bid,
             bidder,
         } => {
-            // Verify the sender is the auction address
-            // register the auction to be done and wait for ping from MM
-            Ok(Response::new())
-        }
-        ExecuteMsg::VerifyAuction { id } => {
             // Verify the sender is the auction address
             // load the intent from the id
             // verify the MM deposited the funds into the account he was supposed to

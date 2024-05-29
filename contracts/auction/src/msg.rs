@@ -17,13 +17,15 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     Bond {},
-    Unbond {},
     Slash {},
     NewIntent(Intent),
     AuctionTick {},
     AuctionBid {
         // Address on the ask domain (can't be verified here most of the time)
         bidder: String,
+    },
+    Fulfilled {
+        id: u64,
     },
 }
 
