@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, to_json_binary, AllBalanceResponse, Binary, Deps, DepsMut, Empty, Env, MessageInfo, QueryRequest, Response, StdError, StdResult, Uint64, WasmMsg
+    ensure, to_json_binary, Binary, Deps, DepsMut, Empty, Env, MessageInfo, QueryRequest, Response, StdError, StdResult, Uint64, WasmMsg
 };
 
 use auction::msg::ExecuteMsg as AuctionExecuteMsg;
@@ -18,7 +18,7 @@ use polytone::callbacks::CallbackRequest;
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     polytone_helpers::{
-        get_note_execute_neutron_msg, get_note_query_neutron_msg, get_proxy_query_balances_message, query_polytone_proxy_address, try_handle_callback, REGISTER_DOMAIN_CALLBACK_ID, SYNC_DOMAIN_CALLBACK_ID
+        get_note_execute_neutron_msg, get_note_query_neutron_msg, query_polytone_proxy_address, try_handle_callback, REGISTER_DOMAIN_CALLBACK_ID, SYNC_DOMAIN_CALLBACK_ID
     },
     state::{ADMIN, AUCTION_ADDR, DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
 };
