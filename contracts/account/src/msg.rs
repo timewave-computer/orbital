@@ -13,6 +13,9 @@ pub enum ExecuteMsg {
     },
     // polytone callback listener
     Callback(CallbackMessage),
+    Sync {
+        domain: OrbitalDomain,
+    },
 }
 
 #[cw_serde]

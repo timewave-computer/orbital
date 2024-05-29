@@ -7,11 +7,10 @@ use cosmwasm_std::{
 
 use cw2::set_contract_version;
 
-
 use crate::{
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
-    state::{CONFIG},
+    state::CONFIG,
 };
 
 const CONTRACT_NAME: &str = "crates.io:vesting";
