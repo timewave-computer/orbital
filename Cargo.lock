@@ -913,6 +913,7 @@ dependencies = [
  "auction",
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-utils",
  "hex",
  "localic-std",
  "orbital-utils",
