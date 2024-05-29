@@ -1,6 +1,6 @@
-use cosmwasm_std::{Addr, Coin, Empty, StdResult, Storage};
+use cosmwasm_std::{Addr, Coin, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
-use orbital_utils::intent::{Intent, SavedIntent};
+use orbital_utils::intent::SavedIntent;
 
 use crate::types::{ActiveAuction, Config};
 

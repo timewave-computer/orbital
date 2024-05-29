@@ -1,6 +1,9 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, Uint128};
-use orbital_utils::{domain::OrbitalDomain, intent::{Intent, SavedIntent}};
+use orbital_utils::{
+    domain::OrbitalDomain,
+    intent::{Intent, SavedIntent},
+};
 use polytone::callbacks::CallbackMessage;
 
 #[cw_serde]
@@ -38,19 +41,13 @@ pub enum ExecuteMsg {
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     #[returns(String)]
-    QueryDomainAddr {
-        domain: String,
-    },
+    QueryDomainAddr { domain: String },
     #[returns(String)]
-    QueryProxyAccount {
-        domain: String,
-    },
+    QueryProxyAccount { domain: String },
     #[returns(Vec<(String, u128)>)]
-    QueryLedger {
-        domain: String,
-    },
+    QueryLedger { domain: String },
     #[returns(String)]
-    QueryAllDomains{},
+    QueryAllDomains {},
     #[returns(Vec<(String, String, u128)>)]
-    QueryAllLedgers{},
+    QueryAllLedgers {},
 }

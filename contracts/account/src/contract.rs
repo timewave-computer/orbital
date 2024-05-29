@@ -3,7 +3,8 @@ use std::{collections::HashMap, str::FromStr};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, to_json_binary, BankMsg, BankQuery, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, QueryRequest, Response, StdError, StdResult, Uint64, WasmMsg
+    ensure, to_json_binary, BankMsg, BankQuery, Binary, Coin, Deps, DepsMut, Empty, Env,
+    MessageInfo, QueryRequest, Response, StdError, StdResult, Uint64, WasmMsg,
 };
 
 use auction::msg::ExecuteMsg as AuctionExecuteMsg;
@@ -19,7 +20,8 @@ use crate::{
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     polytone_helpers::{
         get_note_execute_neutron_msg, get_note_query_neutron_msg, query_polytone_proxy_address,
-        try_handle_callback, REGISTER_DOMAIN_CALLBACK_ID, SYNC_DOMAIN_CALLBACK_ID, WITHDRAW_FUNDS_CALLBACK_ID,
+        try_handle_callback, REGISTER_DOMAIN_CALLBACK_ID, SYNC_DOMAIN_CALLBACK_ID,
+        WITHDRAW_FUNDS_CALLBACK_ID,
     },
     state::{ADMIN, AUCTION_ADDR, DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
     types::QueryRecievedFundsOnDestDomain,
@@ -154,18 +156,18 @@ pub fn execute_new_intent(
 pub fn execute_withdraw_funds(
     deps: ExecuteDeps,
     env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     domain: OrbitalDomain,
     coin: Coin,
     dest: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let note_addr = DOMAIN_TO_NOTE.load(deps.storage, domain.value())?;
-    
+
     let bank_send_msg = BankMsg::Send {
         to_address: dest,
         amount: vec![coin],
     };
-    
+
     let polytone_init_msg = get_note_execute_neutron_msg(
         vec![bank_send_msg.into()],
         Uint64::new(120),

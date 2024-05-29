@@ -31,5 +31,4 @@ impl FromStr for OrbitalDomain {
             _ => Err(StdError::generic_err("Invalid domain")),
         }
     }
-    
 }
