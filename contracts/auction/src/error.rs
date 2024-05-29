@@ -29,8 +29,8 @@ pub enum ContractError {
     #[error("Must send funds to start vesting")]
     NoFundsSent,
 
-    #[error("Auction is expired")]
-    AuctionExpired,
+    #[error("Auction is not expired yet")]
+    AuctionNotExpired,
 
     #[error("Invalid denom was provided: {0}")]
     InvalidDenom(String),

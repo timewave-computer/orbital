@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Coin, Decimal};
+use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use cw_utils::{Duration, Expiration};
 use orbital_utils::{domain::OrbitalDomain, intent::Intent};
 
@@ -26,15 +26,23 @@ pub struct ActiveAuction {
     pub highest_bid: Coin,
     pub bidder: Option<String>,
     pub end_time: Expiration,
+    pub verified: bool,
+}
+
+#[cw_serde]
+pub struct WaitingFulfillment {
+    pub id: u64,
+    pub original_intent: Intent,
+    pub winning_bid: Uint128,
+    pub bidder: String,
+    pub fulfilled: bool,
 }
 
 #[cw_serde]
 pub enum TestAccountExecuteMsg {
-    AuctionFinished {
+    VerifyAuction {
         original_intent: Intent,
-        fulfillment_end: Expiration,
-        id: u64,
-        winning_bid: Coin,
-        bidder: Option<String>,
+        winning_bid: Uint128,
+        bidder: String,
     },
 }

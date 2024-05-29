@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Coin,  StdResult, Storage};
+use cosmwasm_std::{Addr, Coin, Empty, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 use orbital_utils::intent::Intent;
 
@@ -14,6 +14,7 @@ pub const QUEUE: cw_fifo::FIFOQueue<u64> = cw_fifo::FIFOQueue::new("front", "bac
 /// List of intentes we want to auction
 pub const INTENTS: Map<u64, Intent> = Map::new("intents");
 
+pub const TO_VERIFY: Item<ActiveAuction> = Item::new("to_verify");
 /// keep track of ids
 pub const IDS: Item<u64> = Item::new("ids");
 /// Get the next id

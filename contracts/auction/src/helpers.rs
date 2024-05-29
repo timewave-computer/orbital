@@ -17,15 +17,6 @@ pub fn add_intent(deps: DepsMut, intent: Intent) -> StdResult<()> {
 }
 
 // remove intent from our system
-pub fn remove_intent(deps: DepsMut) -> StdResult<Option<u64>> {
-    Ok(match QUEUE.dequeue(deps.storage)? {
-        Some(id) => {
-            if id > 0 {
-                INTENTS.remove(deps.storage, id - 1);
-            }
-
-            Some(id)
-        }
-        None => None,
-    })
+pub fn next_intent(deps: DepsMut) -> StdResult<Option<u64>> {
+    QUEUE.dequeue(deps.storage)
 }

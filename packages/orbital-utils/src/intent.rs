@@ -9,4 +9,5 @@ pub struct Intent {
     pub ask_coin: Coin,
     pub offer_domain: OrbitalDomain,
     pub ask_domain: OrbitalDomain,
+    pub is_verified: bool,
 }

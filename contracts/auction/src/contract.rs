@@ -11,9 +11,9 @@ use orbital_utils::intent::Intent;
 
 use crate::{
     error::ContractError,
-    helpers::{add_intent, remove_intent},
+    helpers::{add_intent, next_intent},
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
-    state::{ACTIVE_AUCTION, BONDS, CONFIG, IDS, INTENTS},
+    state::{ACTIVE_AUCTION, BONDS, CONFIG, IDS, INTENTS, TO_VERIFY},
     types::{ActiveAuction, Config, TestAccountExecuteMsg},
 };
 
@@ -97,38 +97,50 @@ pub fn execute_new_intent(
 }
 
 pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, ContractError> {
-    let auction = ACTIVE_AUCTION.load(deps.storage)?;
     let config = CONFIG.load(deps.storage)?;
-    let curr_intent = INTENTS.load(deps.storage, auction.intent_id)?;
+    let mut msgs: Vec<WasmMsg> = Vec::with_capacity(1);
+
+    let curr_auction = ACTIVE_AUCTION.load(deps.storage)?;
 
     // ensure the auction is expired
     ensure!(
-        auction.end_time.is_expired(&env.block),
-        ContractError::AuctionExpired
+        curr_auction.end_time.is_expired(&env.block),
+        ContractError::AuctionNotExpired
     );
 
-    // If we have a bidder addr, meaning we have a winner, so send a msg to the account controller
-    if auction.bidder.is_some() {
-        // Send msg to the account controller, and tell him the auction is finished, and
-        let msg = WasmMsg::Execute {
-            contract_addr: config.account_addr.to_string(),
-            msg: to_json_binary(&TestAccountExecuteMsg::AuctionFinished {
-                original_intent: curr_intent,
-                fulfillment_end: config.fulfillment_timeout.after(&env.block),
-                id: auction.intent_id,
-                winning_bid: auction.highest_bid,
-                bidder: auction.bidder.clone(),
-            })?,
-            funds: vec![],
-        };
-
-        return Ok(Response::default().add_message(msg));
-    }
-
-    let Some(next_intent_id) = remove_intent(deps.branch())? else {
-        // If we don't have an id here, itm eans we have nothing in the queue
+    let Some(next_intent_id) = next_intent(deps.branch())? else {
+        // If we don't have an id here, it means we have nothing in the queue
         return Ok(Response::default());
     };
+
+    // If ive got something to verify, i verify it.
+    match TO_VERIFY.load(deps.storage) {
+        Ok(auction) => {
+            // if we have an auction to verify, we need to do that first
+            let mut intent = INTENTS.load(deps.storage, auction.intent_id)?;
+
+            if !intent.is_verified {
+                msgs.push(WasmMsg::Execute {
+                    contract_addr: config.account_addr.to_string(),
+                    msg: to_json_binary(&TestAccountExecuteMsg::VerifyAuction {
+                        original_intent: intent.clone(),
+                        winning_bid: auction.highest_bid.amount,
+                        bidder: auction.bidder.unwrap(),
+                    })?,
+                    funds: vec![],
+                });
+                intent.is_verified = true;
+                INTENTS.save(deps.storage, auction.intent_id, &intent)?;
+                TO_VERIFY.remove(deps.storage);
+            }
+        }
+        Err(_) => (),
+    };
+
+    if curr_auction.bidder.is_some() {
+        //we havea bidder, so add it to the verify storage
+        TO_VERIFY.save(deps.storage, &curr_auction)?;
+    }
 
     let next_intent = INTENTS
         .load(deps.storage, next_intent_id)
@@ -142,10 +154,11 @@ pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, Con
             highest_bid: next_intent.ask_coin,
             bidder: None,
             intent_id: next_intent_id,
+            verified: false,
         },
     )?;
 
-    Ok(Response::default())
+    Ok(Response::default().add_messages(msgs))
 }
 
 pub fn execute_auction_bid(
@@ -160,7 +173,7 @@ pub fn execute_auction_bid(
     // ensure the auction is still active
     ensure!(
         !auction.end_time.is_expired(&env.block),
-        ContractError::AuctionExpired
+        ContractError::AuctionNotExpired
     );
     // make sure the sender has bond to bid
     ensure!(
