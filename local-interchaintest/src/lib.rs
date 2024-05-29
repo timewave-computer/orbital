@@ -23,6 +23,7 @@ pub const TRANSFER_PORT: &str = "transfer";
 
 pub const ADMIN_KEY: &str = "admin";
 pub const ACC_0_KEY: &str = "acc0";
+pub const MM_KEY: &str = "marketmaker";
 
 pub fn pretty_print(msg: &str, obj: &Value) {
     let mut buf = Vec::new();

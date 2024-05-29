@@ -13,7 +13,7 @@ use neutron_sdk::{
 use orbital_utils::domain::OrbitalDomain;
 use polytone::callbacks::{CallbackMessage, CallbackRequest, ErrorResponse};
 
-use crate::state::{LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS};
+use crate::{contract::try_sync_domain, state::{LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS}};
 
 use polytone::callbacks::{Callback as PolytoneCallback, ExecutionResponse};
 
@@ -21,6 +21,7 @@ type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 
 pub const REGISTER_DOMAIN_CALLBACK_ID: u8 = 1;
 pub const SYNC_DOMAIN_CALLBACK_ID: u8 = 2;
+pub const WITHDRAW_FUNDS_CALLBACK_ID: u8 = 3;
 
 pub fn try_handle_callback(
     env: Env,
@@ -75,7 +76,7 @@ fn process_execute_callback(
     // only a registered note can submit a callback
     let note_domain = NOTE_TO_DOMAIN.load(deps.storage, info.sender.clone())?;
 
-    let _callback_result: ExecutionResponse = match execute_callback_result {
+    let callback_result: ExecutionResponse = match execute_callback_result {
         Ok(val) => val,
         Err(e) => return Err(NeutronError::Std(StdError::generic_err(e.to_string()))),
     };
@@ -96,8 +97,15 @@ fn process_execute_callback(
                 USER_DOMAINS.save(deps.storage, note_domain.value(), &debug)?;
             }
         }
+        WITHDRAW_FUNDS_CALLBACK_ID => {
+            // let debug = format!("WITHDRAW_FUNDS_CALLBACK_ID : {:?}", callback_result);
+            // let mut ledger = LEDGER.load(deps.storage, note_domain.value())?;
+            // ledger.insert(debug, 0);
+            // LEDGER.save(deps.storage, note_domain.value(), &ledger)?;
+            return try_sync_domain(deps, env, note_domain)
+        }
         _ => {
-            let debug = format!("process_execute_callback [_]: {:?}", _callback_result);
+            let debug = format!("process_execute_callback [_]: {:?}", callback_result);
             USER_DOMAINS.save(deps.storage, note_domain.value(), &debug)?;
         },
     }
