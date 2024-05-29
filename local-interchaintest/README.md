@@ -43,7 +43,7 @@ echo $ICTEST_HOME #should print out the directory of local interchaintest
 ### spinning up the env
 
 ```bash
-local-ic start neutron_gaia --api-port 42069
+local-ic start neutron_gaia_juno 
 ```
 
 ### running tests
