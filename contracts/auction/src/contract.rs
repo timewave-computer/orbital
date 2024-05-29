@@ -1,20 +1,19 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    coin, ensure, to_json_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, IbcMsg,
-    IbcTimeout, MessageInfo, Response, StdResult, Timestamp, Uint128,
+    ensure, to_json_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    WasmMsg,
 };
 
 use cw2::set_contract_version;
-use cw_utils::{must_pay, Duration, Expiration};
 use orbital_utils::intent::Intent;
 
 use crate::{
     error::ContractError,
-    helpers::{add_intent, get_bid},
+    helpers::{add_intent, get_bid, remove_intent},
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
-    state::{next_id, ACTIVE_AUCTION, CONFIG, IDS, INTENTS, QUEUE},
-    types::{ActiveAuction, Config, NewAuction},
+    state::{ACTIVE_AUCTION, CONFIG, IDS, INTENTS},
+    types::{ActiveAuction, Config, TestAccountExecuteMsg},
 };
 
 const CONTRACT_NAME: &str = "crates.io:vesting";
@@ -51,16 +50,14 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::NewIntent(new_intent) => execute_new_intent(deps, env, info, new_intent),
-        ExecuteMsg::AuctionTick {} => execute_auction_tick(deps, env, info),
+        ExecuteMsg::NewIntent(new_intent) => execute_new_intent(deps, info, new_intent),
+        ExecuteMsg::AuctionTick {} => execute_auction_tick(deps, env),
         ExecuteMsg::AuctionBid { bidder } => execute_auction_bid(deps, env, info, bidder),
-        ExecuteMsg::AuctionClaim {} => execute_auction_claim(deps, env, info),
     }
 }
 
 pub fn execute_new_intent(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     new_intent: Intent,
 ) -> Result<Response, ContractError> {
@@ -78,13 +75,10 @@ pub fn execute_new_intent(
     Ok(Response::new())
 }
 
-pub fn execute_auction_tick(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    let mut auction = ACTIVE_AUCTION.load(deps.storage)?;
+pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, ContractError> {
+    let auction = ACTIVE_AUCTION.load(deps.storage)?;
     let config = CONFIG.load(deps.storage)?;
+    let curr_intent = INTENTS.load(deps.storage, auction.intent_id)?;
 
     // ensure the auction is expired
     ensure!(
@@ -92,22 +86,31 @@ pub fn execute_auction_tick(
         ContractError::AuctionExpired
     );
 
-    // get next intent
-    let Some(last_id) = QUEUE.dequeue(deps.storage)? else {
-        return Err(ContractError::QueueIsEmpty);
+    // If we have a bidder addr, meaning we have a winner, so send a msg to the account controller
+    if auction.bidder.is_some() {
+        // Send msg to the account controller, and tell him the auction is finished, and
+        let msg = WasmMsg::Execute {
+            contract_addr: config.account_addr.to_string(),
+            msg: to_json_binary(&TestAccountExecuteMsg::AuctionFinished {
+                original_intent: curr_intent,
+                id: auction.intent_id,
+                winning_bid: auction.highest_bid,
+                bidder: auction.bidder.clone(),
+            })?,
+            funds: vec![],
+        };
+
+        return Ok(Response::default().add_message(msg));
+    }
+
+    let Some(next_intent_id) = remove_intent(deps.branch())? else {
+        // If we don't have an id here, itm eans we have nothing in the queue
+        return Ok(Response::default());
     };
-    let next_id = last_id + 1;
 
     let next_intent = INTENTS
-        .load(deps.storage, next_id)
+        .load(deps.storage, next_intent_id)
         .map_err(|_| ContractError::IntentNotFound)?;
-
-    // TODO: Set our "watcher" to wait for the MM to proof he deposited the funds on the intent addr
-    // TODO: Before we add it to the watcher, make sure that there is a bidder, else do nothing
-    // ensure!(
-    //     auction.bidder.is_some(),
-    //     ContractError::NoBids
-    // );
 
     // set the active auction to the next intent
     ACTIVE_AUCTION.save(
@@ -116,7 +119,7 @@ pub fn execute_auction_tick(
             end_time: config.duration.after(&env.block),
             highest_bid: next_intent.ask_coin.amount,
             bidder: None,
-            intent_id: next_id,
+            intent_id: next_intent_id,
         },
     )?;
 
@@ -139,7 +142,7 @@ pub fn execute_auction_bid(
     );
 
     // check for the bid amounts, that it included the bond and what is the amount he bid
-    let bid = get_bid(deps, &config, &env, &info)?;
+    let bid = get_bid(&config, &info)?;
 
     // make sure the bid is at least above the othere bid by the increment
     let min_bid = auction.highest_bid.checked_add(
@@ -157,28 +160,9 @@ pub fn execute_auction_bid(
     Ok(Response::default())
 }
 
-pub fn execute_auction_claim(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    // We need to get the proof of the balance
-    // verify the proof is legit
-    // send the account controller a message telling him that this intent was fulfilled.
-    Ok(Response::default())
-}
-
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetAuction {} => {
-            let auction = ACTIVE_AUCTION.load(deps.storage)?;
-
-            if auction.end_time.is_expired(&env.block) {
-                to_json_binary(&None::<()>)
-            } else {
-                to_json_binary(&Some(auction))
-            }
-        }
+        QueryMsg::GetAuction {} => to_json_binary(&ACTIVE_AUCTION.load(deps.storage)?),
     }
 }

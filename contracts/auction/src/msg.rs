@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Coin, Uint128};
+use cosmwasm_std::Coin;
 use cw_utils::Duration;
 use orbital_utils::intent::Intent;
 
@@ -23,7 +23,6 @@ pub enum ExecuteMsg {
         bidder: String,
         // ask_amount: Uint128,
     },
-    AuctionClaim {},
 }
 
 #[cw_serde]

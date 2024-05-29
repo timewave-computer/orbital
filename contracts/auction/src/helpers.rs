@@ -1,9 +1,9 @@
-use cosmwasm_std::{ensure, Coin, DepsMut, Env, MessageInfo, StdResult, Uint128};
+use cosmwasm_std::{ensure, Coin, DepsMut, MessageInfo, StdResult};
 use orbital_utils::intent::Intent;
 
 use crate::{
-    state::{next_id, INTENTS, QUEUE},
-    types::{ActiveAuction, Config},
+    state::{next_id, IDS, INTENTS, QUEUE},
+    types::Config,
     ContractError,
 };
 
@@ -11,6 +11,7 @@ use crate::{
 pub fn add_intent(deps: DepsMut, intent: Intent) -> StdResult<()> {
     let id = next_id(deps.as_ref().storage)?;
 
+    IDS.save(deps.storage, &id)?;
     // add to our intent list
     INTENTS.save(deps.storage, id, &intent)?;
     // add to the queue
@@ -20,19 +21,21 @@ pub fn add_intent(deps: DepsMut, intent: Intent) -> StdResult<()> {
 }
 
 // remove intent from our system
-pub fn remove_intent(deps: DepsMut, id: u64) -> StdResult<()> {
-    INTENTS.remove(deps.storage, id);
-    QUEUE.dequeue(deps.storage)?;
-    Ok(())
+pub fn remove_intent(deps: DepsMut) -> StdResult<Option<u64>> {
+    Ok(match QUEUE.dequeue(deps.storage)? {
+        Some(id) => {
+            if id > 0 {
+                INTENTS.remove(deps.storage, id - 1);
+            }
+
+            Some(id)
+        }
+        None => None,
+    })
 }
 
 /// Ensure the bond is paid and return the bid amount
-pub fn get_bid(
-    deps: DepsMut,
-    config: &Config,
-    env: &Env,
-    info: &MessageInfo,
-) -> Result<Coin, ContractError> {
+pub fn get_bid(config: &Config, info: &MessageInfo) -> Result<Coin, ContractError> {
     let bid = if info.funds.len() == 1 {
         let funds = info.funds[0].clone();
         ensure!(

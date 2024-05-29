@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use cw_utils::{Duration, Expiration};
-use orbital_utils::domain::OrbitalDomain;
+use orbital_utils::{domain::OrbitalDomain, intent::Intent};
 
 #[cw_serde]
 pub struct Config {
@@ -26,4 +26,14 @@ pub struct ActiveAuction {
     pub highest_bid: Uint128,
     pub bidder: Option<String>,
     pub end_time: Expiration,
+}
+
+#[cw_serde]
+pub enum TestAccountExecuteMsg {
+    AuctionFinished {
+        original_intent: Intent,
+        id: u64,
+        winning_bid: Uint128,
+        bidder: Option<String>,
+    },
 }
