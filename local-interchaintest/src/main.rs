@@ -10,7 +10,7 @@ use local_ictest_e2e::{
     },
     API_URL, CHAIN_CONFIG_PATH, JUNO_CHAIN, MM_KEY, NEUTRON_CHAIN,
 };
-use localic_std::{polling::poll_for_start, relayer::Relayer};
+use localic_std::{modules::cosmwasm::CosmWasm, polling::poll_for_start, relayer::Relayer};
 use orbital_utils::domain::OrbitalDomain;
 use reqwest::blocking::Client;
 
@@ -22,6 +22,19 @@ use auction::msg::InstantiateMsg as AuctionInstantiate;
 
 pub const MM_JUNO_ADDR: &str = "juno1efd63aw40lxf3n4mhf7dzhjkr453axurv2zdzk";
 pub const MM_NEUTRON_ADDR: &str = "neutron1efd63aw40lxf3n4mhf7dzhjkr453axur78g5ld";
+pub const USER_KEY: &str = "acc0";
+
+pub fn register_new_domain(cw: &CosmWasm, domain: OrbitalDomain, note_addr: String) {
+    let msg = AccountExecute::RegisterDomain {
+        domain,
+        note_addr,
+    };
+
+    let register_domain_msg_str = to_json_string(&msg).unwrap();
+    let resp = cw.execute(USER_KEY, &register_domain_msg_str, "--gas 5502650")
+        .unwrap();
+    println!("register new domain tx: {:?}", resp.tx_hash);
+}
 
 // local-ic start neutron_gaia_juno
 fn main() {
@@ -52,7 +65,6 @@ fn main() {
     let mut voice_cw = test_ctx.get_cosmwasm_instance(JUNO_CHAIN);
     let mut proxy_cw = test_ctx.get_cosmwasm_instance(JUNO_CHAIN);
 
-    let key = "acc0";
     let neutron_rb = test_ctx
         .get_request_builder()
         .get_request_builder(NEUTRON_CHAIN);
@@ -63,12 +75,12 @@ fn main() {
     let _neutron_relayer = Relayer::new(neutron_rb);
     let juno_relayer = Relayer::new(juno_rb);
 
-    let note_code_id = note_cw.store(key, &note_path).unwrap();
-    let account_code_id = account_cw.store(key, &account_path).unwrap();
-    let auction_code_id = auction_cw.store(key, &auction_path).unwrap();
+    let note_code_id = note_cw.store(USER_KEY, &note_path).unwrap();
+    let account_code_id = account_cw.store(USER_KEY, &account_path).unwrap();
+    let auction_code_id = auction_cw.store(USER_KEY, &auction_path).unwrap();
 
-    let voice_code_id = voice_cw.store(key, &voice_path).unwrap();
-    let proxy_code_id = proxy_cw.store(key, &proxy_path).unwrap();
+    let voice_code_id = voice_cw.store(USER_KEY, &voice_path).unwrap();
+    let proxy_code_id = proxy_cw.store(USER_KEY, &proxy_path).unwrap();
 
     println!("[NEUTRON] note code id: {:?}", note_code_id);
     println!("[NEUTRON] auction code id: {:?}", auction_code_id);
@@ -81,7 +93,7 @@ fn main() {
 
     let note_contract = note_cw
         .instantiate(
-            "acc0",
+            USER_KEY,
             "{\"block_max_gas\":\"3010000\"}",
             "neutron_note",
             None,
@@ -93,7 +105,7 @@ fn main() {
 
     let voice_contract = voice_cw
         .instantiate(
-            "acc0",
+            USER_KEY,
             format!(
                 "{{\"proxy_code_id\":\"{}\",\"block_max_gas\":\"{}\"}}",
                 proxy_code_id, "3010000"
@@ -119,22 +131,16 @@ fn main() {
     pretty_print("polytone channel init response", &polytone_channel_init);
 
     let account_contract = account_cw
-        .instantiate("acc0", "{}", "orbital_account", None, "")
+        .instantiate(USER_KEY, "{}", "orbital_account", None, "")
         .unwrap();
 
     println!("account contract: {:?}", account_contract);
 
-    let msg = AccountExecute::RegisterDomain {
-        domain: OrbitalDomain::Juno,
-        note_addr: note_contract.address,
-    };
-
-    let register_domain_msg_str = to_json_string(&msg).unwrap();
-
-    let resp = account_cw
-        .execute("acc0", &register_domain_msg_str, "--gas 5502650")
-        .unwrap();
-    println!("resp: {:?}", resp);
+    register_new_domain(&account_cw, OrbitalDomain::Juno, note_contract.address.to_string());
+    // let resp = account_cw
+    //     .execute(USER_KEY, &register_domain_msg, "--gas 5502650")
+    //     .unwrap();
+    // println!("resp: {:?}", resp);
 
     std::thread::sleep(std::time::Duration::from_secs(20));
 
@@ -156,7 +162,7 @@ fn main() {
 
     let _fund_proxy = localic_std::modules::bank::send(
         juno_rb,
-        "acc0",
+        USER_KEY,
         juno_proxy_address,
         &[coin(100_000, "ujuno")],
         &coin(1_000, "ujuno"),
@@ -171,7 +177,7 @@ fn main() {
     let sync_juno_domain_msg_str = to_json_string(&sync_juno_domain_msg).unwrap();
 
     let resp = account_cw
-        .execute("acc0", &sync_juno_domain_msg_str, "--gas 5502650")
+        .execute(USER_KEY, &sync_juno_domain_msg_str, "--gas 5502650")
         .unwrap();
     println!("sync_juno_domain_msg_response: {:?}", resp);
     std::thread::sleep(std::time::Duration::from_secs(10));
@@ -199,7 +205,7 @@ fn main() {
 
     let withdraw_funds_resp = account_cw
         .execute(
-            "acc0",
+            USER_KEY,
             to_json_string(&withdraw_msg).unwrap().as_str(),
             "--gas 5502650",
         )
@@ -221,7 +227,7 @@ fn main() {
 
     let auction_contract = auction_cw
         .instantiate(
-            "acc0",
+            USER_KEY,
             to_json_string(&AuctionInstantiate {
                 account_addr: account_contract.address.clone(),
                 bond: coin(100, "untrn"),
@@ -242,7 +248,7 @@ fn main() {
 
     let response = account_cw
         .execute(
-            "acc0",
+            USER_KEY,
             &to_json_string(&AccountExecute::UpdateAuctionAddr {
                 auction_addr: auction_contract.address.clone(),
             })
@@ -262,7 +268,12 @@ fn main() {
     });
 
     let response = account_cw
-        .execute("acc0", &to_json_string(&new_intent_msg).unwrap(), "")
+        .execute(
+            USER_KEY,
+            &to_json_string(&new_intent_msg)
+            .unwrap(),
+            "",
+        )
         .unwrap();
     println!("create new intent response: {:?}", response);
     std::thread::sleep(std::time::Duration::from_secs(5));
