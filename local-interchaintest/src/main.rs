@@ -20,6 +20,7 @@ use account::msg::QueryMsg as AccountQuery;
 use auction::msg::ExecuteMsg as AuctionExecute;
 use auction::msg::InstantiateMsg as AuctionInstantiate;
 use auction::msg::QueryMsg as AuctionQuery;
+use serde_json::Value;
 
 pub const MM_JUNO_ADDR: &str = "juno1efd63aw40lxf3n4mhf7dzhjkr453axurv2zdzk";
 pub const MM_NEUTRON_ADDR: &str = "neutron1efd63aw40lxf3n4mhf7dzhjkr453axur78g5ld";
@@ -90,7 +91,7 @@ fn main() {
         )
         .unwrap();
 
-    println!("note contract: {:?}", note_contract);
+    println!("note contract: {:?}", note_contract.address);
 
     let voice_contract = voice_cw
         .instantiate(
@@ -105,7 +106,7 @@ fn main() {
             "",
         )
         .unwrap();
-    println!("voice contract: {:?}", voice_contract);
+    println!("voice contract: {:?}", voice_contract.address);
 
     let polytone_channel_init = juno_relayer
         .create_channel(
@@ -123,205 +124,72 @@ fn main() {
         .instantiate(USER_KEY, "{}", "orbital_account", None, "")
         .unwrap();
 
-    println!("account contract: {:?}", account_contract);
-
     register_new_domain(
         &account_cw,
         OrbitalDomain::Juno,
         note_contract.address.to_string(),
     );
-    // let resp = account_cw
-    //     .execute(USER_KEY, &register_domain_msg, "--gas 5502650")
-    //     .unwrap();
-    // println!("resp: {:?}", resp);
 
-    std::thread::sleep(std::time::Duration::from_secs(20));
+    let juno_proxy_address = query_domain_proxy_addr(&account_cw, "juno");
 
-    let proxy_acc_query_msg_str = to_json_string(&AccountQuery::QueryProxyAccount {
-        domain: "juno".to_string(),
-    })
-    .unwrap();
-    let resp = account_cw.query(&proxy_acc_query_msg_str);
-    let juno_proxy_address = resp["data"].as_str().unwrap();
-    println!("juno proxy account address: {}", juno_proxy_address);
+    query_domain_ledger(&account_cw, "juno");
 
-    let proxy_acc_ledger_query_msg_str = to_json_string(&AccountQuery::QueryLedger {
-        domain: "juno".to_string(),
-    })
-    .unwrap();
+    fund_proxy(juno_rb, USER_KEY, &juno_proxy_address, "ujuno", 100_000);
 
-    let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
-    println!("juno proxy account ledger response: {:?}", resp);
+    sync_account_domain_balance(&account_cw, OrbitalDomain::Juno, USER_KEY);
 
-    let _fund_proxy = localic_std::modules::bank::send(
-        juno_rb,
-        USER_KEY,
-        juno_proxy_address,
-        &[coin(100_000, "ujuno")],
-        &coin(1_000, "ujuno"),
-    )
-    .unwrap();
+    query_domain_ledger(&account_cw, "juno");
 
-    std::thread::sleep(std::time::Duration::from_secs(10));
+    query_mm_balance(juno_rb, MM_JUNO_ADDR);
 
-    let sync_juno_domain_msg = AccountExecute::Sync {
-        domain: OrbitalDomain::Juno,
-    };
-    let sync_juno_domain_msg_str = to_json_string(&sync_juno_domain_msg).unwrap();
+    withdraw_funds(OrbitalDomain::Juno, &account_cw, USER_KEY, MM_JUNO_ADDR, "ujuno", 1);
 
-    let resp = account_cw
-        .execute(USER_KEY, &sync_juno_domain_msg_str, "--gas 5502650")
-        .unwrap();
-    println!("sync_juno_domain_msg_response: {:?}", resp);
-    std::thread::sleep(std::time::Duration::from_secs(10));
+    query_mm_balance(juno_rb, MM_JUNO_ADDR);
 
-    let proxy_acc_ledger_query_msg_str = to_json_string(&AccountQuery::QueryLedger {
-        domain: "juno".to_string(),
-    })
-    .unwrap();
+    query_domain_ledger(&account_cw, "juno");
 
-    let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
-    pretty_print("ledger query response", &resp);
-
-    let withdraw_msg = AccountExecute::WithdrawFunds {
-        domain: OrbitalDomain::Juno,
-        coin: Coin {
-            denom: "ujuno".to_string(),
-            amount: Uint128::new(1),
-        },
-        dest: MM_JUNO_ADDR.to_string(),
-    };
-
-    let bal = localic_std::modules::bank::get_balance(juno_rb, MM_JUNO_ADDR);
-    println!("juno mm balance: {:?}", bal);
-    println!("\n withdrawing funds from juno domain to mm address\n");
-
-    let withdraw_funds_resp = account_cw
-        .execute(
-            USER_KEY,
-            to_json_string(&withdraw_msg).unwrap().as_str(),
-            "--gas 5502650",
-        )
-        .unwrap();
-    println!("withdraw_funds_resp: {:?}", withdraw_funds_resp);
-
-    std::thread::sleep(std::time::Duration::from_secs(15));
-
-    let bal = localic_std::modules::bank::get_balance(juno_rb, MM_JUNO_ADDR);
-    println!("juno mm balance: {:?}", bal);
-
-    let proxy_acc_ledger_query_msg_str = to_json_string(&AccountQuery::QueryLedger {
-        domain: "juno".to_string(),
-    })
-    .unwrap();
-
-    let resp = account_cw.query(&proxy_acc_ledger_query_msg_str);
-    pretty_print("ledger query response", &resp);
+    let auction_instantiate_msg = &get_instantiate_auction_msg_str(
+        account_contract.address.as_str(),
+        coin(100, "untrn"),
+        10,
+        CwDuration::Time(30));
 
     let auction_contract = auction_cw
-        .instantiate(
-            USER_KEY,
-            to_json_string(&AuctionInstantiate {
-                account_addr: account_contract.address.clone(),
-                bond: coin(100, "untrn"),
-                increment_bps: 10,
-                duration: CwDuration::Time(30),
-                fulfillment_timeout: CwDuration::Time(30),
-            })
-            .unwrap()
-            .as_str(),
-            "orbital_auction",
-            None,
-            "",
-        )
+        .instantiate(USER_KEY, auction_instantiate_msg, "orbital_auction", None,"")
         .unwrap();
-
-    println!("auction contract: {:?}", auction_contract);
     std::thread::sleep(std::time::Duration::from_secs(5));
 
-    let response = account_cw
-        .execute(
-            USER_KEY,
-            &to_json_string(&AccountExecute::UpdateAuctionAddr {
-                auction_addr: auction_contract.address.clone(),
-            })
-            .unwrap(),
-            "",
-        )
-        .unwrap();
-    println!("update auction response: {:?}", response);
-    std::thread::sleep(std::time::Duration::from_secs(5));
+    update_auction_addr(&account_cw, USER_KEY, &auction_contract.address.as_str());
 
-    let new_intent_msg = AccountExecute::NewIntent(orbital_utils::intent::Intent {
+    let new_intent_msg = orbital_utils::intent::Intent {
         ask_domain: OrbitalDomain::Neutron,
         ask_coin: coin(10, "untrn"),
         offer_domain: OrbitalDomain::Juno,
         offer_coin: coin(100, "ujuno"),
         is_verified: false,
-    });
+    };
+    submit_intent(&account_cw, USER_KEY, &new_intent_msg);
 
-    let response = account_cw
-        .execute(USER_KEY, &to_json_string(&new_intent_msg).unwrap(), "")
-        .unwrap();
-    println!("create new intent response: {:?}", response);
-    std::thread::sleep(std::time::Duration::from_secs(5));
-
-    let new_intent_msg = AccountExecute::NewIntent(orbital_utils::intent::Intent {
+    let new_intent_msg = orbital_utils::intent::Intent {
         ask_domain: OrbitalDomain::Neutron,
         ask_coin: coin(21, "untrn"),
         offer_domain: OrbitalDomain::Juno,
         offer_coin: coin(123, "ujuno"),
         is_verified: false,
-    });
-
-    let response = account_cw
-        .execute(USER_KEY, &to_json_string(&new_intent_msg).unwrap(), "")
-        .unwrap();
-    println!("create new intent response: {:?}", response);
-    std::thread::sleep(std::time::Duration::from_secs(5));
-    
-    let new_tick_msg = AuctionExecute::AuctionTick {};
-    let response = auction_cw
-        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
-        .unwrap();
-    println!("tick auction response: {:?}", response);
-    std::thread::sleep(std::time::Duration::from_secs(5));
-
-    let new_bond_msg = AuctionExecute::Bond {};
-    let response = auction_cw
-        .execute(
-            MM_KEY,
-            &to_json_string(&new_bond_msg).unwrap(),
-            "--amount 100untrn",
-        )
-        .unwrap();
-    println!("MM bond response: {:?}", response);
-    std::thread::sleep(std::time::Duration::from_secs(5));
-
-    let bid_msg = AuctionExecute::AuctionBid {
-        bidder: MM_JUNO_ADDR.to_string(),
-        bid: Uint128::new(100),
     };
-    let response = auction_cw
-        .execute(MM_KEY, &to_json_string(&bid_msg).unwrap(), "")
-        .unwrap();
-    println!("bid response: {:?}", response);
-    std::thread::sleep(std::time::Duration::from_secs(25));
+    submit_intent(&account_cw, USER_KEY, &new_intent_msg);
 
-    let get_deposit_addr_msg = AuctionQuery::GetAuction {};
-    let resp = auction_cw.query(&to_json_string(&get_deposit_addr_msg).unwrap());
-    println!("query obj: {:?}", resp.as_object().unwrap());
-    let deposit_addr = resp.as_object().unwrap()["data"]["intent"]["deposit_addr"]
-        .as_str()
-        .unwrap();
-    println!("deposit addr: {}", deposit_addr);
+    tick_auction(&auction_cw);
 
-    let new_tick_msg = AuctionExecute::AuctionTick {};
-    let response = auction_cw
-        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
-        .unwrap();
-    println!("tick auction response: {:?}", response);
-    std::thread::sleep(std::time::Duration::from_secs(5));
+    mm_submit_bond(&auction_cw, MM_KEY, coin(100, "untrn"));
+
+    auction_bid(&auction_cw, MM_JUNO_ADDR, 100);
+  
+    std::thread::sleep(std::time::Duration::from_secs(20));
+
+    let deposit_addr = &get_auction_deposit_addr(&auction_cw);
+
+    tick_auction(&auction_cw);
 
     let res = localic_std::modules::bank::send(
         neutron_rb,
@@ -332,14 +200,10 @@ fn main() {
     )
     .unwrap();
     pretty_print("bank send res", &res);
+
     std::thread::sleep(std::time::Duration::from_secs(25));
 
-    let new_tick_msg = AuctionExecute::AuctionTick {};
-    let response = auction_cw
-        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
-        .unwrap();
-    println!("tick auction response: {:?}", response);
-    std::thread::sleep(std::time::Duration::from_secs(5));
+    tick_auction(&auction_cw);
 }
 
 // D - init an auction
@@ -350,6 +214,34 @@ fn main() {
 // mm deposit into given addr
 // verify auction
 
+pub fn mm_fulfil_bid(rb: &ChainRequestBuilder, dest: &str, bid: Coin) -> Value {
+    let resp = localic_std::modules::bank::send(
+        rb,
+        MM_KEY,
+        dest,
+        &[bid.clone()],
+        &coin(100, bid.denom.as_str()),
+    )
+    .unwrap();
+
+    println!("[MM FULFIL BID] (dest: {}, coin: ({}{}))", dest, bid.amount, bid.denom);
+    println!("sleeping for 10");
+    std::thread::sleep(std::time::Duration::from_secs(10));
+    resp
+}
+
+pub fn mm_submit_bond(cw: &CosmWasm, key: &str, bond: Coin) {
+    let new_bond_msg = to_json_string(&AuctionExecute::Bond {}).unwrap();
+
+    let coin_flag = format!("--amount {}{}", bond.amount, bond.denom);
+
+    let response = cw
+        .execute(key, &new_bond_msg, coin_flag.as_str())
+        .unwrap();
+    println!("[MM SUBMIT BOND] (bond: {}, tx_resp: {:?}", coin_flag, response.tx_hash.unwrap());
+    println!("sleeping for 5...");
+    std::thread::sleep(std::time::Duration::from_secs(5));
+}
 
 pub fn get_instantiate_auction_msg_str(account_addr: &str, bond_coin: Coin, increment_bps: u64, duration: CwDuration) -> String {
     let auction_instantiate_msg = AuctionInstantiate {
@@ -476,25 +368,35 @@ pub fn submit_intent(cw: &CosmWasm, key: &str, intent: &orbital_utils::intent::I
     let response = cw
         .execute(key, &to_json_string(&new_intent_msg).unwrap(), "")
         .unwrap();
-    println!("submit intent response: {:?}", response);
+    println!("[SUBMITTING INTENT] (tx_hash: {})", response.tx_hash.unwrap());
     println!("sleeping for 5");
     std::thread::sleep(std::time::Duration::from_secs(5));
+}
+
+pub fn get_auction_deposit_addr(cw: &CosmWasm) -> String {
+    let get_auction_msg = to_json_string(&AuctionQuery::GetAuction {}).unwrap();
+    let resp = cw.query(&get_auction_msg);
+
+    let deposit_addr = resp.as_object().unwrap()["data"]["intent"]["deposit_addr"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    println!("[AUCTION DEPOSIT ADDRESS] (addr: {})", deposit_addr);
+    deposit_addr
 }
 
 pub fn tick_auction(cw: &CosmWasm) {
-    println!("[TICK AUCTION]");
     let new_tick_msg = AuctionExecute::AuctionTick {};
     let response = cw
-        .execute(USER_KEY, &to_json_string(&new_tick_msg).unwrap(), "")
+        .execute(USER_KEY, &to_json_string(&new_tick_msg).unwrap(), "--gas 5502650")
         .unwrap();
-    println!("tick auction response: {:?}", response);
+    println!("[TICK AUCTION] (tx_hash: {:?})", response.tx_hash.unwrap());
     println!("sleeping for 5");
     std::thread::sleep(std::time::Duration::from_secs(5));
 }
 
-
 pub fn auction_bid(cw: &CosmWasm, bidder: &str, bid_amount: u128) {
-    println!("[AUCTION BID] (bidder: {}, bid: {})", bidder, bid_amount);
     let bid_msg = AuctionExecute::AuctionBid {
         bidder: bidder.to_string(),
         bid: bid_amount.into(),
@@ -503,7 +405,7 @@ pub fn auction_bid(cw: &CosmWasm, bidder: &str, bid_amount: u128) {
     let response = cw
         .execute(MM_KEY, &to_json_string(&bid_msg).unwrap(), "")
         .unwrap();
-    println!("bid response: {:?}", response);
+    println!("[AUCTION BID] (bidder: {}, bid: {}, tx_hash: {})", bidder, bid_amount, response.tx_hash.unwrap());
     println!("sleeping for 5");
     std::thread::sleep(std::time::Duration::from_secs(5));
 }
