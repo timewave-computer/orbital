@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Coin;
+use cosmwasm_std::{Coin, Uint128};
 use cw_utils::Duration;
 use orbital_utils::intent::Intent;
 
@@ -25,6 +25,7 @@ pub enum ExecuteMsg {
     AuctionBid {
         // Address on the ask domain (can't be verified here most of the time)
         bidder: String,
+        bid: Uint128,
     },
     Fulfilled {
         id: u64,

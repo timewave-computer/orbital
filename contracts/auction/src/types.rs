@@ -28,6 +28,7 @@ pub struct ActiveAuction {
     pub intent_id: u64,
     pub highest_bid: Coin,
     pub bidder: Option<String>,
+    pub mm_addr: Option<String>,
     pub end_time: Expiration,
     pub verified: bool,
 }
@@ -47,5 +48,6 @@ pub enum TestAccountExecuteMsg {
         original_intent: SavedIntent,
         winning_bid: Uint128,
         bidder: String,
+        mm_addr: String,
     },
 }
