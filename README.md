@@ -54,6 +54,15 @@ For now, this is done using polytone.
 After polytone proxy is created and account receives the callback, users can bank-send funds
 into the created proxy address.
 
+This enables users to interact with a single contract address on neutron in order to control
+an account on any chain that supports cosmwasm (polytone).
+
+The plan was to have an option to chose between an ICA and Polytone account type for each domain,
+but we ran out of time.
+
+- some chains support cosmwasm, but not ICA host, and vice versa
+- having the option to chose between two types of remote chain accounts would enable to cover most domains
+
 ### Double accounting
 
 In order to enable the best user experience, system uses an internal double accounting ledger.
