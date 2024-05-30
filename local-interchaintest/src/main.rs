@@ -10,7 +10,7 @@ use local_ictest_e2e::{
     },
     API_URL, CHAIN_CONFIG_PATH, JUNO_CHAIN, MM_KEY, NEUTRON_CHAIN,
 };
-use localic_std::{modules::cosmwasm::CosmWasm, polling::poll_for_start, relayer::Relayer};
+use localic_std::{modules::cosmwasm::CosmWasm, polling::poll_for_start, relayer::Relayer, transactions::ChainRequestBuilder};
 use orbital_utils::domain::OrbitalDomain;
 use reqwest::blocking::Client;
 
@@ -24,16 +24,6 @@ use auction::msg::QueryMsg as AuctionQuery;
 pub const MM_JUNO_ADDR: &str = "juno1efd63aw40lxf3n4mhf7dzhjkr453axurv2zdzk";
 pub const MM_NEUTRON_ADDR: &str = "neutron1efd63aw40lxf3n4mhf7dzhjkr453axur78g5ld";
 pub const USER_KEY: &str = "acc0";
-
-pub fn register_new_domain(cw: &CosmWasm, domain: OrbitalDomain, note_addr: String) {
-    let msg = AccountExecute::RegisterDomain { domain, note_addr };
-
-    let register_domain_msg_str = to_json_string(&msg).unwrap();
-    let resp = cw
-        .execute(USER_KEY, &register_domain_msg_str, "--gas 5502650")
-        .unwrap();
-    println!("register new domain tx: {:?}", resp.tx_hash);
-}
 
 // local-ic start neutron_gaia_juno
 fn main() {
@@ -359,3 +349,161 @@ fn main() {
 // D - call auction tick
 // mm deposit into given addr
 // verify auction
+
+
+pub fn get_instantiate_auction_msg_str(account_addr: &str, bond_coin: Coin, increment_bps: u64, duration: CwDuration) -> String {
+    let auction_instantiate_msg = AuctionInstantiate {
+        account_addr: account_addr.to_string(),
+        bond: bond_coin,
+        increment_bps,
+        duration,
+        fulfillment_timeout: CwDuration::Time(30),
+    };
+    to_json_string(&auction_instantiate_msg).unwrap()
+}
+
+pub fn fund_proxy(rb: &ChainRequestBuilder, from_key: &str, proxy_addr: &str, denom: &str, amount: u128) {
+    localic_std::modules::bank::send(
+        rb,
+        from_key,
+        proxy_addr,
+        &[coin(amount, denom)],
+        &coin(1_000, denom),
+    )
+    .unwrap();
+
+    println!("[FUND PROXY ADDR] (from_key: {}, dest: {}, coin: ({}{}))", from_key, proxy_addr, amount, denom);
+    println!("sleeping for 10");
+    std::thread::sleep(std::time::Duration::from_secs(10));
+}
+
+pub fn withdraw_funds(domain: OrbitalDomain, cw: &CosmWasm, key: &str, dest: &str, denom: &str, amount: u128) {
+    let withdraw_msg = AccountExecute::WithdrawFunds {
+        domain: domain.clone(),
+        coin: Coin {
+            denom: denom.to_string(),
+            amount: amount.into(),
+        },
+        dest: dest.to_string(),
+    };
+
+    let withdraw_funds_resp = cw
+        .execute(
+            key,
+            to_json_string(&withdraw_msg).unwrap().as_str(),
+            "--gas 5502650",
+        )
+        .unwrap();
+
+    println!("[WITHDRAW FUNDS] (domain: {:?}, coin: ({}{}), dest: {}, tx_hash: {})", domain, amount, denom, dest, withdraw_funds_resp.tx_hash.unwrap());
+    println!("sleeping for 15");
+
+    std::thread::sleep(std::time::Duration::from_secs(15));
+}
+
+pub fn query_domain_ledger(cw: &CosmWasm, domain: &str) {
+    let proxy_acc_ledger_query_msg_str = to_json_string(&AccountQuery::QueryLedger {
+        domain: domain.to_string(),
+    })
+    .unwrap();
+
+    let resp = cw.query(&proxy_acc_ledger_query_msg_str);
+    println!("[DOMAIN LEDGER QUERY] (domain: {}, resp: {:?})", domain, resp);
+}
+
+pub fn query_domain_proxy_addr(cw: &CosmWasm, domain: &str) -> String {
+    let proxy_acc_query_msg_str = to_json_string(&AccountQuery::QueryProxyAccount {
+        domain: domain.to_string(),
+    })
+    .unwrap();
+    let resp = cw.query(&proxy_acc_query_msg_str);
+    let proxy_address = resp["data"].as_str().unwrap();
+    println!("[ACCOUNT DOMAIN PROXY QUERY] (domain: {}, address: {:?})", domain, proxy_address);
+    proxy_address.to_string()
+}
+
+pub fn register_new_domain(cw: &CosmWasm, domain: OrbitalDomain, note_addr: String) {
+    let msg = AccountExecute::RegisterDomain {
+        domain: domain.clone(),
+        note_addr,
+    };
+
+    let register_domain_msg_str = to_json_string(&msg).unwrap();
+    let resp = cw.execute(USER_KEY, &register_domain_msg_str, "--gas 5502650")
+        .unwrap();
+    println!("[REGISTER ACCOUNT DOMAIN] (domain: {:?}, tx_hash: {:?})", domain, resp.tx_hash);
+    println!("sleeping for 15");
+    std::thread::sleep(std::time::Duration::from_secs(15));
+}
+
+pub fn update_auction_addr(cw: &CosmWasm, key: &str, auction_addr: &str) {
+    let update_auction_msg = AccountExecute::UpdateAuctionAddr {
+        auction_addr: auction_addr.to_string(),
+    };
+    let update_auction_msg_str = to_json_string(&update_auction_msg).unwrap();
+
+    let response = cw
+        .execute(key, &update_auction_msg_str, "")
+        .unwrap();
+    println!("[UPDATE AUCTION ADDRESS] update tx: {:?}", response.tx_hash.unwrap());
+    println!("sleeping for 5");
+    std::thread::sleep(std::time::Duration::from_secs(5));
+}
+
+pub fn sync_account_domain_balance(cw: &CosmWasm, domain: OrbitalDomain, key: &str) {
+    let sync_domain_msg = AccountExecute::Sync { domain: domain.clone() };
+    let sync_domain_msg_str = to_json_string(&sync_domain_msg).unwrap();
+
+    let resp = cw
+        .execute(key, &sync_domain_msg_str, "--gas 5502650")
+        .unwrap();
+    println!("[SYNC ACCOUNT DOMAIN BALANCE] (domain: {:?}, tx_hash: {:?})", domain, resp.tx_hash.unwrap());
+    std::thread::sleep(std::time::Duration::from_secs(10));
+}
+
+pub fn query_mm_balance(rb: &ChainRequestBuilder, addr: &str) {
+    let bal = localic_std::modules::bank::get_balance(rb, addr);
+    println!("[MM BALANCE QUERY] (addr: {}, balance: {:?})", addr, bal);
+}
+
+pub fn submit_intent(cw: &CosmWasm, key: &str, intent: &orbital_utils::intent::Intent) {
+    println!(
+        "[SUBMITTING INTENT] ( offer: ({}{} on {:?}), ask: ({}{} on {:?}) )",
+        intent.offer_coin.amount, intent.offer_coin.denom, intent.offer_domain,
+        intent.ask_coin.amount, intent.ask_coin.denom, intent.ask_domain,
+    );
+    let new_intent_msg = AccountExecute::NewIntent(intent.clone());
+    let response = cw
+        .execute(key, &to_json_string(&new_intent_msg).unwrap(), "")
+        .unwrap();
+    println!("submit intent response: {:?}", response);
+    println!("sleeping for 5");
+    std::thread::sleep(std::time::Duration::from_secs(5));
+}
+
+pub fn tick_auction(cw: &CosmWasm) {
+    println!("[TICK AUCTION]");
+    let new_tick_msg = AuctionExecute::AuctionTick {};
+    let response = cw
+        .execute(USER_KEY, &to_json_string(&new_tick_msg).unwrap(), "")
+        .unwrap();
+    println!("tick auction response: {:?}", response);
+    println!("sleeping for 5");
+    std::thread::sleep(std::time::Duration::from_secs(5));
+}
+
+
+pub fn auction_bid(cw: &CosmWasm, bidder: &str, bid_amount: u128) {
+    println!("[AUCTION BID] (bidder: {}, bid: {})", bidder, bid_amount);
+    let bid_msg = AuctionExecute::AuctionBid {
+        bidder: bidder.to_string(),
+        bid: bid_amount.into(),
+    };
+
+    let response = cw
+        .execute(MM_KEY, &to_json_string(&bid_msg).unwrap(), "")
+        .unwrap();
+    println!("bid response: {:?}", response);
+    println!("sleeping for 5");
+    std::thread::sleep(std::time::Duration::from_secs(5));
+}
