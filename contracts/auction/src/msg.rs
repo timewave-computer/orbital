@@ -27,9 +27,6 @@ pub enum ExecuteMsg {
         bidder: String,
         bid: Uint128,
     },
-    Fulfilled {
-        id: u64,
-    },
 }
 
 #[cw_serde]

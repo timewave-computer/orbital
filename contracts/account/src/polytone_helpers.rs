@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use auction::msg::ExecuteMsg as AuctionExecuteMsg;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{
-    ensure, from_json, to_json_binary, Addr, AllBalanceResponse, BalanceResponse, BankMsg,
-    BankQuery, Binary, CosmosMsg, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryRequest,
-    Response, StdError, StdResult, Uint64, WasmMsg,
+    from_json, to_json_binary, Addr, AllBalanceResponse, BalanceResponse, BankMsg, BankQuery,
+    Binary, CosmosMsg, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryRequest, Response,
+    StdError, StdResult, Uint64, WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -155,11 +155,11 @@ fn process_query_callback(
                             .unwrap();
                         let new_balance = old_balance + receive_funds.winning_bid.u128();
 
-                        ensure!(
-                            balance.amount.amount.u128() >= new_balance,
-                            NeutronError::Std(StdError::generic_err("Balance mismatch"))
-                        );
-                        Ok(new_balance)
+                        if balance.amount.amount.u128() < new_balance {
+                            Err(())
+                        } else {
+                            Ok(new_balance)
+                        }
                     }
                     Err(_) => Err(()),
                 },
@@ -177,7 +177,6 @@ fn process_query_callback(
                         &ledger,
                     )?;
 
-                    // TODO:: Move funds from the origin domain of the account, to the bidder
                     // Do bank send over polytone to the origin domain bidder
                     let note_origin_domain = DOMAIN_TO_NOTE
                         .load(deps.storage, receive_funds.intent.offer_domain.value())?;
@@ -197,8 +196,6 @@ fn process_query_callback(
                             })?,
                         }),
                     )?;
-
-                    // and on callback update ledger to move funds from the origin domain, to the MM address (bidder)
 
                     return Ok(Response::default().add_message(polytone_execute_msg));
                 }

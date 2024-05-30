@@ -24,7 +24,7 @@ use crate::{
         WITHDRAW_FUNDS_CALLBACK_ID,
     },
     state::{ADMIN, AUCTION_ADDR, DOMAIN_TO_NOTE, LEDGER, NOTE_TO_DOMAIN, USER_DOMAINS},
-    types::QueryRecievedFundsOnDestDomain,
+    types::{ExecuteReleaseFundsFromOrigin, QueryRecievedFundsOnDestDomain},
 };
 
 const CONTRACT_NAME: &str = "crates.io:account";
@@ -92,29 +92,80 @@ pub fn execute(
                 StdError::generic_err("sender is not the auction addr",)
             );
 
-            let note = DOMAIN_TO_NOTE.load(deps.storage, original_intent.ask_domain.value())?;
+            let query = BankQuery::Balance {
+                address: original_intent.deposit_addr.clone(),
+                denom: original_intent.ask_coin.denom.clone(),
+            };
 
-            // Query MM deposit address over polytone
-            let polytone_query_msg = get_note_query_neutron_msg(
-                vec![QueryRequest::Bank(BankQuery::Balance {
-                    address: original_intent.deposit_addr.clone(),
-                    denom: original_intent.ask_coin.denom.clone(),
-                })],
-                Uint64::new(120),
-                note,
-                CallbackRequest {
-                    receiver: env.contract.address.to_string(),
-                    msg: to_json_binary(&QueryRecievedFundsOnDestDomain {
-                        intent: original_intent,
-                        winning_bid,
-                        bidder,
-                        mm_addr,
-                    })?,
-                },
-            )?;
+            match DOMAIN_TO_NOTE.load(deps.storage, original_intent.ask_domain.value()) {
+                Ok(note) => {
+                    // Query MM deposit address over polytone
+                    let polytone_query_msg = get_note_query_neutron_msg(
+                        vec![QueryRequest::Bank(query)],
+                        Uint64::new(120),
+                        note,
+                        CallbackRequest {
+                            receiver: env.contract.address.to_string(),
+                            msg: to_json_binary(&QueryRecievedFundsOnDestDomain {
+                                intent: original_intent,
+                                winning_bid,
+                                bidder,
+                                mm_addr,
+                            })?,
+                        },
+                    )?;
+                    Ok(Response::new().add_message(polytone_query_msg))
+                }
+                Err(_) => {
+                    let balance = deps.querier.query_balance(
+                        original_intent.deposit_addr.clone(),
+                        original_intent.ask_coin.denom.clone(),
+                    )?;
 
-            // if MM didn't fulfill, send a slash msg to the auction addr
-            Ok(Response::new().add_message(polytone_query_msg))
+                    let mut ledger =
+                        LEDGER.load(deps.storage, original_intent.ask_domain.value())?;
+                    let old_balance = *ledger.get(original_intent.ask_coin.denom.as_str()).unwrap();
+                    let new_balance = old_balance + winning_bid.u128();
+
+                    if balance.amount.u128() < new_balance {
+                        // Something failed, so slash the MM
+                        let auction_addr = AUCTION_ADDR.load(deps.storage)?;
+                        let msg = WasmMsg::Execute {
+                            contract_addr: auction_addr.to_string(),
+                            msg: to_json_binary(&AuctionExecuteMsg::Slash {
+                                mm_addr,
+                            })?,
+                            funds: vec![],
+                        };
+
+                        return Ok(Response::new().add_message(msg));
+                    }
+
+                    ledger.insert(original_intent.ask_coin.denom, new_balance);
+                    LEDGER.save(deps.storage, original_intent.ask_domain.value(), &ledger)?;
+
+                    let note_origin_domain =
+                        DOMAIN_TO_NOTE.load(deps.storage, original_intent.offer_domain.value())?;
+                    let polytone_execute_msg = get_note_execute_neutron_msg(
+                        vec![BankMsg::Send {
+                            to_address: bidder.clone(),
+                            amount: vec![original_intent.offer_coin.clone()],
+                        }
+                        .into()],
+                        Uint64::new(120),
+                        note_origin_domain,
+                        Some(CallbackRequest {
+                            receiver: env.contract.address.to_string(),
+                            msg: to_json_binary(&ExecuteReleaseFundsFromOrigin {
+                                offer_coin: original_intent.offer_coin,
+                                origin_domain: original_intent.offer_domain,
+                            })?,
+                        }),
+                    )?;
+
+                    Ok(Response::new().add_message(polytone_execute_msg))
+                }
+            }
         }
         ExecuteMsg::WithdrawFunds { domain, coin, dest } => {
             execute_withdraw_funds(deps, env, info, domain, coin, dest)

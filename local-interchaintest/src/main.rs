@@ -124,7 +124,11 @@ fn main() {
 
     println!("account contract: {:?}", account_contract);
 
-    register_new_domain(&account_cw, OrbitalDomain::Juno, note_contract.address.to_string());
+    register_new_domain(
+        &account_cw,
+        OrbitalDomain::Juno,
+        note_contract.address.to_string(),
+    );
     // let resp = account_cw
     //     .execute(USER_KEY, &register_domain_msg, "--gas 5502650")
     //     .unwrap();
@@ -256,12 +260,7 @@ fn main() {
     });
 
     let response = account_cw
-        .execute(
-            USER_KEY,
-            &to_json_string(&new_intent_msg)
-            .unwrap(),
-            "",
-        )
+        .execute(USER_KEY, &to_json_string(&new_intent_msg).unwrap(), "")
         .unwrap();
     println!("create new intent response: {:?}", response);
     std::thread::sleep(std::time::Duration::from_secs(5));
@@ -273,6 +272,17 @@ fn main() {
     println!("tick auction response: {:?}", response);
     std::thread::sleep(std::time::Duration::from_secs(5));
 
+    let new_bond_msg = AuctionExecute::Bond {};
+    let response = auction_cw
+        .execute(
+            MM_KEY,
+            &to_json_string(&new_bond_msg).unwrap(),
+            "--amount 100untrn",
+        )
+        .unwrap();
+    println!("MM bond response: {:?}", response);
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
     let bid_msg = AuctionExecute::AuctionBid {
         bidder: MM_JUNO_ADDR.to_string(),
         bid: Uint128::new(100),
@@ -281,13 +291,39 @@ fn main() {
         .execute(MM_KEY, &to_json_string(&bid_msg).unwrap(), "")
         .unwrap();
     println!("bid response: {:?}", response);
+    std::thread::sleep(std::time::Duration::from_secs(25));
+
+    let new_tick_msg = AuctionExecute::AuctionTick {};
+    let response = auction_cw
+        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
+        .unwrap();
+    println!("tick auction response: {:?}", response);
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
+    let res = localic_std::modules::bank::send(
+        neutron_rb,
+        MM_KEY,
+        MM_NEUTRON_ADDR,
+        &[coin(100, "untrn")],
+        &coin(100, "untrn"),
+    )
+    .unwrap();
+    pretty_print("bank send res", &res);
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
+    let new_tick_msg = AuctionExecute::AuctionTick {};
+    let response = auction_cw
+        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
+        .unwrap();
+    println!("tick auction response: {:?}", response);
+    std::thread::sleep(std::time::Duration::from_secs(5));
 }
 
-// D init an auction
-// D start new intent
-// bid
-// sleep until auction ends
-// call auction tick
+// D - init an auction
+// D - start new intent
+// D - bid
+// D - sleep until auction ends
+// D - call auction tick
 // mm deposit into given addr
 // verify auction
 
