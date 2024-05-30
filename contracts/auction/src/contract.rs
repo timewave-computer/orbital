@@ -1,7 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, to_json_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, WasmMsg
+    coin, ensure, to_json_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, Uint128, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -12,7 +13,7 @@ use crate::{
     error::ContractError,
     helpers::{add_intent, next_intent},
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
-    state::{ACTIVE_AUCTION, BONDS, CONFIG, IDS, INTENTS, TO_VERIFY},
+    state::{ACTIVE_AUCTION, BONDS, CONFIG, IDS, INTENTS, QUEUE, TO_VERIFY},
     types::{ActiveAuction, Config, TestAccountExecuteMsg},
 };
 
@@ -101,7 +102,17 @@ pub fn execute_auction_tick(mut deps: DepsMut, env: Env) -> Result<Response, Con
     let config = CONFIG.load(deps.storage)?;
     let mut msgs: Vec<WasmMsg> = Vec::with_capacity(1);
 
-    let curr_auction = ACTIVE_AUCTION.load(deps.storage)?;
+    let curr_auction = match ACTIVE_AUCTION.may_load(deps.storage)? {
+        Some(active) => active,
+        None => ActiveAuction {
+            intent_id: 0,
+            highest_bid: coin(0_u128, "denom"),
+            bidder: None,
+            mm_addr: None,
+            end_time: cw_utils::Expiration::AtHeight(0),
+            verified: false,
+        },
+    };
 
     // ensure the auction is expired
     ensure!(
@@ -208,5 +219,9 @@ pub fn execute_auction_bid(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetAuction {} => to_json_binary(&ACTIVE_AUCTION.load(deps.storage)?),
+        QueryMsg::GetQueue {} => {
+            let queue = QUEUE.query_queue(deps.storage, None, None)?;
+            to_json_binary(&queue)
+        }
     }
 }

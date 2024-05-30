@@ -42,8 +42,8 @@ fn main() {
     let proxy_path = polytone_path.join("polytone_proxy.wasm");
 
     let orbital_contracts_path = contracts_path.join("orbital");
-    let auction_path = orbital_contracts_path.join("auction-aarch64.wasm");
-    let account_path = orbital_contracts_path.join("account-aarch64.wasm");
+    let auction_path = orbital_contracts_path.join("auction.wasm");
+    let account_path = orbital_contracts_path.join("account.wasm");
 
     let mut note_cw = test_ctx.get_cosmwasm_instance(NEUTRON_CHAIN);
     let mut account_cw = test_ctx.get_cosmwasm_instance(NEUTRON_CHAIN);
@@ -268,7 +268,7 @@ fn main() {
     std::thread::sleep(std::time::Duration::from_secs(5));
 
     let new_tick_msg = AuctionExecute::AuctionTick {};
-    let response = account_cw
+    let response = auction_cw
         .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
         .unwrap();
     println!("tick auction response: {:?}", response);
@@ -278,7 +278,7 @@ fn main() {
         bidder: MM_JUNO_ADDR.to_string(),
         bid: Uint128::new(100),
     };
-    let response = account_cw
+    let response = auction_cw
         .execute(MM_KEY, &to_json_string(&bid_msg).unwrap(), "")
         .unwrap();
     println!("bid response: {:?}", response);

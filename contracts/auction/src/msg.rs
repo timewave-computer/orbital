@@ -37,4 +37,6 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     #[returns(ActiveAuction)]
     GetAuction {},
+    #[returns(Vec<u64>)]
+    GetQueue {},
 }
