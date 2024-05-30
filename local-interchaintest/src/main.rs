@@ -140,14 +140,6 @@ fn main() {
 
     query_domain_ledger(&account_cw, "juno");
 
-    query_mm_balance(juno_rb, MM_JUNO_ADDR);
-
-    withdraw_funds(OrbitalDomain::Juno, &account_cw, USER_KEY, MM_JUNO_ADDR, "ujuno", 1);
-
-    query_mm_balance(juno_rb, MM_JUNO_ADDR);
-
-    query_domain_ledger(&account_cw, "juno");
-
     let auction_instantiate_msg = &get_instantiate_auction_msg_str(
         account_contract.address.as_str(),
         coin(100, "untrn"),
@@ -166,6 +158,15 @@ fn main() {
         ask_coin: coin(10, "untrn"),
         offer_domain: OrbitalDomain::Juno,
         offer_coin: coin(100, "ujuno"),
+        is_verified: false,
+    };
+    submit_intent(&account_cw, USER_KEY, &new_intent_msg);
+
+    let new_intent_msg = orbital_utils::intent::Intent {
+        ask_domain: OrbitalDomain::Neutron,
+        ask_coin: coin(21, "untrn"),
+        offer_domain: OrbitalDomain::Juno,
+        offer_coin: coin(123, "ujuno"),
         is_verified: false,
     };
     submit_intent(&account_cw, USER_KEY, &new_intent_msg);
@@ -204,6 +205,18 @@ fn main() {
     std::thread::sleep(std::time::Duration::from_secs(25));
 
     tick_auction(&auction_cw);
+    
+    std::thread::sleep(std::time::Duration::from_secs(30));
+
+    tick_auction(&auction_cw);
+
+    println!("\n[POST AUCTION ACCOUNT BALANCES]\n");
+    query_domain_ledger(&account_cw, "juno");
+    query_domain_ledger(&account_cw, "neutron");
+
+    println!("\n[POST AUCTION MARKETMAKER BALANCES]\n");
+    query_mm_balance(juno_rb, MM_JUNO_ADDR);
+    query_mm_balance(neutron_rb, MM_NEUTRON_ADDR);
 }
 
 // D - init an auction

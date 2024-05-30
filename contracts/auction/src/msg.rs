@@ -38,6 +38,9 @@ pub enum QueryMsg {
     GetQueue {},
     #[returns(SavedIntent)]
     GetIntent { id: u64 },
+    #[returns(SavedIntent)]
+    GetToVerify { },
+    
 }
 
 #[cw_serde]

@@ -124,7 +124,9 @@ pub fn execute(
 
                     let mut ledger =
                         LEDGER.load(deps.storage, original_intent.ask_domain.value())?;
-                    let old_balance = *ledger.get(original_intent.ask_coin.denom.as_str()).unwrap();
+                    let old_balance = *ledger
+                        .get(original_intent.ask_coin.denom.as_str())
+                        .unwrap_or(&0_u128);
                     let new_balance = old_balance + winning_bid.u128();
 
                     if balance.amount.u128() < new_balance {
@@ -132,9 +134,7 @@ pub fn execute(
                         let auction_addr = AUCTION_ADDR.load(deps.storage)?;
                         let msg = WasmMsg::Execute {
                             contract_addr: auction_addr.to_string(),
-                            msg: to_json_binary(&AuctionExecuteMsg::Slash {
-                                mm_addr,
-                            })?,
+                            msg: to_json_binary(&AuctionExecuteMsg::Slash { mm_addr })?,
                             funds: vec![],
                         };
 
