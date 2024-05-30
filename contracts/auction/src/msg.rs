@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, Uint128};
 use cw_utils::Duration;
-use orbital_utils::intent::Intent;
+use orbital_utils::intent::{Intent, SavedIntent};
 
 use crate::types::ActiveAuction;
 
@@ -32,8 +32,16 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(ActiveAuction)]
+    #[returns(GetAuctionResponse)]
     GetAuction {},
     #[returns(Vec<u64>)]
     GetQueue {},
+    #[returns(SavedIntent)]
+    GetIntent { id: u64 },
+}
+
+#[cw_serde]
+pub struct GetAuctionResponse {
+    pub auction: ActiveAuction,
+    pub intent: SavedIntent,
 }
