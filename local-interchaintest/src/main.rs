@@ -19,6 +19,7 @@ use account::msg::QueryMsg as AccountQuery;
 
 use auction::msg::ExecuteMsg as AuctionExecute;
 use auction::msg::InstantiateMsg as AuctionInstantiate;
+use auction::msg::QueryMsg as AuctionQuery;
 
 pub const MM_JUNO_ADDR: &str = "juno1efd63aw40lxf3n4mhf7dzhjkr453axurv2zdzk";
 pub const MM_NEUTRON_ADDR: &str = "neutron1efd63aw40lxf3n4mhf7dzhjkr453axur78g5ld";
@@ -265,6 +266,20 @@ fn main() {
     println!("create new intent response: {:?}", response);
     std::thread::sleep(std::time::Duration::from_secs(5));
 
+    let new_intent_msg = AccountExecute::NewIntent(orbital_utils::intent::Intent {
+        ask_domain: OrbitalDomain::Neutron,
+        ask_coin: coin(21, "untrn"),
+        offer_domain: OrbitalDomain::Juno,
+        offer_coin: coin(123, "ujuno"),
+        is_verified: false,
+    });
+
+    let response = account_cw
+        .execute(USER_KEY, &to_json_string(&new_intent_msg).unwrap(), "")
+        .unwrap();
+    println!("create new intent response: {:?}", response);
+    std::thread::sleep(std::time::Duration::from_secs(5));
+    
     let new_tick_msg = AuctionExecute::AuctionTick {};
     let response = auction_cw
         .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
@@ -293,6 +308,14 @@ fn main() {
     println!("bid response: {:?}", response);
     std::thread::sleep(std::time::Duration::from_secs(25));
 
+    let get_deposit_addr_msg = AuctionQuery::GetAuction {};
+    let resp = auction_cw.query(&to_json_string(&get_deposit_addr_msg).unwrap());
+    println!("query obj: {:?}", resp.as_object().unwrap());
+    let deposit_addr = resp.as_object().unwrap()["data"]["intent"]["deposit_addr"]
+        .as_str()
+        .unwrap();
+    println!("deposit addr: {}", deposit_addr);
+
     let new_tick_msg = AuctionExecute::AuctionTick {};
     let response = auction_cw
         .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
@@ -303,13 +326,13 @@ fn main() {
     let res = localic_std::modules::bank::send(
         neutron_rb,
         MM_KEY,
-        MM_NEUTRON_ADDR,
+        deposit_addr,
         &[coin(100, "untrn")],
         &coin(100, "untrn"),
     )
     .unwrap();
     pretty_print("bank send res", &res);
-    std::thread::sleep(std::time::Duration::from_secs(5));
+    std::thread::sleep(std::time::Duration::from_secs(25));
 
     let new_tick_msg = AuctionExecute::AuctionTick {};
     let response = auction_cw

@@ -12,7 +12,7 @@ use orbital_utils::intent::Intent;
 use crate::{
     error::ContractError,
     helpers::{add_intent, next_intent},
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, GetAuctionResponse, InstantiateMsg, QueryMsg},
     state::{ACTIVE_AUCTION, BONDS, CONFIG, IDS, INTENTS, QUEUE, TO_VERIFY},
     types::{ActiveAuction, Config, TestAccountExecuteMsg},
 };
@@ -217,10 +217,16 @@ pub fn execute_auction_bid(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetAuction {} => to_json_binary(&ACTIVE_AUCTION.load(deps.storage)?),
+        QueryMsg::GetAuction {} => {
+            let auction = ACTIVE_AUCTION.load(deps.storage)?;
+            let intent = INTENTS.load(deps.storage, auction.intent_id)?;
+
+            to_json_binary(&GetAuctionResponse { auction, intent })
+        }
         QueryMsg::GetQueue {} => {
             let queue = QUEUE.query_queue(deps.storage, None, None)?;
             to_json_binary(&queue)
         }
+        QueryMsg::GetIntent { id } => to_json_binary(&INTENTS.load(deps.storage, id)?),
     }
 }
