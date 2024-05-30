@@ -228,5 +228,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_json_binary(&queue)
         }
         QueryMsg::GetIntent { id } => to_json_binary(&INTENTS.load(deps.storage, id)?),
+        QueryMsg::GetToVerify { } => to_json_binary(&TO_VERIFY.load(deps.storage)?),
     }
 }

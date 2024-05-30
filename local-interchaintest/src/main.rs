@@ -279,6 +279,20 @@ fn main() {
         .unwrap();
     println!("create new intent response: {:?}", response);
     std::thread::sleep(std::time::Duration::from_secs(5));
+
+    let new_intent_msg = AccountExecute::NewIntent(orbital_utils::intent::Intent {
+        ask_domain: OrbitalDomain::Neutron,
+        ask_coin: coin(21, "untrn"),
+        offer_domain: OrbitalDomain::Juno,
+        offer_coin: coin(123, "ujuno"),
+        is_verified: false,
+    });
+
+    let response = account_cw
+        .execute(USER_KEY, &to_json_string(&new_intent_msg).unwrap(), "")
+        .unwrap();
+    println!("create new intent response: {:?}", response);
+    std::thread::sleep(std::time::Duration::from_secs(5));
     
     let new_tick_msg = AuctionExecute::AuctionTick {};
     let response = auction_cw
@@ -318,7 +332,7 @@ fn main() {
 
     let new_tick_msg = AuctionExecute::AuctionTick {};
     let response = auction_cw
-        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
+        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "--gas 5502650")
         .unwrap();
     println!("tick auction response: {:?}", response);
     std::thread::sleep(std::time::Duration::from_secs(5));
@@ -332,14 +346,20 @@ fn main() {
     )
     .unwrap();
     pretty_print("bank send res", &res);
-    std::thread::sleep(std::time::Duration::from_secs(25));
+    std::thread::sleep(std::time::Duration::from_secs(35));
 
     let new_tick_msg = AuctionExecute::AuctionTick {};
     let response = auction_cw
-        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "")
+        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "--gas 5502650")
         .unwrap();
     println!("tick auction response: {:?}", response);
-    std::thread::sleep(std::time::Duration::from_secs(5));
+    std::thread::sleep(std::time::Duration::from_secs(35));
+
+    let new_tick_msg = AuctionExecute::AuctionTick {};
+    let response = auction_cw
+        .execute("acc0", &to_json_string(&new_tick_msg).unwrap(), "--gas 5502650")
+        .unwrap();
+    println!("tick auction response: {:?}", response);
 }
 
 // D - init an auction
