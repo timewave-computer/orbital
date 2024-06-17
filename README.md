@@ -16,7 +16,7 @@ Orbital is an intent based cross chain auction system.
 
 It involves two key concepts - account and auction.
 
-Once deposit funds into their system account, they can submit intent-based orders.
+Once users deposit funds into their system account, they can submit intent-based orders.
 
 An example intent order may look as follows:
 
@@ -44,10 +44,52 @@ Orbital enables marketmakers to fulfil user intents and capture the arbitrage:
 
 Users who wish to use the system must first create their system account.
 
+```md
+    ┌───────────────────────────────────────┐
+    │ neutron                               │
+    │                                       │
+    │                                       │
+    │                                       │
+    │                                       │
+    │                                       │
+    │                                       │
+    │  .───────.                 ┌───────┐  │
+    │ (  user   )─────create────▶│account│  │
+    │  `───────'                 └───────┘  │
+    │                                       │
+    │                                       │
+    │                                       │
+    │                                       │
+    │                                       │
+    │                                       │
+    │                                       │
+    └───────────────────────────────────────┘
+```
+
 Simply creating an account will create a neutron account, which is the instance of the contract.
 
 In order to take part in cross-chain orders, users must register new domains.
 This will instruct the system account to initiate a proxy account on a remote chain.
+
+```md
+    ┌───────────────────────────────────────┐   ┌────────────────────────────────┐
+    │    neutron                            │   │ domain                         │
+    │                                       │   │                                │
+    │       .───────.                       │   │                                │
+    │      (  user   )                      │   │                                │
+    │       `───────'                       │   │                                │
+    │           │                           │   │                                │
+    │           │                           │   │                                │
+    │    register domain                    │   │                                │
+    │           │                           │   │                                │
+    │           │                           │   │                                │
+    │           │       ┌───────┐           │   │         .─────────.            │
+    │           └──────▶│account│──────────init─┼───────▶(remote acc )           │
+    │                   └───────┘           │   │         `─────────'            │
+    │                                       │   │                                │
+    │                                       │   │                                │
+    └───────────────────────────────────────┘   └────────────────────────────────┘
+```
 
 For now, this is done using polytone.
 
@@ -65,7 +107,7 @@ but we ran out of time.
 
 ### Double accounting
 
-In order to enable the best user experience, system uses an internal double accounting ledger.
+In order to enable the best user (and solver!) experience, orbital uses an internal double accounting ledger.
 
 Once funds are deposited, a remote chain proxy balances sync is initiated.
 This means account will send a balances query to its proxy on the specified domain.
@@ -77,9 +119,49 @@ Internal user balances ledger gets updated in one of the following ways:
 
 user deposits funds and remote chain balances are synced
 
+```md
+    ┌───────────────────────────────────────┐   ┌────────────────────────────────┐
+    │    neutron              ┌ ─ ─ ─ ─ ─   │   │ domain                         │
+    │                            double  │  │   │                                │
+    │                   ┌────▶│accounting   │   │   .─────────────────────.      │
+    │                   │        ledger  │  │   │  (  user acc on domain   )     │
+    │                   │     └ ─ ─ ─ ─ ─   │   │   `─────────────────────'      │
+    │                   │                   │   │              │                 │
+    │              2. reflect               │   │              │                 │
+    │                   │                   │   │      0. deposit funds          │
+    │                   │                   │   │              │                 │
+    │                   │                   │   │              ▼                 │
+    │               ┌───────┐      1. sync  │   │         .─────────.            │
+    │               │account│──────balances─┼───┼───────▶(remote acc )           │
+    │               └───────┘               │   │         `─────────'            │
+    │                                       │   │                                │
+    │                                       │   │                                │
+    └───────────────────────────────────────┘   └────────────────────────────────┘
+```
+
 #### user withdraws funds from the system
 
 user withdraws funds from the system into a specified address
+
+```md
+    ┌───────────────────────────────────────┐  ┌─────────────────────────────────┐
+    │    neutron                            │  │  domain                         │
+    │                        ┌ ─ ─ ─ ─ ─    │  │                                 │
+    │     .───────.             double  │   │  │     .─────────────────────.     │
+    │    (  user   )         │accounting    │  │    (  user acc on domain   )    │
+    │     `───────'             ledger  │   │  │     `─────────────────────'     │
+    │         │              └ ─ ─ ─ ─ ─    │  │                ▲                │
+    │      withdraw                ▲        │  │                │                │
+    │(100udomain, DOMAIN)          │        │  │            transfer             │
+    │         │                reflect      │  │                │                │
+    │         │                    │        │  │                │                │
+    │         │                    │        │  │                │                │
+    │         │                ┌───────┐    │  │           .─────────.           │
+    │         └───────────────▶│account│────transfer─────▶(remote acc )          │
+    │                          └───────┘    │  │           `─────────'           │
+    │                                       │  │                                 │
+    └───────────────────────────────────────┘  └─────────────────────────────────┘
+```
 
 #### user submits an intent
 
@@ -92,6 +174,27 @@ account will then transfer the user offer funds to the solver specified address 
 
 after that, the internal ledger is synced by querying both offer and ask domain proxy accounts.
 
+```md
+    ┌───────────────────────────────────────┐  ┌─────────────────────────────────┐
+    │   neutron                             │  │ domain                          │
+    │                                       │  │                                 │
+    │      .───────.                        │  │          .───────.              │
+    │     (  user   )                       │  │         (   src   )             │
+    │      `───────'                        │  │          `───────'              │
+    │          │                            │  │                                 │
+    │    want: (>=100untrn, NEUTRON)        │  │                                 │
+    │    offer: (200udomain, DOMAIN)        │  │                                 │
+    │          │                            │  │                                 │
+    │          │                            │  │                                 │
+    │          │                            │  │         .─────────.             │
+    │          ▼                            │  │        (remote acc )            │
+    │      ┌───────┐          ┌───────┐     │  │         `─────────'             │
+    │      │account│──submit─▶│auction│     │  │                                 │
+    │      └───────┘          └───────┘     │  │                                 │
+    │                                       │  │                                 │
+    └───────────────────────────────────────┘  └─────────────────────────────────┘
+```
+
 ### Auction
 
 an English (ascending) auction is used for the system.
@@ -103,12 +206,67 @@ instruct the auction to begin an auction cycle.
 
 solvers can begin querying the auction and submitting their bids.
 
+```md
+    ┌───────────────────────────────────────┐  ┌─────────────────────────────────┐
+    │   neutron                             │  │ domain                          │
+    │                                       │  │                                 │
+    │        .─────────────────────.        │  │          .───────.              │
+    │       ( solver acc on domain  )       │  │         (   src   )             │
+    │        `─────────────────────'        │  │          `───────'              │
+    │                   │                   │  │                                 │
+    │                   │                   │  │                                 │
+    │                   │                   │  │                                 │
+    │                   │                   │  │                                 │
+    │            queries and bids           │  │                                 │
+    │                   │                   │  │         .─────────.             │
+    │                   │                   │  │        (remote acc )            │
+    │                   ▼                   │  │         `─────────'             │
+    │               ┌───────┐               │  │                                 │
+    │               │auction│               │  │                                 │
+    │               └───────┘               │  │                                 │
+    │                                       │  │                                 │
+    │                                       │  │                                 │
+    └───────────────────────────────────────┘  └─────────────────────────────────┘
+```
+
 after auction period (sec/block based) is over, the winning solver bid enters the fulfilment period.
 
 solvers are given a period of time during which they have to do the following:
 
 1. deposit the winning bid amount into users destination address
 1. submit a proof to the account to confirm the fulfilment
+
+```md
+    ┌───────────────────────────────────────┐  ┌─────────────────────────────────┐
+    │   neutron                             │  │ domain                          │
+    │                                       │  │                                 │
+    │    ┌ ─ ─ ─ ─ ─                        │  │         .─────────────────────. │
+    │       double  │                       │  │        ( solver acc on domain  )│
+    │    │accounting ◀──reflect────┐        │  │         `─────────────────────' │
+    │       ledger  │              │        │  │                    │            │
+    │    └ ─ ─ ─ ─ ─               │        │  │                    │            │
+    │                              │        │  │                1. send          │
+    │                              │        │  │               200udomain        │
+    │                              │        │  │                    │            │
+    │                              │        │  │                    │            │
+    │                              │        │  │                    ▼            │
+    │                          ┌───────┐    │  │               .─────────.       │
+    │           send ──────────│account│────┼──┼verify───────▶(remote acc )      │
+    │         100untrn         └───────┘    │  │               `─────────'       │
+    │            │                 ▲        │  │                                 │
+    │            │                 │        │  │                                 │
+    │            ▼                 │        │  │                                 │
+    │ .─────────────────────.      │        │  │                                 │
+    │( solver acc on domain  )     │        │  │                                 │
+    │ `─────────────────────'      │        │  │                                 │
+    │            │                 │        │  │                                 │
+    │            │                 │        │  │                                 │
+    │            │             ┌───────┐    │  │                                 │
+    │           done!─────────▶│auction│    │  │                                 │
+    │                          └───────┘    │  │                                 │
+    │                                       │  │                                 │
+    └───────────────────────────────────────┘  └─────────────────────────────────┘
+```
 
 after account validates that the solver indeed delivered on the promise made when bidding,
 account will submit a bank transfer message to the users offer domain proxy account. this
