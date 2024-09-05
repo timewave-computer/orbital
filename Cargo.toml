@@ -24,7 +24,6 @@ incremental      = false
 overflow-checks = true
 
 [workspace.dependencies]
-# common dependencies
 cosmwasm-schema  = "1.5"
 cosmwasm-std     = { version = "1.5.4", features = ["stargate", "cosmwasm_1_2"] }
 cosmwasm-storage = "1.5"
@@ -55,7 +54,3 @@ polytone = "1.0.0"
 cw-multi-test  = "0.18.0"
 assert_matches = "1.5.0"
 anyhow         = "1.0.65"
-
-orbital-utils = { path = "packages/orbital-utils" }
-account = { path = "contracts/account" }
-auction = { path = "contracts/auction" }
