@@ -15,9 +15,3 @@ cosmwasm-schema = { workspace = true }
 sha2 = "0.10.8"
 hex = "0.4.3"
 cw-utils = { workspace = true }
-
-
-# orbital stuff
-account = { workspace = true }
-auction = { workspace = true }
-orbital-utils = { workspace = true }
