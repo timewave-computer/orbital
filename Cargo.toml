@@ -1,56 +1,35 @@
 [workspace]
-members  = [
-    "contracts/*",
-]
+members  = ["contracts/orbital-core"]
 resolver = "2"
 
 [workspace.package]
-edition = "2021"
+edition    = "2021"
 version = "0.1.0"
 license = "Apache-2.0"
 repository = "https://github.com/timewave-computer/orbital"
 
 [profile.release]
-codegen-units    = 1
 opt-level        = 3
 debug            = false
 rpath            = false
 lto              = true
 debug-assertions = false
+codegen-units    = 1
 panic            = 'abort'
 incremental      = false
-# Please do not disable these. Doing so will cause overflow checks in
-# all workspace members to stop working. Overflows should be errors.
-overflow-checks = true
+overflow-checks  = true
 
 [workspace.dependencies]
-cosmwasm-schema  = "1.5"
-cosmwasm-std     = { version = "1.5.4", features = ["stargate", "cosmwasm_1_2"] }
-cosmwasm-storage = "1.5"
-cw-storage-plus  = "1.1"
-cw2              = "1.1"
-cw-utils         = "1.0"
-getrandom       = { version = "0.2", features = ["js"] }
-serde           = { version = "1.0.145", default-features = false, features = ["derive"] }
-thiserror       = "1.0.31"
-schemars        = "0.8.10"
-cw20            = { version = "0.15.1" }
-cw20-base       = { version = "0.15.1" }
-proc-macro2     = "1"
-quote           = "1"
-syn             = "1"
-url       = "2.3.1"
-sha2      = "^0.10"
-neutron-sdk      = { git = "https://github.com/neutron-org/neutron-sdk", tag = "v0.8.0" }
-protobuf         = { version = "3.2.0", features = ["with-bytes"] }
-serde-json-wasm  = { version = "0.5.2" }
-base64           = "0.13.0"
-prost            = "0.11"
-prost-types      = "0.11"
-bech32           = "0.9.0"
-polytone = "1.0.0"
-
-# dev dependencies
-cw-multi-test  = "0.18.0"
-assert_matches = "1.5.0"
-anyhow         = "1.0.65"
+cosmwasm-std    = { version = "2.1.3", features = ["cosmwasm_1_4"] }
+cosmwasm-schema = "2.1.3"
+cw-utils        = "2.0.0"
+cw-storage-plus = "2.0.0"
+cw2             = "2.0.0"
+schemars        = "0.8.16"
+serde           = { version = "1.0.207", default-features = false, features = ["derive"] }
+serde_json      = "1.0.125"
+thiserror       = "1.0.63"
+cw-ownable      = "2.0.0"
+neutron-sdk     = "0.11.0"
+anyhow          = "1.0.86"
+cw-multi-test   = "2.1.1"
