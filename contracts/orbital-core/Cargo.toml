@@ -1,6 +1,6 @@
 [package]
 name        = "orbital-core"
-authors     = ["benskey bekauz@protonmail.com"]
+authors     = ["Timewave Labs"]
 description = "orbital core contract"
 license     = { workspace = true }
 repository  = { workspace = true }
