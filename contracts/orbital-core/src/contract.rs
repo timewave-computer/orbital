@@ -40,7 +40,7 @@ pub fn execute(
         ExecuteMsg::UpdateOwnership(action) => {
             admin_update_ownership(deps, &env.block, &info.sender, action)
         }
-        ExecuteMsg::RegisterNewDomain(config) => admin_register_new_domain(deps, config),
+        ExecuteMsg::RegisterNewDomain(config) => admin_register_new_domain(deps, info, config),
     }
 }
 
@@ -56,8 +56,11 @@ fn admin_update_ownership(
 
 fn admin_register_new_domain(
     deps: DepsMut,
+    info: MessageInfo,
     domain_config: UncheckedDomainConfig,
 ) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
     // validate the domain configuration
     let orbital_domain = domain_config.validate_to_checked(&deps)?;
 

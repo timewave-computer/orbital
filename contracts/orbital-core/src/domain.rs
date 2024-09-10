@@ -27,13 +27,12 @@ impl UncheckedDomainConfig {
                 timeout,
             } => {
                 // validate the note address on orbital chain
-                let note_addr = deps.api.addr_validate(&note)?;
-
+                let note_addr = deps.api.addr_validate(note)?;
                 // ensure that the domain name (key) is non-empty and the timeout is > 0
                 ensure!(!domain.is_empty(), StdError::generic_err("empty domain"));
                 ensure!(
                     timeout.u64() > 0,
-                    StdError::generic_err("timeout must be positive")
+                    StdError::generic_err("timeout must be non-zero")
                 );
 
                 Ok(OrbitalDomainConfig::Polytone {
