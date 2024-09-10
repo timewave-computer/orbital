@@ -1,13 +1,17 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
-use cw_ownable::{get_ownership, initialize_owner, update_ownership, OwnershipError};
+use cw_ownable::{get_ownership, initialize_owner, update_ownership, Action, OwnershipError};
 
 use crate::{
+    domain::UncheckedDomainConfig,
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    state::ORBITAL_DOMAINS,
 };
-use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+};
 
 pub const CONTRACT_NAME: &str = "orbital-core";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -34,15 +38,46 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::UpdateOwnership(action) => {
-            let resp = update_ownership(deps, &env.block, &info.sender, action)?;
-            Ok(Response::default().add_attributes(resp.into_attributes()))
+            admin_update_ownership(deps, &env.block, &info.sender, action)
         }
+        ExecuteMsg::RegisterNewDomain(config) => admin_register_new_domain(deps, config),
     }
+}
+
+fn admin_update_ownership(
+    deps: DepsMut,
+    block: &BlockInfo,
+    sender: &Addr,
+    action: Action,
+) -> Result<Response, ContractError> {
+    let resp = update_ownership(deps, block, sender, action)?;
+    Ok(Response::default().add_attributes(resp.into_attributes()))
+}
+
+fn admin_register_new_domain(
+    deps: DepsMut,
+    domain_config: UncheckedDomainConfig,
+) -> Result<Response, ContractError> {
+    // validate the domain configuration
+    let orbital_domain = domain_config.validate_to_checked(&deps)?;
+
+    // store the validated domain config in state
+    ORBITAL_DOMAINS.save(deps.storage, domain_config.get_key(), &orbital_domain)?;
+
+    Ok(Response::default()
+        .add_attribute("method", "register_new_domain")
+        .add_attribute("domain", domain_config.get_key()))
 }
 
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
+        QueryMsg::OrbitalDomain { domain } => query_orbital_domain(deps, domain),
     }
+}
+
+fn query_orbital_domain(deps: Deps, domain: String) -> StdResult<Binary> {
+    let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain)?;
+    to_json_binary(&domain_config)
 }
