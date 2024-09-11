@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
-use crate::{domain::UncheckedDomainConfig, state::OrbitalDomainConfig};
+use crate::{account_types::AccountConfigType, state::OrbitalDomainConfig};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -11,7 +11,12 @@ pub struct InstantiateMsg {
 #[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
-    RegisterNewDomain(UncheckedDomainConfig),
+    RegisterNewDomain {
+        // string identifier for the domain
+        domain: String,
+        // type of account to be used
+        account_type: AccountConfigType,
+    },
 }
 
 #[cw_ownable_query]

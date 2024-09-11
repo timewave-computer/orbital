@@ -5,14 +5,10 @@ use cw_storage_plus::Map;
 /// map of registered remote domains and their configuration
 pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains");
 
-/// remote domain configuration config which supports different types of bridge connections.
+/// remote domain configuration config which supports different types of account implementations.
 /// currently supported types:
-/// - Polytone: cw-based bridge that operates via note contract on the origin chain
+/// - Polytone: cw-based account implementation that operates via note contract on the origin chain
 #[cw_serde]
 pub enum OrbitalDomainConfig {
-    Polytone {
-        domain: String,
-        note: Addr,
-        timeout: Uint64,
-    },
+    Polytone { note: Addr, timeout: Uint64 },
 }

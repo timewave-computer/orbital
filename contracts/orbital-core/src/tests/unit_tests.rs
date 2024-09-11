@@ -3,7 +3,7 @@ use cw_multi_test::Executor;
 use cw_ownable::Ownership;
 
 use crate::{
-    domain::UncheckedDomainConfig,
+    account_types::AccountConfigType,
     msg::{ExecuteMsg, QueryMsg},
     state::OrbitalDomainConfig,
     tests::ctx::Suite,
@@ -32,31 +32,51 @@ fn test_register_orbital_domain_validates_addr() {
         .execute_contract(
             suite.owner,
             suite.orbital,
-            &ExecuteMsg::RegisterNewDomain(UncheckedDomainConfig::Polytone {
+            &ExecuteMsg::RegisterNewDomain {
                 domain: "domain".to_string(),
-                note: "invalid_note".to_string(),
-                timeout: Uint64::one(),
-            }),
+                account_type: AccountConfigType::Polytone {
+                    note: "invalid_note".to_string(),
+                    timeout: Uint64::one(),
+                },
+            },
             &[],
         )
         .unwrap();
 }
 
 #[test]
-#[should_panic(expected = "empty domain")]
-fn test_register_orbital_domain_validates_domain() {
+#[should_panic(expected = "Orbital domain already registered: ")]
+fn test_register_duplicate_orbital_domain() {
     let mut suite = Suite::default();
+
+    suite
+        .app
+        .execute_contract(
+            suite.owner.clone(),
+            suite.orbital.clone(),
+            &ExecuteMsg::RegisterNewDomain {
+                domain: "".to_string(),
+                account_type: AccountConfigType::Polytone {
+                    note: suite.note.to_string(),
+                    timeout: Uint64::one(),
+                },
+            },
+            &[],
+        )
+        .unwrap();
 
     suite
         .app
         .execute_contract(
             suite.owner,
             suite.orbital,
-            &ExecuteMsg::RegisterNewDomain(UncheckedDomainConfig::Polytone {
+            &ExecuteMsg::RegisterNewDomain {
                 domain: "".to_string(),
-                note: suite.note.to_string(),
-                timeout: Uint64::one(),
-            }),
+                account_type: AccountConfigType::Polytone {
+                    note: suite.note.to_string(),
+                    timeout: Uint64::one(),
+                },
+            },
             &[],
         )
         .unwrap();
@@ -72,11 +92,13 @@ fn test_register_orbital_domain_validates_domain_owner() {
         .execute_contract(
             suite.note.clone(),
             suite.orbital,
-            &ExecuteMsg::RegisterNewDomain(UncheckedDomainConfig::Polytone {
+            &ExecuteMsg::RegisterNewDomain {
                 domain: "domain".to_string(),
-                note: suite.note.to_string(),
-                timeout: Uint64::one(),
-            }),
+                account_type: AccountConfigType::Polytone {
+                    note: suite.note.to_string(),
+                    timeout: Uint64::one(),
+                },
+            },
             &[],
         )
         .unwrap();
@@ -92,11 +114,13 @@ fn test_register_orbital_domain_validates_timeout() {
         .execute_contract(
             suite.owner,
             suite.orbital,
-            &ExecuteMsg::RegisterNewDomain(UncheckedDomainConfig::Polytone {
+            &ExecuteMsg::RegisterNewDomain {
                 domain: "domain".to_string(),
-                note: suite.note.to_string(),
-                timeout: Uint64::zero(),
-            }),
+                account_type: AccountConfigType::Polytone {
+                    note: suite.note.to_string(),
+                    timeout: Uint64::zero(),
+                },
+            },
             &[],
         )
         .unwrap();
@@ -111,11 +135,13 @@ fn test_register_orbital_domain_happy() {
         .execute_contract(
             suite.owner,
             suite.orbital.clone(),
-            &ExecuteMsg::RegisterNewDomain(UncheckedDomainConfig::Polytone {
+            &ExecuteMsg::RegisterNewDomain {
                 domain: "domain".to_string(),
-                note: suite.note.to_string(),
-                timeout: Uint64::one(),
-            }),
+                account_type: AccountConfigType::Polytone {
+                    note: suite.note.to_string(),
+                    timeout: Uint64::one(),
+                },
+            },
             &[],
         )
         .unwrap();
@@ -132,12 +158,7 @@ fn test_register_orbital_domain_happy() {
         .unwrap();
 
     match domain {
-        OrbitalDomainConfig::Polytone {
-            domain,
-            note,
-            timeout,
-        } => {
-            assert_eq!(domain, "domain");
+        OrbitalDomainConfig::Polytone { note, timeout } => {
             assert_eq!(note, suite.note);
             assert_eq!(timeout, Uint64::one());
         }

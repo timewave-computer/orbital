@@ -9,4 +9,7 @@ pub enum ContractError {
 
     #[error(transparent)]
     Ownership(#[from] OwnershipError),
+
+    #[error("Orbital domain already registered: {0}")]
+    OrbitalDomainAlreadyExists(String),
 }

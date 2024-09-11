@@ -1,10 +1,12 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
-use cw_ownable::{get_ownership, initialize_owner, update_ownership, Action, OwnershipError};
+use cw_ownable::{
+    assert_owner, get_ownership, initialize_owner, update_ownership, Action, OwnershipError,
+};
 
 use crate::{
-    domain::UncheckedDomainConfig,
+    account_types::AccountConfigType,
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     state::ORBITAL_DOMAINS,
@@ -40,7 +42,10 @@ pub fn execute(
         ExecuteMsg::UpdateOwnership(action) => {
             admin_update_ownership(deps, &env.block, &info.sender, action)
         }
-        ExecuteMsg::RegisterNewDomain(config) => admin_register_new_domain(deps, info, config),
+        ExecuteMsg::RegisterNewDomain {
+            domain,
+            account_type,
+        } => admin_register_new_domain(deps, info, domain, account_type),
     }
 }
 
@@ -57,19 +62,28 @@ fn admin_update_ownership(
 fn admin_register_new_domain(
     deps: DepsMut,
     info: MessageInfo,
-    domain_config: UncheckedDomainConfig,
+    domain: String,
+    account_type: AccountConfigType,
 ) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    // only the owner can register new domains
+    assert_owner(deps.storage, &info.sender)?;
 
     // validate the domain configuration
-    let orbital_domain = domain_config.validate_to_checked(&deps)?;
+    let orbital_domain = account_type.try_into_domain_config(&deps)?;
+
+    // ensure the domain does not already exist
+    if ORBITAL_DOMAINS.has(deps.storage, domain.to_string()) {
+        return Err(ContractError::OrbitalDomainAlreadyExists(
+            domain.to_string(),
+        ));
+    }
 
     // store the validated domain config in state
-    ORBITAL_DOMAINS.save(deps.storage, domain_config.get_key(), &orbital_domain)?;
+    ORBITAL_DOMAINS.save(deps.storage, domain.to_string(), &orbital_domain)?;
 
     Ok(Response::default()
         .add_attribute("method", "register_new_domain")
-        .add_attribute("domain", domain_config.get_key()))
+        .add_attribute("domain", domain))
 }
 
 #[entry_point]
