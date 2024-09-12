@@ -106,7 +106,30 @@ fn test_register_orbital_domain_validates_domain_owner() {
 
 #[test]
 #[should_panic(expected = "timeout must be non-zero")]
-fn test_register_orbital_domain_validates_timeout() {
+fn test_register_orbital_ica_domain_validates_timeout() {
+    let mut suite = Suite::default();
+
+    suite
+        .app
+        .execute_contract(
+            suite.owner,
+            suite.orbital,
+            &ExecuteMsg::RegisterNewDomain {
+                domain: "domain".to_string(),
+                account_type: AccountConfigType::ICA {
+                    connection_id: "connection-id".to_string(),
+                    channel_id: "channel-id".to_string(),
+                    timeout: Uint64::zero(),
+                },
+            },
+            &[],
+        )
+        .unwrap();
+}
+
+#[test]
+#[should_panic(expected = "timeout must be non-zero")]
+fn test_register_orbital_polytone_domain_validates_timeout() {
     let mut suite = Suite::default();
 
     suite
@@ -133,10 +156,10 @@ fn test_register_orbital_domain_happy() {
     suite
         .app
         .execute_contract(
-            suite.owner,
+            suite.owner.clone(),
             suite.orbital.clone(),
             &ExecuteMsg::RegisterNewDomain {
-                domain: "domain".to_string(),
+                domain: "domain_polytone".to_string(),
                 account_type: AccountConfigType::Polytone {
                     note: suite.note.to_string(),
                     timeout: Uint64::one(),
@@ -146,21 +169,53 @@ fn test_register_orbital_domain_happy() {
         )
         .unwrap();
 
-    let domain: OrbitalDomainConfig = suite
+    suite
+        .app
+        .execute_contract(
+            suite.owner,
+            suite.orbital.clone(),
+            &ExecuteMsg::RegisterNewDomain {
+                domain: "domain_ica".to_string(),
+                account_type: AccountConfigType::ICA {
+                    connection_id: "connection-id".to_string(),
+                    channel_id: "channel-id".to_string(),
+                    timeout: Uint64::one(),
+                },
+            },
+            &[],
+        )
+        .unwrap();
+
+    let polytone_domain: OrbitalDomainConfig = suite
         .app
         .wrap()
         .query_wasm_smart(
             suite.orbital.clone(),
             &QueryMsg::OrbitalDomain {
-                domain: "domain".to_string(),
+                domain: "domain_polytone".to_string(),
+            },
+        )
+        .unwrap();
+    let ica_domain: OrbitalDomainConfig = suite
+        .app
+        .wrap()
+        .query_wasm_smart(
+            suite.orbital.clone(),
+            &QueryMsg::OrbitalDomain {
+                domain: "domain_ica".to_string(),
             },
         )
         .unwrap();
 
-    match domain {
-        OrbitalDomainConfig::Polytone { note, timeout } => {
-            assert_eq!(note, suite.note);
-            assert_eq!(timeout, Uint64::one());
-        }
-    }
+    assert!(matches!(
+        polytone_domain,
+        OrbitalDomainConfig::Polytone { note, timeout }
+        if note == suite.note && timeout == Uint64::one()
+    ));
+
+    assert!(matches!(
+        ica_domain,
+        OrbitalDomainConfig::ICA { connection_id, channel_id, timeout }
+        if connection_id == "connection-id" && channel_id == "channel-id" && timeout == Uint64::one()
+    ));
 }
