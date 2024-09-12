@@ -162,6 +162,21 @@ fn test_register_orbital_domain_happy() {
 }
 
 #[test]
-fn test_register_user() {
-    unimplemented!()
+#[should_panic(expected = "User already registered")]
+fn test_register_user_duplicate() {
+    let mut suite = Suite::default();
+
+    suite.register_user("user").unwrap();
+    suite.register_user("user").unwrap();
+}
+
+#[test]
+fn test_register_user_happy() {
+    let mut suite = Suite::default();
+
+    suite.register_user("user").unwrap();
+
+    let user_config = suite.query_user("user").unwrap();
+
+    assert!(user_config.clearing_accounts.is_empty());
 }

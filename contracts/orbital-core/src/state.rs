@@ -8,19 +8,13 @@ use cw_storage_plus::Map;
 pub const USER_CONFIGS: Map<Addr, UserConfig> = Map::new("user_configs");
 
 #[cw_serde]
+#[derive(Default)]
 pub struct UserConfig {
     // TODO: this may make more sense to have as a top level map
     // with composite keys of (user, domain) -> clearing_addr
     pub clearing_accounts: HashMap<String, String>,
 }
 
-impl Default for UserConfig {
-    fn default() -> Self {
-        UserConfig {
-            clearing_accounts: HashMap::new(),
-        }
-    }
-}
 
 /// map of registered remote domains and their configuration
 pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains");

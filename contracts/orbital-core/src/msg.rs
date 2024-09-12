@@ -21,7 +21,7 @@ pub enum ExecuteMsg {
         // type of account to be used
         account_type: AccountConfigType,
     },
-    ///
+
     RegisterUser {},
 }
 
