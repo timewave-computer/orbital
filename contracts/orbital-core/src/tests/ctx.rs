@@ -1,9 +1,11 @@
-use cosmwasm_std::{Addr, Empty};
-use cw_multi_test::{App, Contract, ContractWrapper, Executor};
+use cosmwasm_std::{Addr, Empty, StdResult, Uint64};
+use cw_multi_test::{error::AnyResult, App, AppResponse, Contract, ContractWrapper, Executor};
 
 use crate::{
+    account_types::AccountConfigType,
     contract::{execute, instantiate, query},
-    msg::InstantiateMsg,
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    state::OrbitalDomainConfig,
 };
 
 const OWNER: &str = "owner";
@@ -23,6 +25,32 @@ pub struct Suite {
 
 fn make_addr(app: &App, addr: &str) -> Addr {
     app.api().addr_make(addr)
+}
+
+impl Suite {
+    pub fn query_domain(&mut self, domain: &str) -> StdResult<OrbitalDomainConfig> {
+        self.app.wrap().query_wasm_smart(
+            self.orbital.clone(),
+            &QueryMsg::OrbitalDomain {
+                domain: domain.to_string(),
+            },
+        )
+    }
+    pub fn register_new_domain(
+        &mut self,
+        domain: &str,
+        account_type: AccountConfigType,
+    ) -> AnyResult<AppResponse> {
+        self.app.execute_contract(
+            self.owner.clone(),
+            self.orbital.clone(),
+            &ExecuteMsg::RegisterNewDomain {
+                domain: domain.to_string(),
+                account_type,
+            },
+            &[],
+        )
+    }
 }
 
 impl Default for Suite {
