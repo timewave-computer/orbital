@@ -7,6 +7,9 @@ use cw_storage_plus::Map;
 /// map of users with their respective configurations
 pub const USER_CONFIGS: Map<Addr, UserConfig> = Map::new("user_configs");
 
+/// map of registered remote domains and their configuration
+pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains");
+
 #[cw_serde]
 #[derive(Default)]
 pub struct UserConfig {
@@ -14,10 +17,6 @@ pub struct UserConfig {
     // with composite keys of (user, domain) -> clearing_addr
     pub clearing_accounts: HashMap<String, String>,
 }
-
-
-/// map of registered remote domains and their configuration
-pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains");
 
 /// remote domain configuration config which supports different types of account implementations.
 /// currently supported types:
