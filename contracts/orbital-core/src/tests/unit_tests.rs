@@ -116,7 +116,7 @@ fn test_register_orbital_ica_domain_validates_timeout() {
             suite.orbital,
             &ExecuteMsg::RegisterNewDomain {
                 domain: "domain".to_string(),
-                account_type: AccountConfigType::ICA {
+                account_type: AccountConfigType::InterchainAccount {
                     connection_id: "connection-id".to_string(),
                     channel_id: "channel-id".to_string(),
                     timeout: Uint64::zero(),
@@ -176,7 +176,7 @@ fn test_register_orbital_domain_happy() {
             suite.orbital.clone(),
             &ExecuteMsg::RegisterNewDomain {
                 domain: "domain_ica".to_string(),
-                account_type: AccountConfigType::ICA {
+                account_type: AccountConfigType::InterchainAccount {
                     connection_id: "connection-id".to_string(),
                     channel_id: "channel-id".to_string(),
                     timeout: Uint64::one(),

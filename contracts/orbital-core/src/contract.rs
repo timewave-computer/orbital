@@ -69,7 +69,7 @@ fn admin_register_new_domain(
     assert_owner(deps.storage, &info.sender)?;
 
     // validate the domain configuration
-    let orbital_domain = account_type.try_into_domain_config(&deps)?;
+    let orbital_domain = account_type.try_into_domain_config(deps.api)?;
 
     // ensure the domain does not already exist
     if ORBITAL_DOMAINS.has(deps.storage, domain.to_string()) {

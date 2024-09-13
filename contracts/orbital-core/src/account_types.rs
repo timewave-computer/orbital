@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{ensure, DepsMut, StdError, StdResult, Uint64};
+use cosmwasm_std::{ensure, Api, StdError, StdResult, Uint64};
 
 use crate::state::OrbitalDomainConfig;
 
@@ -9,7 +9,7 @@ pub enum AccountConfigType {
         note: String,
         timeout: Uint64,
     },
-    ICA {
+    InterchainAccount {
         connection_id: String,
         channel_id: String,
         timeout: Uint64,
@@ -17,7 +17,7 @@ pub enum AccountConfigType {
 }
 
 impl AccountConfigType {
-    pub fn try_into_domain_config(self, deps: &DepsMut) -> StdResult<OrbitalDomainConfig> {
+    pub fn try_into_domain_config(self, api: &dyn Api) -> StdResult<OrbitalDomainConfig> {
         match self {
             AccountConfigType::Polytone { note, timeout } => {
                 // ensure that the timeout is > 0
@@ -28,13 +28,13 @@ impl AccountConfigType {
 
                 let validated_config = OrbitalDomainConfig::Polytone {
                     // validate the note address on orbital chain
-                    note: deps.api.addr_validate(&note)?,
+                    note: api.addr_validate(&note)?,
                     timeout,
                 };
 
                 Ok(validated_config)
             }
-            AccountConfigType::ICA {
+            AccountConfigType::InterchainAccount {
                 connection_id,
                 channel_id,
                 timeout,
