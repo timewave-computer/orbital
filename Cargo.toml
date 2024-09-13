@@ -1,5 +1,8 @@
 [workspace]
-members  = ["contracts/orbital-core"]
+members  = [
+    "contracts/orbital-core",
+    "local-interchaintest",
+]
 resolver = "2"
 
 [workspace.package]
@@ -33,3 +36,9 @@ cw-ownable      = "2.0.0"
 neutron-sdk     = "0.11.0"
 anyhow          = "1.0.86"
 cw-multi-test   = "2.1.1"
+
+hex             = "0.4.3"
+localic-std     = { git = "https://github.com/strangelove-ventures/interchaintest", branch = "main" }
+localic-utils   = { git = "https://github.com/timewave-computer/localic-utils", branch = "main" }
+env_logger      = "0.11.5"
+log             = "0.4.22"
