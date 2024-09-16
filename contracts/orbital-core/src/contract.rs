@@ -6,7 +6,7 @@ use cw_ownable::{
 };
 
 use crate::{
-    account_types::AccountConfigType,
+    account_types::UncheckedOrbitalDomainConfig,
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     state::ORBITAL_DOMAINS,
@@ -63,13 +63,13 @@ fn admin_register_new_domain(
     deps: DepsMut,
     info: MessageInfo,
     domain: String,
-    account_type: AccountConfigType,
+    account_type: UncheckedOrbitalDomainConfig,
 ) -> Result<Response, ContractError> {
     // only the owner can register new domains
     assert_owner(deps.storage, &info.sender)?;
 
     // validate the domain configuration
-    let orbital_domain = account_type.try_into_domain_config(&deps)?;
+    let orbital_domain = account_type.try_into_checked(&deps)?;
 
     // ensure the domain does not already exist
     if ORBITAL_DOMAINS.has(deps.storage, domain.to_string()) {
