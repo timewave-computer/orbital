@@ -3,7 +3,7 @@ use cw_multi_test::Executor;
 use cw_ownable::Ownership;
 
 use crate::{
-    account_types::AccountConfigType,
+    account_types::UncheckedOrbitalDomainConfig,
     msg::{ExecuteMsg, QueryMsg},
     state::OrbitalDomainConfig,
     tests::ctx::Suite,
@@ -30,7 +30,7 @@ fn test_register_orbital_domain_validates_addr() {
     suite
         .register_new_domain(
             "domain",
-            AccountConfigType::Polytone {
+            UncheckedOrbitalDomainConfig::Polytone {
                 note: "invalid_note".to_string(),
                 timeout: Uint64::one(),
             },
@@ -46,17 +46,16 @@ fn test_register_duplicate_orbital_domain() {
     suite
         .register_new_domain(
             "",
-            AccountConfigType::Polytone {
+            UncheckedOrbitalDomainConfig::Polytone {
                 note: suite.note.to_string(),
                 timeout: Uint64::one(),
             },
         )
         .unwrap();
-
     suite
         .register_new_domain(
             "",
-            AccountConfigType::Polytone {
+            UncheckedOrbitalDomainConfig::Polytone {
                 note: suite.note.to_string(),
                 timeout: Uint64::one(),
             },
@@ -76,7 +75,7 @@ fn test_register_orbital_domain_validates_domain_owner() {
             suite.orbital,
             &ExecuteMsg::RegisterNewDomain {
                 domain: "domain".to_string(),
-                account_type: AccountConfigType::Polytone {
+                account_type: UncheckedOrbitalDomainConfig::Polytone {
                     note: suite.note.to_string(),
                     timeout: Uint64::one(),
                 },
@@ -94,7 +93,7 @@ fn test_register_orbital_ica_domain_validates_timeout() {
     suite
         .register_new_domain(
             "domain",
-            AccountConfigType::ICA {
+            UncheckedOrbitalDomainConfig::InterchainAccount {
                 connection_id: "connection-id".to_string(),
                 channel_id: "channel-id".to_string(),
                 timeout: Uint64::zero(),
@@ -111,7 +110,7 @@ fn test_register_orbital_polytone_domain_validates_timeout() {
     suite
         .register_new_domain(
             "domain",
-            AccountConfigType::Polytone {
+            UncheckedOrbitalDomainConfig::Polytone {
                 note: suite.note.to_string(),
                 timeout: Uint64::zero(),
             },
@@ -126,7 +125,7 @@ fn test_register_orbital_domain_happy() {
     suite
         .register_new_domain(
             "domain_polytone",
-            AccountConfigType::Polytone {
+            UncheckedOrbitalDomainConfig::Polytone {
                 note: suite.note.to_string(),
                 timeout: Uint64::one(),
             },
@@ -136,7 +135,7 @@ fn test_register_orbital_domain_happy() {
     suite
         .register_new_domain(
             "domain_ica",
-            AccountConfigType::ICA {
+            UncheckedOrbitalDomainConfig::InterchainAccount {
                 connection_id: "connection-id".to_string(),
                 channel_id: "channel-id".to_string(),
                 timeout: Uint64::one(),
@@ -145,20 +144,24 @@ fn test_register_orbital_domain_happy() {
         .unwrap();
 
     let polytone_domain = suite.query_domain("domain_polytone").unwrap();
-
     let ica_domain = suite.query_domain("domain_ica").unwrap();
 
-    assert!(matches!(
-        polytone_domain,
-        OrbitalDomainConfig::Polytone { note, timeout }
-        if note == suite.note && timeout == Uint64::one()
-    ));
+    assert!(
+        polytone_domain
+            == OrbitalDomainConfig::Polytone {
+                note: suite.note,
+                timeout: Uint64::one()
+            }
+    );
 
-    assert!(matches!(
-        ica_domain,
-        OrbitalDomainConfig::ICA { connection_id, channel_id, timeout }
-        if connection_id == "connection-id" && channel_id == "channel-id" && timeout == Uint64::one()
-    ));
+    assert!(
+        ica_domain
+            == OrbitalDomainConfig::ICA {
+                connection_id: "connection-id".to_string(),
+                channel_id: "channel-id".to_string(),
+                timeout: Uint64::one()
+            }
+    );
 }
 
 #[test]
