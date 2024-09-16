@@ -4,7 +4,7 @@ use cosmwasm_std::{ensure, Api, StdError, StdResult, Uint64};
 use crate::state::OrbitalDomainConfig;
 
 #[cw_serde]
-pub enum AccountConfigType {
+pub enum UncheckedOrbitalDomainConfig {
     Polytone {
         note: String,
         timeout: Uint64,
@@ -16,10 +16,10 @@ pub enum AccountConfigType {
     },
 }
 
-impl AccountConfigType {
-    pub fn try_into_domain_config(self, api: &dyn Api) -> StdResult<OrbitalDomainConfig> {
+impl UncheckedOrbitalDomainConfig {
+    pub fn try_into_checked(self, api: &dyn Api) -> StdResult<OrbitalDomainConfig> {
         match self {
-            AccountConfigType::Polytone { note, timeout } => {
+            UncheckedOrbitalDomainConfig::Polytone { note, timeout } => {
                 // ensure that the timeout is > 0
                 ensure!(
                     timeout.u64() > 0,
@@ -34,7 +34,7 @@ impl AccountConfigType {
 
                 Ok(validated_config)
             }
-            AccountConfigType::InterchainAccount {
+            UncheckedOrbitalDomainConfig::InterchainAccount {
                 connection_id,
                 channel_id,
                 timeout,
