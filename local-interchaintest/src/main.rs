@@ -1,9 +1,11 @@
-use localic_std::modules::cosmwasm::contract_instantiate;
+use cosmwasm_std::Uint64;
+use localic_std::modules::cosmwasm::{contract_execute, contract_instantiate};
 use localic_utils::{
     ConfigChainBuilder, TestContextBuilder, DEFAULT_KEY, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME,
     LOCAL_IC_API_URL, NEUTRON_CHAIN_NAME,
 };
 use log::info;
+use orbital_core::account_types::AccountConfigType;
 use std::{env, error::Error};
 
 pub const POLYTONE_PATH: &str = "local-interchaintest/wasms/polytone";
@@ -70,6 +72,44 @@ fn main() -> Result<(), Box<dyn Error>> {
     .unwrap();
 
     info!("orbital core: {}", orbital_core.address);
+
+    let register_gaia_domain_msg = orbital_core::msg::ExecuteMsg::RegisterNewDomain {
+        domain: "gaia".to_string(),
+        account_type: AccountConfigType::ICA {
+            connection_id: test_ctx
+                .get_connections()
+                .src(NEUTRON_CHAIN_NAME)
+                .dest(GAIA_CHAIN_NAME)
+                .get(),
+            channel_id: test_ctx
+                .get_transfer_channels()
+                .src(NEUTRON_CHAIN_NAME)
+                .dest(GAIA_CHAIN_NAME)
+                .get(),
+            timeout: Uint64::new(100),
+        },
+    };
+    let resp = contract_execute(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core.address,
+        DEFAULT_KEY,
+        &serde_json::to_string(&register_gaia_domain_msg).unwrap(),
+        "",
+    )
+    .unwrap();
+
+    let user_registration_resp = contract_execute(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core.address,
+        "acc1",
+        &serde_json::to_string(&orbital_core::msg::ExecuteMsg::RegisterUser {}).unwrap(),
+        "",
+    )
+    .unwrap();
 
     Ok(())
 }

@@ -13,3 +13,4 @@ serde_json      = { workspace = true }
 env_logger      = { workspace = true }
 log             = { workspace = true }
 orbital-core    = { workspace = true }
+cosmwasm-std    = { workspace = true }
