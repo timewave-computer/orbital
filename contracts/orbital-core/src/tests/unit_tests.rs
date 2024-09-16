@@ -207,15 +207,20 @@ fn test_register_orbital_domain_happy() {
         )
         .unwrap();
 
-    assert!(matches!(
-        polytone_domain,
-        OrbitalDomainConfig::Polytone { note, timeout }
-        if note == suite.note && timeout == Uint64::one()
-    ));
+    assert!(
+        polytone_domain
+            == OrbitalDomainConfig::Polytone {
+                note: suite.note,
+                timeout: Uint64::one()
+            }
+    );
 
-    assert!(matches!(
-        ica_domain,
-        OrbitalDomainConfig::ICA { connection_id, channel_id, timeout }
-        if connection_id == "connection-id" && channel_id == "channel-id" && timeout == Uint64::one()
-    ));
+    assert!(
+        ica_domain
+            == OrbitalDomainConfig::ICA {
+                connection_id: "connection-id".to_string(),
+                channel_id: "channel-id".to_string(),
+                timeout: Uint64::one()
+            }
+    );
 }
