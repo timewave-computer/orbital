@@ -1,22 +1,22 @@
 {
-  "start_time": 1726235936,
+  "start_time": 1726492797,
   "chains": [
     {
       "chain_id": "localcosmos-1",
       "chain_name": "localcosmos-1",
-      "rpc_address": "http://0.0.0.0:33695",
-      "rest_address": "http://0.0.0.0:46005",
-      "grpc_address": "0.0.0.0:45445",
-      "p2p_address": "0.0.0.0:44795",
+      "rpc_address": "http://0.0.0.0:62338",
+      "rest_address": "http://0.0.0.0:62340",
+      "grpc_address": "0.0.0.0:62339",
+      "p2p_address": "0.0.0.0:62337",
       "ibc_paths": []
     },
     {
       "chain_id": "localneutron-1",
       "chain_name": "localneutron-1",
-      "rpc_address": "http://0.0.0.0:45533",
-      "rest_address": "http://0.0.0.0:44125",
-      "grpc_address": "0.0.0.0:32829",
-      "p2p_address": "0.0.0.0:38849",
+      "rpc_address": "http://0.0.0.0:62358",
+      "rest_address": "http://0.0.0.0:62360",
+      "grpc_address": "0.0.0.0:62359",
+      "p2p_address": "0.0.0.0:62357",
       "ibc_paths": [
         "neutron-juno"
       ]
@@ -24,10 +24,10 @@
     {
       "chain_id": "localjuno-1",
       "chain_name": "localjuno-1",
-      "rpc_address": "http://0.0.0.0:45285",
-      "rest_address": "http://0.0.0.0:41631",
-      "grpc_address": "0.0.0.0:42393",
-      "p2p_address": "0.0.0.0:41219",
+      "rpc_address": "http://0.0.0.0:62329",
+      "rest_address": "http://0.0.0.0:62331",
+      "grpc_address": "0.0.0.0:62330",
+      "p2p_address": "0.0.0.0:62333",
       "ibc_paths": [
         "neutron-juno"
       ]
@@ -48,7 +48,7 @@
         ],
         "version": "ics20-1",
         "port_id": "transfer",
-        "channel_id": "channel-2"
+        "channel_id": "channel-0"
       }
     },
     {
@@ -58,7 +58,7 @@
         "ordering": "ORDER_UNORDERED",
         "counterparty": {
           "port_id": "transfer",
-          "channel_id": "channel-2"
+          "channel_id": "channel-0"
         },
         "connection_hops": [
           "connection-0"

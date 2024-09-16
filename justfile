@@ -21,3 +21,9 @@ optimize: build
       fi
     done
   fi
+
+local-ic-start:
+    cd local-interchaintest && local-ic start neutron_gaia_juno
+
+local-ic-run:
+    cargo run --package local-interchaintest --bin local-interchaintest
