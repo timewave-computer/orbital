@@ -10,5 +10,13 @@ pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains"
 /// - Polytone: cw-based account implementation that operates via note contract on the origin chain
 #[cw_serde]
 pub enum OrbitalDomainConfig {
-    Polytone { note: Addr, timeout: Uint64 },
+    Polytone {
+        note: Addr,
+        timeout: Uint64,
+    },
+    ICA {
+        connection_id: String,
+        channel_id: String,
+        timeout: Uint64,
+    },
 }
