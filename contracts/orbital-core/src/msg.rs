@@ -18,8 +18,10 @@ pub enum ExecuteMsg {
         // type of account to be used
         account_type: UncheckedOrbitalDomainConfig,
     },
-
+    /// register user to orbital
     RegisterUser {},
+    /// register user to a specific domain
+    RegisterUserDomain { domain: String },
 }
 
 #[cw_ownable_query]

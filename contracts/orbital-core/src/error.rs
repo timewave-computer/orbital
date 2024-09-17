@@ -15,4 +15,10 @@ pub enum ContractError {
 
     #[error("User already registered")]
     UserAlreadyRegistered {},
+
+    #[error("User not registered")]
+    UserNotRegistered {},
+
+    #[error("Unknown domain: {0}")]
+    UnknownDomain(String),
 }

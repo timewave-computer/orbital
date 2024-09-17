@@ -12,7 +12,8 @@ use crate::{
     state::{UserConfig, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    ensure, to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
@@ -47,7 +48,35 @@ pub fn execute(
             account_type,
         } => admin_register_new_domain(deps, info, domain, account_type),
         ExecuteMsg::RegisterUser {} => register_user(deps, env, info),
+        ExecuteMsg::RegisterUserDomain { domain } => {
+            register_new_user_domain(deps, env, info, domain)
+        }
     }
+}
+
+fn register_new_user_domain(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    domain: String,
+) -> Result<Response, ContractError> {
+    // user must be registered to operate on domains
+    ensure!(
+        USER_CONFIGS.has(deps.storage, info.sender.clone()),
+        ContractError::UserNotRegistered {}
+    );
+
+    // the domain must be enabled on orbital level to be able to register
+    ensure!(
+        ORBITAL_DOMAINS.has(deps.storage, domain.to_string()),
+        ContractError::UnknownDomain(domain)
+    );
+
+    let _domain = ORBITAL_DOMAINS.load(deps.storage, domain)?;
+
+    // TODO: fire a registration message
+
+    Ok(Response::new().add_attribute("method", "register_user_domain"))
 }
 
 fn register_user(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {

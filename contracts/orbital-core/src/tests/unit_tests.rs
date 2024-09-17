@@ -183,3 +183,15 @@ fn test_register_user_happy() {
 
     assert!(user_config.clearing_accounts.is_empty());
 }
+
+#[test]
+#[should_panic(expected = "User not registered")]
+fn test_register_user_new_domain_validates_user_registration() {
+    unimplemented!()
+}
+
+#[test]
+#[should_panic(expected = "Unknown domain: gaia")]
+fn test_register_user_new_domain_validates_domain_existance() {
+    unimplemented!()
+}
