@@ -21,14 +21,14 @@ pub struct UserConfig {
 /// remote domain configuration config which supports different types of account implementations.
 /// currently supported types:
 /// - Polytone: cw-based account implementation that operates via note contract on the origin chain
-/// - ICA: interchain account implementation based on ICS-27
+/// - InterchainAccount: interchain account implementation based on ICS-27
 #[cw_serde]
 pub enum OrbitalDomainConfig {
     Polytone {
         note: Addr,
         timeout: Uint64,
     },
-    ICA {
+    InterchainAccount {
         connection_id: String,
         channel_id: String,
         timeout: Uint64,

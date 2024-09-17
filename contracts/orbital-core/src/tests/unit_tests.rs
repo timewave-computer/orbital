@@ -156,7 +156,7 @@ fn test_register_orbital_domain_happy() {
 
     assert!(
         ica_domain
-            == OrbitalDomainConfig::ICA {
+            == OrbitalDomainConfig::InterchainAccount {
                 connection_id: "connection-id".to_string(),
                 channel_id: "channel-id".to_string(),
                 timeout: Uint64::one()
