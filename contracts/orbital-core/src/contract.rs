@@ -2,31 +2,37 @@
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
 use cw_ownable::{assert_owner, get_ownership, initialize_owner, update_ownership, Action};
-use neutron_sdk::bindings::msg::NeutronMsg;
-
-pub type OrbitalResult<T> = Result<T, ContractError>;
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    sudo::msg::SudoMsg,
+    NeutronResult,
+};
 
 use crate::{
     account_types::UncheckedOrbitalDomainConfig,
     error::ContractError,
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     state::{UserConfig, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 use cosmwasm_std::{
-    ensure, to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult,
+    ensure, to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Reply,
+    Response, StdResult,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+type OrbitalResult = NeutronResult<Response<NeutronMsg>>;
+type QueryDeps<'a> = Deps<'a, NeutronQuery>;
+type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
+
 #[entry_point]
 pub fn instantiate(
-    deps: DepsMut,
+    deps: ExecuteDeps,
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> OrbitalResult<Response> {
+) -> OrbitalResult {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
 
@@ -34,12 +40,7 @@ pub fn instantiate(
 }
 
 #[entry_point]
-pub fn execute(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    msg: ExecuteMsg,
-) -> OrbitalResult<Response<NeutronMsg>> {
+pub fn execute(deps: ExecuteDeps, env: Env, info: MessageInfo, msg: ExecuteMsg) -> OrbitalResult {
     match msg {
         ExecuteMsg::UpdateOwnership(action) => {
             admin_update_ownership(deps, &env.block, &info.sender, action)
@@ -56,11 +57,11 @@ pub fn execute(
 }
 
 fn register_new_user_domain(
-    deps: DepsMut,
+    deps: ExecuteDeps,
     _env: Env,
     info: MessageInfo,
     domain: String,
-) -> OrbitalResult<Response<NeutronMsg>> {
+) -> OrbitalResult {
     // user must be registered to operate on domains
     ensure!(
         USER_CONFIGS.has(deps.storage, info.sender.clone()),
@@ -86,15 +87,12 @@ fn register_new_user_domain(
         .add_attribute("method", "register_user_domain"))
 }
 
-fn register_user(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-) -> OrbitalResult<Response<NeutronMsg>> {
+fn register_user(deps: ExecuteDeps, _env: Env, info: MessageInfo) -> OrbitalResult {
     // user can only register once
-    if USER_CONFIGS.has(deps.storage, info.sender.clone()) {
-        return Err(ContractError::UserAlreadyRegistered {});
-    }
+    ensure!(
+        !USER_CONFIGS.has(deps.storage, info.sender.clone()),
+        ContractError::UserAlreadyRegistered {}
+    );
 
     // save an empty user config
     USER_CONFIGS.save(deps.storage, info.sender, &UserConfig::default())?;
@@ -103,33 +101,32 @@ fn register_user(
 }
 
 fn admin_update_ownership(
-    deps: DepsMut,
+    deps: ExecuteDeps,
     block: &BlockInfo,
     sender: &Addr,
     action: Action,
-) -> OrbitalResult<Response<NeutronMsg>> {
-    let resp = update_ownership(deps, block, sender, action)?;
+) -> OrbitalResult {
+    let resp = update_ownership(deps, block, sender, action).map_err(ContractError::Ownership)?;
     Ok(Response::default().add_attributes(resp.into_attributes()))
 }
 
 fn admin_register_new_domain(
-    deps: DepsMut,
+    deps: ExecuteDeps,
     info: MessageInfo,
     domain: String,
     account_type: UncheckedOrbitalDomainConfig,
-) -> OrbitalResult<Response<NeutronMsg>> {
+) -> OrbitalResult {
     // only the owner can register new domains
-    assert_owner(deps.storage, &info.sender)?;
+    assert_owner(deps.storage, &info.sender).map_err(ContractError::Ownership)?;
 
     // validate the domain configuration
     let orbital_domain = account_type.try_into_checked(deps.api)?;
 
     // ensure the domain does not already exist
-    if ORBITAL_DOMAINS.has(deps.storage, domain.to_string()) {
-        return Err(ContractError::OrbitalDomainAlreadyExists(
-            domain.to_string(),
-        ));
-    }
+    ensure!(
+        !ORBITAL_DOMAINS.has(deps.storage, domain.to_string()),
+        ContractError::OrbitalDomainAlreadyExists(domain.to_string())
+    );
 
     // store the validated domain config in state
     ORBITAL_DOMAINS.save(deps.storage, domain.to_string(), &orbital_domain)?;
@@ -140,20 +137,40 @@ fn admin_register_new_domain(
 }
 
 #[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> NeutronResult<Binary> {
     match msg {
-        QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::OrbitalDomain { domain } => query_orbital_domain(deps, domain),
         QueryMsg::UserConfig { user } => query_user_config(deps, user),
+        QueryMsg::Ownership {} => query_ownership(deps),
     }
 }
 
-fn query_orbital_domain(deps: Deps, domain: String) -> StdResult<Binary> {
-    let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain)?;
-    to_json_binary(&domain_config)
+fn query_ownership(deps: QueryDeps) -> NeutronResult<Binary> {
+    let ownership = get_ownership(deps.storage)?;
+    Ok(to_json_binary(&ownership)?)
 }
 
-fn query_user_config(deps: Deps, user: String) -> StdResult<Binary> {
+fn query_orbital_domain(deps: QueryDeps, domain: String) -> NeutronResult<Binary> {
+    let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain)?;
+    Ok(to_json_binary(&domain_config)?)
+}
+
+fn query_user_config(deps: QueryDeps, user: String) -> NeutronResult<Binary> {
     let user_config = USER_CONFIGS.load(deps.storage, Addr::unchecked(user))?;
-    to_json_binary(&user_config)
+    Ok(to_json_binary(&user_config)?)
+}
+
+#[entry_point]
+pub fn reply(_deps: ExecuteDeps, _env: Env, _msg: Reply) -> Result<Response, ContractError> {
+    Ok(Response::default())
+}
+
+#[entry_point]
+pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    Ok(Response::default())
+}
+
+#[entry_point]
+pub fn sudo(_deps: ExecuteDeps, _env: Env, _msg: SudoMsg) -> StdResult<Response<NeutronMsg>> {
+    Ok(Response::default())
 }

@@ -34,3 +34,6 @@ pub enum QueryMsg {
     #[returns(crate::state::UserConfig)]
     UserConfig { user: String },
 }
+
+#[cw_serde]
+pub enum MigrateMsg {}
