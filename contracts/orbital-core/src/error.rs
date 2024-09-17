@@ -12,4 +12,7 @@ pub enum ContractError {
 
     #[error("Orbital domain already registered: {0}")]
     OrbitalDomainAlreadyExists(String),
+
+    #[error("User already registered")]
+    UserAlreadyRegistered {},
 }

@@ -9,7 +9,7 @@ use crate::{
     account_types::UncheckedOrbitalDomainConfig,
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
-    state::ORBITAL_DOMAINS,
+    state::{UserConfig, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 use cosmwasm_std::{
     to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
@@ -46,7 +46,20 @@ pub fn execute(
             domain,
             account_type,
         } => admin_register_new_domain(deps, info, domain, account_type),
+        ExecuteMsg::RegisterUser {} => register_user(deps, env, info),
     }
+}
+
+fn register_user(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+    // user can only register once
+    if USER_CONFIGS.has(deps.storage, info.sender.clone()) {
+        return Err(ContractError::UserAlreadyRegistered {});
+    }
+
+    // save an empty user config
+    USER_CONFIGS.save(deps.storage, info.sender, &UserConfig::default())?;
+
+    Ok(Response::new().add_attribute("method", "register_user"))
 }
 
 fn admin_update_ownership(
@@ -91,10 +104,16 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::OrbitalDomain { domain } => query_orbital_domain(deps, domain),
+        QueryMsg::UserConfig { user } => query_user_config(deps, user),
     }
 }
 
 fn query_orbital_domain(deps: Deps, domain: String) -> StdResult<Binary> {
     let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain)?;
     to_json_binary(&domain_config)
+}
+
+fn query_user_config(deps: Deps, user: String) -> StdResult<Binary> {
+    let user_config = USER_CONFIGS.load(deps.storage, Addr::unchecked(user))?;
+    to_json_binary(&user_config)
 }

@@ -45,7 +45,7 @@ impl UncheckedOrbitalDomainConfig {
                     StdError::generic_err("timeout must be non-zero")
                 );
 
-                Ok(OrbitalDomainConfig::ICA {
+                Ok(OrbitalDomainConfig::InterchainAccount {
                     connection_id,
                     channel_id,
                     timeout,
