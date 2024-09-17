@@ -1,10 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
-use crate::{
-    account_types::UncheckedOrbitalDomainConfig,
-    state::{OrbitalDomainConfig, UserConfig},
-};
+use crate::account_types::UncheckedOrbitalDomainConfig;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -29,9 +26,9 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(OrbitalDomainConfig)]
+    #[returns(crate::state::OrbitalDomainConfig)]
     OrbitalDomain { domain: String },
 
-    #[returns(UserConfig)]
+    #[returns(crate::state::UserConfig)]
     UserConfig { user: String },
 }

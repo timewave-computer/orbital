@@ -5,7 +5,7 @@ use localic_utils::{
     LOCAL_IC_API_URL, NEUTRON_CHAIN_NAME,
 };
 use log::info;
-use orbital_core::account_types::AccountConfigType;
+use orbital_core::account_types::UncheckedOrbitalDomainConfig;
 use std::{env, error::Error};
 
 pub const POLYTONE_PATH: &str = "local-interchaintest/wasms/polytone";
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let register_gaia_domain_msg = orbital_core::msg::ExecuteMsg::RegisterNewDomain {
         domain: "gaia".to_string(),
-        account_type: AccountConfigType::ICA {
+        account_type: UncheckedOrbitalDomainConfig::InterchainAccount {
             connection_id: test_ctx
                 .get_connections()
                 .src(NEUTRON_CHAIN_NAME)

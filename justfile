@@ -25,5 +25,5 @@ optimize: build
 local-ic-start:
     cd local-interchaintest && local-ic start neutron_gaia_juno
 
-local-ic-run:
+local-ic-run: optimize
     RUST_LOG=debug cargo run --package local-interchaintest --bin local-interchaintest
