@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             timeout: Uint64::new(100),
         },
     };
-    let resp = contract_execute(
+    let _resp = contract_execute(
         test_ctx
             .get_request_builder()
             .get_request_builder(NEUTRON_CHAIN_NAME),
@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )
     .unwrap();
 
-    let user_registration_resp = contract_execute(
+    let _user_registration_resp = contract_execute(
         test_ctx
             .get_request_builder()
             .get_request_builder(NEUTRON_CHAIN_NAME),

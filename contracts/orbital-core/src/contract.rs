@@ -1,9 +1,10 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
-use cw_ownable::{
-    assert_owner, get_ownership, initialize_owner, update_ownership, Action, OwnershipError,
-};
+use cw_ownable::{assert_owner, get_ownership, initialize_owner, update_ownership, Action};
+use neutron_sdk::bindings::msg::NeutronMsg;
+
+pub type OrbitalResult<T> = Result<T, ContractError>;
 
 use crate::{
     account_types::UncheckedOrbitalDomainConfig,
@@ -25,7 +26,7 @@ pub fn instantiate(
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> Result<Response, OwnershipError> {
+) -> OrbitalResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
 
@@ -38,7 +39,7 @@ pub fn execute(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<Response, ContractError> {
+) -> OrbitalResult<Response<NeutronMsg>> {
     match msg {
         ExecuteMsg::UpdateOwnership(action) => {
             admin_update_ownership(deps, &env.block, &info.sender, action)
@@ -59,7 +60,7 @@ fn register_new_user_domain(
     _env: Env,
     info: MessageInfo,
     domain: String,
-) -> Result<Response, ContractError> {
+) -> OrbitalResult<Response<NeutronMsg>> {
     // user must be registered to operate on domains
     ensure!(
         USER_CONFIGS.has(deps.storage, info.sender.clone()),
@@ -72,14 +73,24 @@ fn register_new_user_domain(
         ContractError::UnknownDomain(domain)
     );
 
-    let _domain = ORBITAL_DOMAINS.load(deps.storage, domain)?;
+    let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain.to_string())?;
+
+    // TODO: query and assert registration fee payment for the domain (if applicable)
 
     // TODO: fire a registration message
+    let registration_msg =
+        domain_config.get_registration_message(deps, domain, info.sender.clone())?;
 
-    Ok(Response::new().add_attribute("method", "register_user_domain"))
+    Ok(Response::new()
+        .add_message(registration_msg)
+        .add_attribute("method", "register_user_domain"))
 }
 
-fn register_user(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+fn register_user(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> OrbitalResult<Response<NeutronMsg>> {
     // user can only register once
     if USER_CONFIGS.has(deps.storage, info.sender.clone()) {
         return Err(ContractError::UserAlreadyRegistered {});
@@ -96,7 +107,7 @@ fn admin_update_ownership(
     block: &BlockInfo,
     sender: &Addr,
     action: Action,
-) -> Result<Response, ContractError> {
+) -> OrbitalResult<Response<NeutronMsg>> {
     let resp = update_ownership(deps, block, sender, action)?;
     Ok(Response::default().add_attributes(resp.into_attributes()))
 }
@@ -106,7 +117,7 @@ fn admin_register_new_domain(
     info: MessageInfo,
     domain: String,
     account_type: UncheckedOrbitalDomainConfig,
-) -> Result<Response, ContractError> {
+) -> OrbitalResult<Response<NeutronMsg>> {
     // only the owner can register new domains
     assert_owner(deps.storage, &info.sender)?;
 
