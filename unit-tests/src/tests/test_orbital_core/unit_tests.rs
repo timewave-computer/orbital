@@ -2,12 +2,13 @@ use cosmwasm_std::Uint64;
 use cw_multi_test::Executor;
 use cw_ownable::Ownership;
 
-use crate::{
+use orbital_core::{
     account_types::UncheckedOrbitalDomainConfig,
     msg::{ExecuteMsg, QueryMsg},
-    state::OrbitalDomainConfig,
-    tests::ctx::Suite,
+    state::{OrbitalDomainConfig, UserConfig},
 };
+
+use crate::tests::test_orbital_core::ctx::Suite;
 
 #[test]
 fn test_init() {
@@ -181,7 +182,7 @@ fn test_register_user_happy() {
 
     let user_config = suite.query_user("user").unwrap();
 
-    assert!(user_config.clearing_accounts.is_empty());
+    assert!(user_config == UserConfig::default());
 }
 
 #[test]

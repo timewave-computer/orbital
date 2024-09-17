@@ -25,6 +25,3 @@ thiserror       = { workspace = true }
 neutron-sdk     = { workspace = true }
 schemars        = { workspace = true }
 serde_json      = { workspace = true }
-
-[dev-dependencies]
-cw-multi-test   = { workspace = true }

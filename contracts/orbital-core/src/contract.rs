@@ -24,7 +24,7 @@ pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 type OrbitalResult = NeutronResult<Response<NeutronMsg>>;
 type QueryDeps<'a> = Deps<'a, NeutronQuery>;
-type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
+pub type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 
 #[entry_point]
 pub fn instantiate(
@@ -106,7 +106,8 @@ fn admin_update_ownership(
     sender: &Addr,
     action: Action,
 ) -> OrbitalResult {
-    let resp = update_ownership(deps, block, sender, action).map_err(ContractError::Ownership)?;
+    let resp = update_ownership(deps.into_empty(), block, sender, action)
+        .map_err(ContractError::Ownership)?;
     Ok(Response::default().add_attributes(resp.into_attributes()))
 }
 
@@ -161,12 +162,12 @@ fn query_user_config(deps: QueryDeps, user: String) -> NeutronResult<Binary> {
 }
 
 #[entry_point]
-pub fn reply(_deps: ExecuteDeps, _env: Env, _msg: Reply) -> Result<Response, ContractError> {
+pub fn reply(_deps: ExecuteDeps, _env: Env, _msg: Reply) -> StdResult<Response<NeutronMsg>> {
     Ok(Response::default())
 }
 
 #[entry_point]
-pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> StdResult<Response<NeutronMsg>> {
     Ok(Response::default())
 }
 

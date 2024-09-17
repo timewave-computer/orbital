@@ -1,7 +1,9 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{coins, Addr, DepsMut, StdResult, Uint64};
+use cosmwasm_std::{coins, Addr, StdResult, Uint64};
 use cw_storage_plus::Map;
 use neutron_sdk::bindings::msg::NeutronMsg;
+
+use crate::contract::ExecuteDeps;
 
 /// map of users with their respective configurations
 pub const USER_CONFIGS: Map<Addr, UserConfig> = Map::new("user_configs");
@@ -40,7 +42,7 @@ pub enum OrbitalDomainConfig {
 impl OrbitalDomainConfig {
     pub fn get_registration_message(
         &self,
-        deps: DepsMut,
+        deps: ExecuteDeps,
         domain: String,
         user_addr: Addr,
     ) -> StdResult<NeutronMsg> {

@@ -2,6 +2,7 @@
 members  = [
     "contracts/orbital-core",
     "local-interchaintest",
+    "unit-tests/",
 ]
 resolver = "2"
 
@@ -23,7 +24,12 @@ incremental      = false
 overflow-checks  = true
 
 [workspace.dependencies]
-cosmwasm-std    = { version = "2.1.3", features = ["cosmwasm_1_4"] }
+cosmwasm-std    = { version = "2.1.3", features = [
+    "cosmwasm_1_1",
+    "cosmwasm_1_2",
+    "cosmwasm_1_4",
+    "cosmwasm_2_0",
+] }
 cosmwasm-schema = "2.1.3"
 cw-utils        = "2.0.0"
 cw-storage-plus = "2.0.0"
@@ -43,3 +49,6 @@ localic-std     = { git = "https://github.com/strangelove-ventures/interchaintes
 localic-utils   = { git = "https://github.com/timewave-computer/localic-utils", branch = "main" }
 env_logger      = "0.11.5"
 log             = "0.4.22"
+unit-tests      = { path = "unit-tests" }
+prost           = "0.11"
+cosmos-sdk-proto = { version = "0.14.0", default-features = false }
