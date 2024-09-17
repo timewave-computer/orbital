@@ -2,7 +2,7 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 use crate::{
-    account_types::AccountConfigType,
+    account_types::UncheckedOrbitalDomainConfig,
     state::{OrbitalDomainConfig, UserConfig},
 };
 
@@ -19,7 +19,7 @@ pub enum ExecuteMsg {
         // string identifier for the domain
         domain: String,
         // type of account to be used
-        account_type: AccountConfigType,
+        account_type: UncheckedOrbitalDomainConfig,
     },
 
     RegisterUser {},

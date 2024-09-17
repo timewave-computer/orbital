@@ -1,25 +1,25 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{ensure, DepsMut, StdError, StdResult, Uint64};
+use cosmwasm_std::{ensure, Api, StdError, StdResult, Uint64};
 
 use crate::state::OrbitalDomainConfig;
 
 #[cw_serde]
-pub enum AccountConfigType {
+pub enum UncheckedOrbitalDomainConfig {
     Polytone {
         note: String,
         timeout: Uint64,
     },
-    ICA {
+    InterchainAccount {
         connection_id: String,
         channel_id: String,
         timeout: Uint64,
     },
 }
 
-impl AccountConfigType {
-    pub fn try_into_domain_config(self, deps: &DepsMut) -> StdResult<OrbitalDomainConfig> {
+impl UncheckedOrbitalDomainConfig {
+    pub fn try_into_checked(self, api: &dyn Api) -> StdResult<OrbitalDomainConfig> {
         match self {
-            AccountConfigType::Polytone { note, timeout } => {
+            UncheckedOrbitalDomainConfig::Polytone { note, timeout } => {
                 // ensure that the timeout is > 0
                 ensure!(
                     timeout.u64() > 0,
@@ -28,13 +28,13 @@ impl AccountConfigType {
 
                 let validated_config = OrbitalDomainConfig::Polytone {
                     // validate the note address on orbital chain
-                    note: deps.api.addr_validate(&note)?,
+                    note: api.addr_validate(&note)?,
                     timeout,
                 };
 
                 Ok(validated_config)
             }
-            AccountConfigType::ICA {
+            UncheckedOrbitalDomainConfig::InterchainAccount {
                 connection_id,
                 channel_id,
                 timeout,
@@ -45,7 +45,7 @@ impl AccountConfigType {
                     StdError::generic_err("timeout must be non-zero")
                 );
 
-                Ok(OrbitalDomainConfig::ICA {
+                Ok(OrbitalDomainConfig::InterchainAccount {
                     connection_id,
                     channel_id,
                     timeout,

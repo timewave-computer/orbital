@@ -2,7 +2,7 @@ use cosmwasm_std::{Addr, Empty, StdResult};
 use cw_multi_test::{error::AnyResult, App, AppResponse, Contract, ContractWrapper, Executor};
 
 use crate::{
-    account_types::AccountConfigType,
+    account_types::UncheckedOrbitalDomainConfig,
     contract::{execute, instantiate, query},
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     state::{OrbitalDomainConfig, UserConfig},
@@ -55,7 +55,7 @@ impl Suite {
     pub fn register_new_domain(
         &mut self,
         domain: &str,
-        account_type: AccountConfigType,
+        account_type: UncheckedOrbitalDomainConfig,
     ) -> AnyResult<AppResponse> {
         self.app.execute_contract(
             self.owner.clone(),
