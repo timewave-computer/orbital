@@ -1,6 +1,5 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     coin, coins, from_json, to_json_binary, to_json_string, Addr, Api, BalanceResponse, BankMsg,
     BankQuery, BlockInfo, CustomMsg, CustomQuery, StdError, StdResult, Storage, Uint128,
@@ -9,7 +8,6 @@ use cw_multi_test::{
     error::{bail, AnyError, AnyResult},
     AppResponse, BankSudo, CosmosRouter, MockApiBech32, Module, WasmSudo,
 };
-use cw_storage_plus::Map;
 use neutron_sdk::{
     bindings::{
         msg::{MsgSubmitTxResponse, NeutronMsg},
@@ -22,52 +20,17 @@ use neutron_sdk::{
 use prost::Message;
 use serde::de::DeserializeOwned;
 
-use super::{MsgTransfer, PacketMetadata};
-
-pub const CHAIN_PREFIX: &str = "cosmos";
-pub const DENOM_NTRN: &str = "untrn";
-
-/// Namespace for neutron storage
-pub const NAMESPACE_NEUTRON: &[u8] = b"neutron_storage";
-
-/// Map for (sender, conn_id) => account_id
-const ACCOUNTS: Map<(&Addr, String, String), Addr> = Map::new("accounts");
-
-const LOCAL_CHANNELS: Map<String, String> = Map::new("local_channels");
-const LOCAL_CHANNELS_VALUES: Map<String, String> = Map::new("local_channels_values");
-
-const REMOTE_CHANNELS: Map<String, String> = Map::new("remote_channels");
-const REMOTE_CHANNELS_VALUES: Map<String, String> = Map::new("remote_channels_values");
+use crate::testing_utils::{
+    consts::{
+        ACCOUNTS, DENOM_NTRN, LOCAL_CHANNELS, LOCAL_CHANNELS_VALUES, REMOTE_CHANNELS,
+        REMOTE_CHANNELS_VALUES,
+    },
+    types::{MsgTransfer, OpenAckVersion, PacketMetadata},
+};
 
 pub trait Neutron:
     Module<ExecT = NeutronMsg, QueryT = NeutronQuery, SudoT = neutron_sdk::sudo::msg::SudoMsg>
 {
-}
-
-#[cw_serde]
-pub struct OpenAckVersion {
-    pub version: String,
-    pub controller_connection_id: String,
-    pub host_connection_id: String,
-    pub address: String,
-    pub encoding: String,
-    pub tx_type: String,
-}
-
-#[cw_serde]
-pub enum AcknowledgementResult {
-    /// Success - Got success acknowledgement in sudo with array of message item types in it
-    Success(Vec<String>),
-    /// Error - Got error acknowledgement in sudo with payload message in it and error details
-    Error((String, String)),
-    /// Timeout - Got timeout acknowledgement in sudo with payload message in it
-    Timeout(String),
-}
-
-#[cw_serde]
-pub struct SudoPayload {
-    pub message: String,
-    pub port_id: String,
 }
 
 pub struct NeutronKeeper {

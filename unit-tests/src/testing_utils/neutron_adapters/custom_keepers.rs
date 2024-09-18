@@ -1,9 +1,8 @@
-use cosmwasm_schema::cw_serde;
 use cosmwasm_schema::serde::de::DeserializeOwned;
 use cosmwasm_schema::serde::Serialize;
 use cosmwasm_std::{
-    from_json, to_json_binary, Addr, Api, Binary, BlockInfo, Coin, CustomMsg, CustomQuery,
-    GrpcQuery, Querier, Storage, Uint64,
+    from_json, to_json_binary, Addr, Api, Binary, BlockInfo, CustomMsg, CustomQuery, GrpcQuery,
+    Querier, Storage,
 };
 use cw_multi_test::error::{AnyError, AnyResult};
 use cw_multi_test::{AppResponse, CosmosRouter, Module};
@@ -11,16 +10,7 @@ use cw_multi_test::{AppResponse, CosmosRouter, Module};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-#[cw_serde]
-pub struct QueryParamsResponse {
-    pub params: Params,
-}
-
-#[cw_serde]
-pub struct Params {
-    pub msg_submit_tx_max_messages: Uint64,
-    pub register_fee: Vec<Coin>,
-}
+use crate::testing_utils::types::{Params, QueryParamsResponse};
 
 pub struct CustomStargateKeeper<ExecT, QueryT, SudoT>(
     PhantomData<(ExecT, QueryT, SudoT)>,

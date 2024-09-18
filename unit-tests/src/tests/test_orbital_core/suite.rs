@@ -6,7 +6,10 @@ use orbital_core::{
     state::{OrbitalDomainConfig, UserConfig},
 };
 
-use crate::testing_utils::{base_suite_builder::SuiteBuilder, make_addr, CustomApp};
+use crate::testing_utils::{
+    base_suite_builder::{make_addr, SuiteBuilder},
+    types::CustomApp,
+};
 
 pub struct OrbitalCoreBuilder {
     pub builder: SuiteBuilder,

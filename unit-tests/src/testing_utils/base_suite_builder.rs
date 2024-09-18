@@ -4,9 +4,31 @@ use cw_multi_test::{
 };
 
 use super::{
-    neutron_adapters::custom_module::NeutronKeeper, neutron_type_contracts::orbital_core_contract,
-    CustomApp, ALL_DENOMS, CHAIN_PREFIX, FAUCET, NOTE, OWNER,
+    consts::{ALL_DENOMS, CHAIN_PREFIX, FAUCET, NOTE, OWNER},
+    neutron_adapters::custom_module::NeutronKeeper,
+    neutron_type_contracts::orbital_core_contract,
+    types::CustomApp,
 };
+
+pub trait BaseSuite {
+    fn get_app(&self) -> &CustomApp;
+
+    fn query_balance(&self, addr: &Addr, denom: &str) -> Coin {
+        let app = self.get_app();
+        app.wrap().query_balance(addr, denom).unwrap()
+    }
+
+    fn query_all_balances(&self, addr: &Addr) -> Vec<Coin> {
+        let app = self.get_app();
+        app.wrap().query_all_balances(addr).unwrap()
+    }
+
+    fn assert_balance(&self, addr: impl Into<String>, coin: Coin) {
+        let app = self.get_app();
+        let bal = app.wrap().query_balance(addr, &coin.denom).unwrap();
+        assert_eq!(bal, coin);
+    }
+}
 
 pub struct SuiteBuilder {
     pub faucet: Addr,
@@ -58,4 +80,8 @@ impl SuiteBuilder {
     pub fn build(self) -> CustomApp {
         self.app
     }
+}
+
+pub fn make_addr(app: &CustomApp, addr: &str) -> Addr {
+    app.api().addr_make(addr)
 }

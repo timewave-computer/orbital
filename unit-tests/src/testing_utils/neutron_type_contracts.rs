@@ -7,7 +7,7 @@ use neutron_sdk::bindings::{msg::NeutronMsg, query::NeutronQuery};
 /// Turn a neutron response into an empty response
 /// This is fine because the contract return an empty response, but our testing enviroment expects a neutron response
 /// the contract that uses this function will never emit a neutron response anyways
-pub(crate) fn execute_into_neutron<E: Display>(
+pub fn execute_into_neutron<E: Display>(
     into: Result<Response, E>,
 ) -> Result<Response<NeutronMsg>, E> {
     into.map(|r| {
@@ -17,7 +17,7 @@ pub(crate) fn execute_into_neutron<E: Display>(
             .messages
             .into_iter()
             .filter_map(|m| {
-                let msg: Option<CosmosMsg<NeutronMsg>> = if let CosmosMsg::Custom(t) = m.msg {
+                let msg: Option<CosmosMsg<NeutronMsg>> = if let CosmosMsg::Custom(_) = m.msg {
                     Some(CosmosMsg::<NeutronMsg>::Custom(
                         NeutronMsg::RemoveSchedule {
                             name: "".to_string(),
@@ -42,7 +42,7 @@ pub(crate) fn execute_into_neutron<E: Display>(
 }
 
 /// Turn neutron DepsMut into empty DepsMut
-pub(crate) fn get_empty_depsmut(deps: DepsMut<NeutronQuery>) -> DepsMut<'_, Empty> {
+pub fn get_empty_depsmut(deps: DepsMut<NeutronQuery>) -> DepsMut<'_, Empty> {
     DepsMut {
         storage: deps.storage,
         api: deps.api,
@@ -51,7 +51,7 @@ pub(crate) fn get_empty_depsmut(deps: DepsMut<NeutronQuery>) -> DepsMut<'_, Empt
 }
 
 /// Turn neutron Deps into empty Deps
-pub(crate) fn get_empty_deps(deps: Deps<NeutronQuery>) -> Deps<'_, Empty> {
+pub fn get_empty_deps(deps: Deps<NeutronQuery>) -> Deps<'_, Empty> {
     Deps {
         storage: deps.storage,
         api: deps.api,
