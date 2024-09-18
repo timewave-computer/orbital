@@ -1,4 +1,3 @@
-mod ctx;
-mod orbital_core;
+mod suite;
 #[cfg(test)]
 mod unit_tests;

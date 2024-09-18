@@ -8,7 +8,7 @@ use orbital_core::{
     state::{OrbitalDomainConfig, UserConfig},
 };
 
-use crate::tests::test_orbital_core::ctx::Suite;
+use crate::tests::test_orbital_core::suite::Suite;
 
 #[test]
 fn test_init() {

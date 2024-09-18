@@ -1,13 +1,8 @@
-use cosmwasm_std::{coin, Addr, Binary, Coin, Empty, GrpcQuery, MemoryStorage, StdResult};
+use cosmwasm_std::{coin, Addr, Coin, StdResult};
 use cw_multi_test::{
-    error::AnyResult, App, AppResponse, BankKeeper, BasicAppBuilder, Executor, FailingModule,
-    GovFailingModule, IbcFailingModule, MockApiBech32, SimpleAddressGenerator, StargateAccepting,
-    WasmKeeper,
+    error::AnyResult, AppResponse, BasicAppBuilder, Executor, MockApiBech32,
+    SimpleAddressGenerator, StargateAccepting, WasmKeeper,
 };
-use neutron_sdk::bindings::{msg::NeutronMsg, query::NeutronQuery};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use orbital_core::{
     account_types::UncheckedOrbitalDomainConfig,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
@@ -15,18 +10,10 @@ use orbital_core::{
 };
 
 use crate::testing_utils::{
-    neutron_adapters::{custom_keepers::CustomStargateKeeper, custom_module::NeutronKeeper},
-    neutron_type_contracts::orbital_core_contract,
+    make_addr, neutron_adapters::custom_module::NeutronKeeper,
+    neutron_type_contracts::orbital_core_contract, CustomApp, ALL_DENOMS, CHAIN_PREFIX, FAUCET,
+    NOTE, OWNER,
 };
-
-pub const DENOM_FALLBACK: &str = "ufallback";
-pub const DENOM_ATOM: &str = "uatom";
-pub const DENOM_NTRN: &str = "untrn";
-pub const DENOM_OSMO: &str = "uosmo";
-pub const FAUCET: &str = "faucet_addr";
-pub const ADMIN: &str = "admin_addr";
-pub const ALL_DENOMS: &[&str] = &[DENOM_ATOM, DENOM_NTRN, DENOM_OSMO, DENOM_FALLBACK];
-pub const CHAIN_PREFIX: &str = "cosmos";
 
 pub struct OrbitalCoreInstantiate {
     pub msg: InstantiateMsg,
@@ -42,41 +29,6 @@ impl Default for OrbitalCoreInstantiate {
     }
 }
 
-#[non_exhaustive]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct StargateMsg {
-    /// Stargate message type.
-    pub type_url: String,
-    /// Stargate message body.
-    pub value: Binary,
-}
-
-#[non_exhaustive]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct StargateQuery {
-    /// Fully qualified service path used for routing, e.g. custom/cosmos_sdk.x.bank.v1.Query/QueryBalance.
-    pub path: String,
-    /// Expected protobuf message type (not any), binary encoded.
-    pub data: Binary,
-}
-
-pub type CustomApp = App<
-    BankKeeper,
-    MockApiBech32,
-    MemoryStorage,
-    NeutronKeeper,
-    WasmKeeper<NeutronMsg, NeutronQuery>,
-    FailingModule<Empty, Empty, Empty>,
-    FailingModule<Empty, Empty, Empty>,
-    IbcFailingModule,
-    GovFailingModule,
-    StargateAccepting,
->;
-const OWNER: &str = "owner";
-const NOTE: &str = "note";
-
 pub struct SuiteBuilder {}
 
 pub struct Suite {
@@ -84,10 +36,6 @@ pub struct Suite {
     pub owner: Addr,
     pub orbital: Addr,
     pub note: Addr,
-}
-
-fn make_addr(app: &CustomApp, addr: &str) -> Addr {
-    app.api().addr_make(addr)
 }
 
 impl Suite {
