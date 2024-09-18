@@ -1,40 +1,62 @@
-use cosmwasm_std::{coin, Addr, Coin, StdResult};
-use cw_multi_test::{
-    error::AnyResult, AppResponse, BasicAppBuilder, Executor, MockApiBech32,
-    SimpleAddressGenerator, StargateAccepting, WasmKeeper,
-};
+use cosmwasm_std::{Addr, StdResult};
+use cw_multi_test::{error::AnyResult, AppResponse, Executor};
 use orbital_core::{
     account_types::UncheckedOrbitalDomainConfig,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     state::{OrbitalDomainConfig, UserConfig},
 };
 
-use crate::testing_utils::{
-    make_addr, neutron_adapters::custom_module::NeutronKeeper,
-    neutron_type_contracts::orbital_core_contract, CustomApp, ALL_DENOMS, CHAIN_PREFIX, FAUCET,
-    NOTE, OWNER,
-};
+use crate::testing_utils::{base_suite_builder::SuiteBuilder, make_addr, CustomApp};
 
-pub struct OrbitalCoreInstantiate {
-    pub msg: InstantiateMsg,
+pub struct OrbitalCoreBuilder {
+    pub builder: SuiteBuilder,
+    pub instantiate_msg: InstantiateMsg,
 }
 
-impl Default for OrbitalCoreInstantiate {
+impl Default for OrbitalCoreBuilder {
     fn default() -> Self {
-        OrbitalCoreInstantiate {
-            msg: InstantiateMsg {
-                owner: "TODO".to_string(),
-            },
+        let builder = SuiteBuilder::default();
+
+        let owner = builder.admin.to_string();
+
+        Self {
+            builder,
+            instantiate_msg: InstantiateMsg { owner },
         }
     }
 }
 
-pub struct SuiteBuilder {}
+impl OrbitalCoreBuilder {
+    pub fn build(mut self) -> Suite {
+        let owner = self.builder.admin.clone();
+        let note = self.builder.note.clone();
+
+        let orbital_core_addr = self
+            .builder
+            .app
+            .instantiate_contract(
+                self.builder.orbital_core_code_id,
+                owner.clone(),
+                &self.instantiate_msg,
+                &[],
+                "orbital-core",
+                None,
+            )
+            .unwrap();
+
+        Suite {
+            app: self.builder.build(),
+            note,
+            owner,
+            orbital_core: orbital_core_addr,
+        }
+    }
+}
 
 pub struct Suite {
     pub app: CustomApp,
     pub owner: Addr,
-    pub orbital: Addr,
+    pub orbital_core: Addr,
     pub note: Addr,
 }
 
@@ -42,14 +64,14 @@ impl Suite {
     pub fn register_user(&mut self, user_addr: &str) -> AnyResult<AppResponse> {
         self.app.execute_contract(
             make_addr(&self.app, user_addr),
-            self.orbital.clone(),
+            self.orbital_core.clone(),
             &ExecuteMsg::RegisterUser {},
             &[],
         )
     }
     pub fn query_domain(&mut self, domain: &str) -> StdResult<OrbitalDomainConfig> {
         self.app.wrap().query_wasm_smart(
-            self.orbital.clone(),
+            self.orbital_core.clone(),
             &QueryMsg::OrbitalDomain {
                 domain: domain.to_string(),
             },
@@ -57,7 +79,7 @@ impl Suite {
     }
     pub fn query_user(&mut self, user: &str) -> StdResult<UserConfig> {
         self.app.wrap().query_wasm_smart(
-            self.orbital.clone(),
+            self.orbital_core.clone(),
             &QueryMsg::UserConfig {
                 user: make_addr(&self.app, user).to_string(),
             },
@@ -70,79 +92,12 @@ impl Suite {
     ) -> AnyResult<AppResponse> {
         self.app.execute_contract(
             self.owner.clone(),
-            self.orbital.clone(),
+            self.orbital_core.clone(),
             &ExecuteMsg::RegisterNewDomain {
                 domain: domain.to_string(),
                 account_type,
             },
             &[],
         )
-    }
-}
-
-impl Default for Suite {
-    fn default() -> Self {
-        let mut app = BasicAppBuilder::new_custom()
-            .with_custom(NeutronKeeper::new(CHAIN_PREFIX))
-            .with_stargate(StargateAccepting)
-            .with_api(MockApiBech32::new(CHAIN_PREFIX))
-            .with_wasm(WasmKeeper::default().with_address_generator(SimpleAddressGenerator))
-            .build(|r, _, s| {
-                let balances: Vec<Coin> = ALL_DENOMS
-                    .iter()
-                    .map(|d| coin(1_000_000_000_000_000_000_000_000_u128, d.to_string()))
-                    .collect();
-
-                r.bank
-                    .init_balance(
-                        s,
-                        &MockApiBech32::new(CHAIN_PREFIX).addr_make(FAUCET),
-                        balances,
-                    )
-                    .unwrap();
-
-                // r.custom
-                //     .add_local_channel(s, NTRN_HUB_CHANNEL.0, NTRN_HUB_CHANNEL.1)
-                //     .unwrap();
-                // r.custom
-                //     .add_local_channel(s, NTRN_OSMO_CHANNEL.0, NTRN_OSMO_CHANNEL.1)
-                //     .unwrap();
-                // r.custom
-                //     .add_local_channel(s, NTRN_STRIDE_CHANNEL.0, NTRN_STRIDE_CHANNEL.1)
-                //     .unwrap();
-
-                // r.custom
-                //     .add_remote_channel(s, HUB_OSMO_CHANNEL.0, HUB_OSMO_CHANNEL.1)
-                //     .unwrap();
-
-                // r.custom
-                //     .add_remote_channel(s, HUB_STRIDE_CHANNEL.0, HUB_STRIDE_CHANNEL.1)
-                //     .unwrap();
-            });
-
-        let code_id = app.store_code(orbital_core_contract());
-
-        let owner_addr = app.api().addr_make(OWNER);
-        let note_addr = app.api().addr_make(NOTE);
-
-        let addr = app
-            .instantiate_contract(
-                code_id,
-                owner_addr.clone(),
-                &InstantiateMsg {
-                    owner: owner_addr.to_string(),
-                },
-                &[],
-                "orbital-core",
-                None,
-            )
-            .unwrap();
-
-        Self {
-            app,
-            owner: owner_addr,
-            orbital: addr,
-            note: note_addr,
-        }
     }
 }

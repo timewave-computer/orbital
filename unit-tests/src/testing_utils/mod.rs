@@ -8,6 +8,7 @@ use neutron_sdk::bindings::{msg::NeutronMsg, query::NeutronQuery};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+pub mod base_suite_builder;
 pub mod neutron_adapters;
 pub mod neutron_type_contracts;
 pub mod setup;
