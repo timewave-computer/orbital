@@ -6,8 +6,6 @@ version    = { workspace = true }
 repository = { workspace = true }
 
 [dependencies]
-localic-std     = { workspace = true }
-localic-utils   = { workspace = true }
 hex             = { workspace = true }
 serde_json      = { workspace = true }
 env_logger      = { workspace = true }

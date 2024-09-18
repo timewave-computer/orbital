@@ -1,9 +1,13 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{coins, Addr, StdResult, Uint64};
+use cosmwasm_std::{coins, ensure, Addr, MessageInfo, StdResult, Uint128, Uint64};
 use cw_storage_plus::Map;
-use neutron_sdk::bindings::msg::NeutronMsg;
+use cw_utils::must_pay;
+use neutron_sdk::{
+    bindings::msg::{IbcFee, NeutronMsg},
+    query::min_ibc_fee::query_min_ibc_fee,
+};
 
-use crate::contract::ExecuteDeps;
+use crate::{contract::ExecuteDeps, error::ContractError};
 
 /// map of users with their respective configurations
 pub const USER_CONFIGS: Map<Addr, UserConfig> = Map::new("user_configs");
@@ -39,18 +43,45 @@ pub enum OrbitalDomainConfig {
     },
 }
 
+/// assumes that fees are only denominated in untrn and flattens them into a single coin
+fn flatten_ibc_fees_amt(fee_response: IbcFee) -> Uint128 {
+    fee_response
+        .ack_fee
+        .iter()
+        .chain(fee_response.recv_fee.iter())
+        .chain(fee_response.timeout_fee.iter())
+        .map(|fee| fee.amount)
+        .sum()
+}
+
 impl OrbitalDomainConfig {
     pub fn get_registration_message(
         &self,
         deps: ExecuteDeps,
+        info: &MessageInfo,
         domain: String,
-        user_addr: Addr,
-    ) -> StdResult<NeutronMsg> {
+    ) -> Result<NeutronMsg, ContractError> {
         let msg = match self {
             OrbitalDomainConfig::InterchainAccount { connection_id, .. } => {
+                let min_ibc_fee = query_min_ibc_fee(deps.as_ref()).map_err(|e| {
+                    ContractError::DomainRegistrationError(format!(
+                        "failed to query min ibc fee: {}",
+                        e
+                    ))
+                })?;
+                let expected_fee_payment = flatten_ibc_fees_amt(min_ibc_fee.min_fee);
+
+                match must_pay(info, "untrn") {
+                    Ok(amt) => ensure!(
+                        amt >= expected_fee_payment,
+                        ContractError::DomainRegistrationError("insufficient fee".to_string())
+                    ),
+                    Err(e) => return Err(ContractError::DomainRegistrationError(e.to_string())),
+                }
+
                 NeutronMsg::register_interchain_account(
                     connection_id.to_string(),
-                    user_addr.to_string(),
+                    info.sender.to_string(),
                     Some(coins(100_000, "untrn")),
                 )
             }
@@ -58,7 +89,7 @@ impl OrbitalDomainConfig {
         };
 
         // store `None` as the clearing account until the callback is received
-        CLEARING_ACCOUNTS.save(deps.storage, (domain, user_addr.to_string()), &None)?;
+        CLEARING_ACCOUNTS.save(deps.storage, (domain, info.sender.to_string()), &None)?;
 
         Ok(msg)
     }

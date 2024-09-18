@@ -1,4 +1,4 @@
-use cosmwasm_std::Uint64;
+use cosmwasm_std::{coins, Uint64};
 use cw_multi_test::Executor;
 use cw_ownable::Ownership;
 
@@ -8,7 +8,10 @@ use orbital_core::{
     state::{OrbitalDomainConfig, UserConfig},
 };
 
-use crate::tests::test_orbital_core::suite::OrbitalCoreBuilder;
+use crate::{
+    testing_utils::consts::{DENOM_NTRN, GAIA_DOMAIN, OSMOSIS_DOMAIN, USER_1},
+    tests::test_orbital_core::suite::OrbitalCoreBuilder,
+};
 
 #[test]
 fn test_init() {
@@ -30,7 +33,7 @@ fn test_register_orbital_domain_validates_addr() {
 
     suite
         .register_new_domain(
-            "domain",
+            GAIA_DOMAIN,
             UncheckedOrbitalDomainConfig::Polytone {
                 note: "invalid_note".to_string(),
                 timeout: Uint64::one(),
@@ -46,7 +49,7 @@ fn test_register_duplicate_orbital_domain() {
 
     suite
         .register_new_domain(
-            "",
+            GAIA_DOMAIN,
             UncheckedOrbitalDomainConfig::Polytone {
                 note: suite.note.to_string(),
                 timeout: Uint64::one(),
@@ -55,7 +58,7 @@ fn test_register_duplicate_orbital_domain() {
         .unwrap();
     suite
         .register_new_domain(
-            "",
+            GAIA_DOMAIN,
             UncheckedOrbitalDomainConfig::Polytone {
                 note: suite.note.to_string(),
                 timeout: Uint64::one(),
@@ -75,7 +78,7 @@ fn test_register_orbital_domain_validates_domain_owner() {
             suite.note.clone(),
             suite.orbital_core,
             &ExecuteMsg::RegisterNewDomain {
-                domain: "domain".to_string(),
+                domain: GAIA_DOMAIN.to_string(),
                 account_type: UncheckedOrbitalDomainConfig::Polytone {
                     note: suite.note.to_string(),
                     timeout: Uint64::one(),
@@ -93,7 +96,7 @@ fn test_register_orbital_ica_domain_validates_timeout() {
 
     suite
         .register_new_domain(
-            "domain",
+            GAIA_DOMAIN,
             UncheckedOrbitalDomainConfig::InterchainAccount {
                 connection_id: "connection-id".to_string(),
                 channel_id: "channel-id".to_string(),
@@ -110,7 +113,7 @@ fn test_register_orbital_polytone_domain_validates_timeout() {
 
     suite
         .register_new_domain(
-            "domain",
+            OSMOSIS_DOMAIN,
             UncheckedOrbitalDomainConfig::Polytone {
                 note: suite.note.to_string(),
                 timeout: Uint64::zero(),
@@ -125,7 +128,7 @@ fn test_register_orbital_domain_happy() {
 
     suite
         .register_new_domain(
-            "domain_polytone",
+            OSMOSIS_DOMAIN,
             UncheckedOrbitalDomainConfig::Polytone {
                 note: suite.note.to_string(),
                 timeout: Uint64::one(),
@@ -135,7 +138,7 @@ fn test_register_orbital_domain_happy() {
 
     suite
         .register_new_domain(
-            "domain_ica",
+            GAIA_DOMAIN,
             UncheckedOrbitalDomainConfig::InterchainAccount {
                 connection_id: "connection-id".to_string(),
                 channel_id: "channel-id".to_string(),
@@ -144,8 +147,8 @@ fn test_register_orbital_domain_happy() {
         )
         .unwrap();
 
-    let polytone_domain = suite.query_domain("domain_polytone").unwrap();
-    let ica_domain = suite.query_domain("domain_ica").unwrap();
+    let polytone_domain = suite.query_domain(OSMOSIS_DOMAIN).unwrap();
+    let ica_domain = suite.query_domain(GAIA_DOMAIN).unwrap();
 
     assert!(
         polytone_domain
@@ -170,17 +173,17 @@ fn test_register_orbital_domain_happy() {
 fn test_register_user_duplicate() {
     let mut suite = OrbitalCoreBuilder::default().build();
 
-    suite.register_user("user").unwrap();
-    suite.register_user("user").unwrap();
+    suite.register_user(USER_1).unwrap();
+    suite.register_user(USER_1).unwrap();
 }
 
 #[test]
 fn test_register_user_happy() {
     let mut suite = OrbitalCoreBuilder::default().build();
 
-    suite.register_user("user").unwrap();
+    suite.register_user(USER_1).unwrap();
 
-    let user_config = suite.query_user("user").unwrap();
+    let user_config = suite.query_user(USER_1).unwrap();
 
     assert!(user_config == UserConfig::default());
 }
@@ -188,11 +191,62 @@ fn test_register_user_happy() {
 #[test]
 #[should_panic(expected = "User not registered")]
 fn test_register_user_new_domain_validates_user_registration() {
-    unimplemented!()
+    let mut suite = OrbitalCoreBuilder::default().build();
+
+    suite
+        .register_user_to_new_domain(USER_1, GAIA_DOMAIN, vec![])
+        .unwrap();
 }
 
 #[test]
 #[should_panic(expected = "Unknown domain: gaia")]
 fn test_register_user_new_domain_validates_domain_existance() {
-    unimplemented!()
+    let mut suite = OrbitalCoreBuilder::default().build();
+    suite.register_user(USER_1).unwrap();
+
+    suite
+        .register_user_to_new_domain(USER_1, GAIA_DOMAIN, vec![])
+        .unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Domain registration error: No funds sent")]
+fn test_register_user_new_ica_domain_asserts_fee_denom() {
+    let mut suite = OrbitalCoreBuilder::default().build();
+    suite.register_user(USER_1).unwrap();
+    suite
+        .register_new_domain(
+            GAIA_DOMAIN,
+            UncheckedOrbitalDomainConfig::InterchainAccount {
+                connection_id: "connection-id".to_string(),
+                channel_id: "channel-id".to_string(),
+                timeout: Uint64::one(),
+            },
+        )
+        .unwrap();
+
+    suite
+        .register_user_to_new_domain(USER_1, GAIA_DOMAIN, vec![])
+        .unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Domain registration error: insufficient fee")]
+fn test_register_user_new_ica_domain_asserts_insufficient_fee() {
+    let mut suite = OrbitalCoreBuilder::default().build();
+    suite.register_user(USER_1).unwrap();
+    suite
+        .register_new_domain(
+            GAIA_DOMAIN,
+            UncheckedOrbitalDomainConfig::InterchainAccount {
+                connection_id: "connection-id".to_string(),
+                channel_id: "channel-id".to_string(),
+                timeout: Uint64::one(),
+            },
+        )
+        .unwrap();
+
+    suite
+        .register_user_to_new_domain(USER_1, GAIA_DOMAIN, coins(1, DENOM_NTRN))
+        .unwrap();
 }

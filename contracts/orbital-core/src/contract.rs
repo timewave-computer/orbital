@@ -2,8 +2,13 @@
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
 use cw_ownable::{assert_owner, get_ownership, initialize_owner, update_ownership, Action};
+use cw_utils::must_pay;
 use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    bindings::{
+        msg::{IbcFee, NeutronMsg},
+        query::NeutronQuery,
+    },
+    query::min_ibc_fee::{query_min_ibc_fee, MinIbcFeeResponse},
     sudo::msg::SudoMsg,
     NeutronResult,
 };
@@ -15,8 +20,8 @@ use crate::{
     state::{UserConfig, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 use cosmwasm_std::{
-    ensure, to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Reply,
-    Response, StdResult,
+    coin, ensure, to_json_binary, Addr, Binary, BlockInfo, Coin, Deps, DepsMut, Env, MessageInfo,
+    Reply, Response, StdResult, Uint128,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
@@ -79,8 +84,7 @@ fn register_new_user_domain(
     // TODO: query and assert registration fee payment for the domain (if applicable)
 
     // TODO: fire a registration message
-    let registration_msg =
-        domain_config.get_registration_message(deps, domain, info.sender.clone())?;
+    let registration_msg = domain_config.get_registration_message(deps, &info, domain)?;
 
     Ok(Response::new()
         .add_message(registration_msg)

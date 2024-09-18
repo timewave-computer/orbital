@@ -2936,8 +2936,6 @@ dependencies = [
  "cw-storage-plus 2.0.0",
  "env_logger",
  "hex",
- "localic-std",
- "localic-utils",
  "log",
  "neutron-sdk",
  "orbital-core",

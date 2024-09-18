@@ -22,6 +22,9 @@ pub enum ContractError {
 
     #[error("Unknown domain: {0}")]
     UnknownDomain(String),
+
+    #[error("Domain registration error: {0}")]
+    DomainRegistrationError(String),
 }
 
 impl From<ContractError> for NeutronError {

@@ -11,6 +11,10 @@ pub const ALL_DENOMS: &[&str] = &[DENOM_ATOM, DENOM_NTRN, DENOM_OSMO, DENOM_FALL
 pub const CHAIN_PREFIX: &str = "cosmos";
 pub const OWNER: &str = "owner";
 pub const NOTE: &str = "note";
+pub const USER_1: &str = "user_1";
+
+pub const GAIA_DOMAIN: &str = "gaia";
+pub const OSMOSIS_DOMAIN: &str = "osmosis";
 
 /// Namespace for neutron storage
 pub const NAMESPACE_NEUTRON: &[u8] = b"neutron_storage";
