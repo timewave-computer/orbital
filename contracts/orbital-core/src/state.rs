@@ -1,10 +1,12 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{coins, ensure, Addr, MessageInfo, StdResult, Uint128, Uint64};
+use cosmwasm_std::{
+    coins, ensure, Addr, Binary, Coin, GrpcQuery, MessageInfo, QueryRequest, Uint128, Uint64,
+};
 use cw_storage_plus::Map;
 use cw_utils::must_pay;
-use neutron_sdk::{
-    bindings::msg::{IbcFee, NeutronMsg},
-    query::min_ibc_fee::query_min_ibc_fee,
+use neutron_sdk::bindings::{
+    msg::{IbcFee, NeutronMsg},
+    query::NeutronQuery,
 };
 
 use crate::{contract::ExecuteDeps, error::ContractError};
@@ -54,6 +56,43 @@ fn flatten_ibc_fees_amt(fee_response: IbcFee) -> Uint128 {
         .sum()
 }
 
+pub fn get_ictxs_module_params_query_msg() -> QueryRequest<NeutronQuery> {
+    QueryRequest::Grpc(GrpcQuery {
+        path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
+        data: Binary::new(Vec::new()),
+    })
+}
+
+// pub fn query_ica_registration_fee(
+//     querier: QuerierWrapper<'_, NeutronQuery>,
+// ) -> StdResult<Vec<Coin>> {
+//     let query_msg = get_ictxs_module_params_query_msg();
+//     let response: QueryParamsResponse = querier.query(&query_msg)?;
+//     Ok(response.params.into().register_fee)
+// }
+
+fn assert_fee_payment(info: &MessageInfo, expected_fee: Uint128) -> Result<(), ContractError> {
+    match must_pay(info, "untrn") {
+        Ok(amt) => ensure!(
+            amt >= expected_fee,
+            ContractError::DomainRegistrationError("insufficient fee".to_string())
+        ),
+        Err(e) => return Err(ContractError::DomainRegistrationError(e.to_string())),
+    };
+    Ok(())
+}
+
+#[cw_serde]
+pub struct QueryParamsResponse {
+    pub params: Option<Params>,
+}
+
+#[cw_serde]
+pub struct Params {
+    pub msg_submit_tx_max_messages: Uint64,
+    pub register_fee: Vec<Coin>,
+}
+
 impl OrbitalDomainConfig {
     pub fn get_registration_message(
         &self,
@@ -63,26 +102,24 @@ impl OrbitalDomainConfig {
     ) -> Result<NeutronMsg, ContractError> {
         let msg = match self {
             OrbitalDomainConfig::InterchainAccount { connection_id, .. } => {
-                let min_ibc_fee = query_min_ibc_fee(deps.as_ref()).map_err(|e| {
-                    ContractError::DomainRegistrationError(format!(
-                        "failed to query min ibc fee: {}",
-                        e
-                    ))
-                })?;
-                let expected_fee_payment = flatten_ibc_fees_amt(min_ibc_fee.min_fee);
+                // let min_ibc_fee = query_min_ibc_fee(deps.as_ref())
+                //     .map_err(|e| ContractError::DomainRegistrationError(e.to_string()))?;
 
-                match must_pay(info, "untrn") {
-                    Ok(amt) => ensure!(
-                        amt >= expected_fee_payment,
-                        ContractError::DomainRegistrationError("insufficient fee".to_string())
-                    ),
-                    Err(e) => return Err(ContractError::DomainRegistrationError(e.to_string())),
-                }
+                let query_request = get_ictxs_module_params_query_msg();
+
+                let query_response: QueryParamsResponse =
+                    deps.as_ref().querier.query(&query_request)?;
+
+                println!("query response: {:?}", query_response);
+
+                // let expected_fee_payment = flatten_ibc_fees_amt(min_ibc_fee.min_fee);
+
+                // assert_fee_payment(info, expected_fee_payment)?;
 
                 NeutronMsg::register_interchain_account(
                     connection_id.to_string(),
                     info.sender.to_string(),
-                    Some(coins(100_000, "untrn")),
+                    Some(coins(1, "untrn")),
                 )
             }
             _ => unimplemented!(),

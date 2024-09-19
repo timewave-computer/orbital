@@ -776,7 +776,10 @@ impl Module for NeutronKeeper {
                     events: vec![],
                 })
             }
-            _ => unimplemented!(),
+            _ => {
+                println!("custom module execute catch-all arm");
+                unimplemented!()
+            }
         }
     }
 
@@ -788,6 +791,7 @@ impl Module for NeutronKeeper {
         _block: &cosmwasm_std::BlockInfo,
         request: Self::QueryT,
     ) -> cw_multi_test::error::AnyResult<cosmwasm_std::Binary> {
+        println!("query request in custom neutron mod: {:?}", request);
         match request {
             NeutronQuery::InterchainAccountAddress {
                 owner_address,
@@ -807,12 +811,15 @@ impl Module for NeutronKeeper {
             NeutronQuery::MinIbcFee {} => Ok(to_json_binary(&MinIbcFeeResponse {
                 min_fee: neutron_sdk::bindings::msg::IbcFee {
                     recv_fee: vec![],
-                    ack_fee: vec![coin(10000, DENOM_NTRN)],
-                    timeout_fee: vec![coin(10000, DENOM_NTRN)],
+                    ack_fee: vec![coin(10_000, DENOM_NTRN)],
+                    timeout_fee: vec![coin(10_000, DENOM_NTRN)],
                 },
             })
             .unwrap()),
-            _ => unimplemented!(),
+            _ => {
+                println!("custom module query catch-all arm");
+                unimplemented!()
+            }
         }
     }
 

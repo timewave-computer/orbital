@@ -1,6 +1,6 @@
 use crate::testing_utils::neutron_adapters::custom_module::NeutronKeeper;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Binary, Coin, Uint64};
+use cosmwasm_std::{Binary, Coin, GrpcQuery, Uint64};
 use neutron_sdk::bindings::{msg::NeutronMsg, query::NeutronQuery};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,8 @@ use cw_multi_test::{
     App, BankKeeper, FailingModule, GovFailingModule, IbcFailingModule, MockApiBech32,
     StargateAccepting, WasmKeeper,
 };
+
+// use super::neutron_adapters::custom_keepers::CustomStargateKeeper;
 
 #[non_exhaustive]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -30,17 +32,6 @@ pub struct StargateQuery {
     pub path: String,
     /// Expected protobuf message type (not any), binary encoded.
     pub data: Binary,
-}
-
-#[cw_serde]
-pub struct QueryParamsResponse {
-    pub params: Params,
-}
-
-#[cw_serde]
-pub struct Params {
-    pub msg_submit_tx_max_messages: Uint64,
-    pub register_fee: Vec<Coin>,
 }
 
 #[cw_serde]
@@ -137,5 +128,5 @@ pub type CustomApp = App<
     FailingModule<Empty, Empty, Empty>,
     IbcFailingModule,
     GovFailingModule,
-    StargateAccepting,
+    StargateAccepting, // CustomStargateKeeper<Empty, Empty, Empty>,
 >;

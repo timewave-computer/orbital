@@ -2,13 +2,8 @@
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
 use cw_ownable::{assert_owner, get_ownership, initialize_owner, update_ownership, Action};
-use cw_utils::must_pay;
 use neutron_sdk::{
-    bindings::{
-        msg::{IbcFee, NeutronMsg},
-        query::NeutronQuery,
-    },
-    query::min_ibc_fee::{query_min_ibc_fee, MinIbcFeeResponse},
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
     sudo::msg::SudoMsg,
     NeutronResult,
 };
@@ -20,8 +15,8 @@ use crate::{
     state::{UserConfig, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 use cosmwasm_std::{
-    coin, ensure, to_json_binary, Addr, Binary, BlockInfo, Coin, Deps, DepsMut, Env, MessageInfo,
-    Reply, Response, StdResult, Uint128,
+    ensure, to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Reply,
+    Response, StdResult,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
