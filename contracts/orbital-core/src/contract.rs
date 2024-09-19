@@ -1,30 +1,27 @@
+use crate::{admin_logic::admin, user_logic::user};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
-use cw_ownable::{assert_owner, get_ownership, initialize_owner, update_ownership, Action};
+use cw_ownable::{get_ownership, initialize_owner};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::SudoMsg,
     NeutronResult,
 };
 
 use crate::{
-    account_types::UncheckedOrbitalDomainConfig,
-    error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{UserConfig, ORBITAL_DOMAINS, USER_CONFIGS},
+    state::{CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 use cosmwasm_std::{
-    ensure, to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Reply,
-    Response, StdResult,
+    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-type OrbitalResult = NeutronResult<Response<NeutronMsg>>;
-type QueryDeps<'a> = Deps<'a, NeutronQuery>;
+pub type OrbitalResult = NeutronResult<Response<NeutronMsg>>;
+pub type QueryDeps<'a> = Deps<'a, NeutronQuery>;
 pub type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 
 #[entry_point]
@@ -48,116 +45,45 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
+        // admin action to manage ownership of orbital-core
         ExecuteMsg::UpdateOwnership(action) => {
-            admin_update_ownership(deps, &env.block, &info.sender, action)
+            admin::transfer_admin(deps, &env.block, &info.sender, action)
         }
+        // admin action to enable new domain for user registration
         ExecuteMsg::RegisterNewDomain {
             domain,
             account_type,
-        } => admin_register_new_domain(deps, info, domain, account_type),
-        ExecuteMsg::RegisterUser {} => register_user(deps, env, info),
+        } => admin::register_new_domain(deps, info, domain, account_type),
+        // user action to create a new user account which enables registration to domains
+        ExecuteMsg::RegisterUser {} => user::register(deps, env, info),
+        // user action to register a new domain which creates their clearing account
         ExecuteMsg::RegisterUserDomain { domain } => {
-            register_new_user_domain(deps, env, info, domain)
+            user::register_new_domain(deps, env, info, domain)
         }
     }
-}
-
-fn register_new_user_domain(
-    deps: ExecuteDeps,
-    _env: Env,
-    info: MessageInfo,
-    domain: String,
-) -> OrbitalResult {
-    // user must be registered to operate on domains
-    ensure!(
-        USER_CONFIGS.has(deps.storage, info.sender.clone()),
-        ContractError::UserNotRegistered {}
-    );
-
-    // the domain must be enabled on orbital level to be able to register
-    ensure!(
-        ORBITAL_DOMAINS.has(deps.storage, domain.to_string()),
-        ContractError::UnknownDomain(domain)
-    );
-
-    let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain.to_string())?;
-
-    // TODO: fire a registration message
-    let _registration_msg = domain_config.get_registration_message(deps, &info, domain)?;
-
-    Ok(Response::new()
-        // .add_message(registration_msg)
-        .add_attribute("method", "register_user_domain"))
-}
-
-// pub fn get_ictxs_module_params_query_msg() -> QueryRequest<NeutronQuery> {
-//     QueryRequest::Grpc(()) {
-//         path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
-//         data: Default::default(),
-//     }
-// }
-
-fn register_user(deps: ExecuteDeps, _env: Env, info: MessageInfo) -> OrbitalResult {
-    // user can only register once
-    ensure!(
-        !USER_CONFIGS.has(deps.storage, info.sender.clone()),
-        ContractError::UserAlreadyRegistered {}
-    );
-
-    let min_ibc_fee = query_min_ibc_fee(deps.as_ref())
-        .map_err(|e| ContractError::DomainRegistrationError(e.to_string()))?;
-
-    println!("min ibc fee query result: {:?}", min_ibc_fee);
-    // save an empty user config
-    USER_CONFIGS.save(deps.storage, info.sender, &UserConfig::default())?;
-
-    Ok(Response::new().add_attribute("method", "register_user"))
-}
-
-fn admin_update_ownership(
-    deps: ExecuteDeps,
-    block: &BlockInfo,
-    sender: &Addr,
-    action: Action,
-) -> OrbitalResult {
-    let resp = update_ownership(deps.into_empty(), block, sender, action)
-        .map_err(ContractError::Ownership)?;
-    Ok(Response::default().add_attributes(resp.into_attributes()))
-}
-
-fn admin_register_new_domain(
-    deps: ExecuteDeps,
-    info: MessageInfo,
-    domain: String,
-    account_type: UncheckedOrbitalDomainConfig,
-) -> OrbitalResult {
-    // only the owner can register new domains
-    assert_owner(deps.storage, &info.sender).map_err(ContractError::Ownership)?;
-
-    // validate the domain configuration
-    let orbital_domain = account_type.try_into_checked(deps.api)?;
-
-    // ensure the domain does not already exist
-    ensure!(
-        !ORBITAL_DOMAINS.has(deps.storage, domain.to_string()),
-        ContractError::OrbitalDomainAlreadyExists(domain.to_string())
-    );
-
-    // store the validated domain config in state
-    ORBITAL_DOMAINS.save(deps.storage, domain.to_string(), &orbital_domain)?;
-
-    Ok(Response::default()
-        .add_attribute("method", "register_new_domain")
-        .add_attribute("domain", domain))
 }
 
 #[entry_point]
 pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> NeutronResult<Binary> {
     match msg {
         QueryMsg::OrbitalDomain { domain } => query_orbital_domain(deps, domain),
-        QueryMsg::UserConfig { user } => query_user_config(deps, user),
+        QueryMsg::UserConfig { addr } => query_user_config(deps, addr),
         QueryMsg::Ownership {} => query_ownership(deps),
+        QueryMsg::UserRegisteredDomains { addr } => query_registered_domains(deps, addr),
+        QueryMsg::ClearingAccountAddress { addr, domain } => {
+            query_clearing_account(deps, domain, addr)
+        }
     }
+}
+
+fn query_registered_domains(deps: QueryDeps, addr: String) -> NeutronResult<Binary> {
+    let user_config = USER_CONFIGS.load(deps.storage, addr)?;
+    Ok(to_json_binary(&user_config.registered_domains)?)
+}
+
+fn query_clearing_account(deps: QueryDeps, domain: String, addr: String) -> NeutronResult<Binary> {
+    let clearing_account = CLEARING_ACCOUNTS.load(deps.storage, (domain, addr))?;
+    Ok(to_json_binary(&clearing_account)?)
 }
 
 fn query_ownership(deps: QueryDeps) -> NeutronResult<Binary> {
@@ -171,7 +97,7 @@ fn query_orbital_domain(deps: QueryDeps, domain: String) -> NeutronResult<Binary
 }
 
 fn query_user_config(deps: QueryDeps, user: String) -> NeutronResult<Binary> {
-    let user_config = USER_CONFIGS.load(deps.storage, Addr::unchecked(user))?;
+    let user_config = USER_CONFIGS.load(deps.storage, user)?;
     Ok(to_json_binary(&user_config)?)
 }
 

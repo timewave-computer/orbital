@@ -102,7 +102,7 @@ impl Suite {
         self.app.wrap().query_wasm_smart(
             self.orbital_core.clone(),
             &QueryMsg::UserConfig {
-                user: make_addr(&self.app, user).to_string(),
+                addr: make_addr(&self.app, user).to_string(),
             },
         )
     }

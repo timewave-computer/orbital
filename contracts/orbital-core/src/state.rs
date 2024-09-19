@@ -1,8 +1,8 @@
+use std::str::FromStr;
+
 use crate::{contract::ExecuteDeps, error::ContractError};
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{
-    coins, ensure, Addr, Binary, GrpcQuery, MessageInfo, StdResult, Uint128, Uint64,
-};
+use cosmwasm_std::{coins, ensure, Addr, Binary, GrpcQuery, MessageInfo, Uint128, Uint64};
 use cw_storage_plus::Map;
 use cw_utils::must_pay;
 use neutron_sdk::{
@@ -12,7 +12,7 @@ use neutron_sdk::{
 };
 
 /// map of users with their respective configurations
-pub const USER_CONFIGS: Map<Addr, UserConfig> = Map::new("user_configs");
+pub const USER_CONFIGS: Map<String, UserConfig> = Map::new("user_configs");
 
 /// map of registered remote domains and their configuration
 pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains");
@@ -26,7 +26,9 @@ pub const CLEARING_ACCOUNTS: Map<(String, String), Option<Addr>> = Map::new("cle
 
 #[cw_serde]
 #[derive(Default)]
-pub struct UserConfig {}
+pub struct UserConfig {
+    pub registered_domains: Vec<String>,
+}
 
 /// remote domain configuration config which supports different types of account implementations.
 /// currently supported types:
@@ -56,24 +58,7 @@ fn _flatten_ibc_fees_amt(fee_response: IbcFee) -> Uint128 {
         .sum()
 }
 
-// pub fn get_ictxs_module_params_query_msg() -> QueryRequest<NeutronQuery> {
-//     QueryRequest::Stargate {
-//         path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
-//         data: Binary::new(Vec::new()),
-//     }
-// }
-
-// pub fn query_ica_registration_fee(
-//     querier: QuerierWrapper<'_, NeutronQuery>,
-// ) -> StdResult<Vec<Coin>> {
-//     let query_msg = get_ictxs_module_params_query_msg();
-//     println!("query message: {:?}", query_msg);
-//     let response: QueryParamsResponse = querier.query(&query_msg)?;
-//     println!("response: {:?}", response);
-//     Ok(response.params.unwrap().register_fee)
-// }
-
-fn _assert_fee_payment(info: &MessageInfo, expected_fee: Uint128) -> Result<(), ContractError> {
+fn assert_fee_payment(info: &MessageInfo, expected_fee: Uint128) -> Result<(), ContractError> {
     match must_pay(info, "untrn") {
         Ok(amt) => ensure!(
             amt >= expected_fee,
@@ -84,25 +69,13 @@ fn _assert_fee_payment(info: &MessageInfo, expected_fee: Uint128) -> Result<(), 
     Ok(())
 }
 
-// #[cw_serde]
-// pub struct QueryParamsResponse {
-//     pub params: Option<Params>,
-// }
-
-// #[cw_serde]
-// pub struct Params {
-//     pub msg_submit_tx_max_messages: Uint64,
-//     pub register_fee: Vec<Coin>,
-// }
-
 impl OrbitalDomainConfig {
     pub fn get_registration_message(
         &self,
         deps: ExecuteDeps,
         info: &MessageInfo,
-        domain: String,
-    ) -> StdResult<NeutronMsg> {
-        let msg = match self {
+    ) -> Result<NeutronMsg, ContractError> {
+        match self {
             OrbitalDomainConfig::InterchainAccount { connection_id, .. } => {
                 let grpc_query_msg = GrpcQuery {
                     path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
@@ -116,20 +89,20 @@ impl OrbitalDomainConfig {
                 let slice = grpc_query_response.to_vec();
                 let query_params_response: QueryParamsResponse = decode_message_response(&slice)?;
 
-                println!("query_params_response: {:?}", query_params_response);
+                if let Some(params) = query_params_response.params {
+                    for coin in params.register_fee.iter() {
+                        let coin = Uint128::from_str(&coin.amount)?;
+                        assert_fee_payment(info, coin)?;
+                    }
+                }
 
-                NeutronMsg::register_interchain_account(
+                Ok(NeutronMsg::register_interchain_account(
                     connection_id.to_string(),
                     info.sender.to_string(),
                     Some(coins(1, "untrn")),
-                )
+                ))
             }
             _ => unimplemented!(),
-        };
-
-        // store `None` as the clearing account until the callback is received
-        CLEARING_ACCOUNTS.save(deps.storage, (domain, info.sender.to_string()), &None)?;
-
-        Ok(msg)
+        }
     }
 }

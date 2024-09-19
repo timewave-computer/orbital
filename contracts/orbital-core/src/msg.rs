@@ -32,7 +32,13 @@ pub enum QueryMsg {
     OrbitalDomain { domain: String },
 
     #[returns(crate::state::UserConfig)]
-    UserConfig { user: String },
+    UserConfig { addr: String },
+
+    #[returns(Vec<crate::state::UserConfig>)]
+    UserRegisteredDomains { addr: String },
+
+    #[returns(Vec<crate::state::UserConfig>)]
+    ClearingAccountAddress { addr: String, domain: String },
 }
 
 #[cw_serde]

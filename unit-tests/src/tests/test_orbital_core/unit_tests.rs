@@ -250,3 +250,24 @@ fn test_register_user_new_ica_domain_asserts_insufficient_fee() {
         .register_user_to_new_domain(USER_1, GAIA_DOMAIN, coins(1, DENOM_NTRN))
         .unwrap();
 }
+
+#[test]
+#[should_panic(expected = "Domain registration error: insufficient fee")]
+fn test_register_user_new_ica_domain_happy() {
+    let mut suite = OrbitalCoreBuilder::default().build();
+    suite.register_user(USER_1).unwrap();
+    suite
+        .register_new_domain(
+            GAIA_DOMAIN,
+            UncheckedOrbitalDomainConfig::InterchainAccount {
+                connection_id: "connection-id".to_string(),
+                channel_id: "channel-id".to_string(),
+                timeout: Uint64::one(),
+            },
+        )
+        .unwrap();
+
+    suite
+        .register_user_to_new_domain(USER_1, GAIA_DOMAIN, coins(1, DENOM_NTRN))
+        .unwrap();
+}
