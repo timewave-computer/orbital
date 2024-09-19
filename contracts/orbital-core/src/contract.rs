@@ -4,6 +4,7 @@ use cw2::set_contract_version;
 use cw_ownable::{assert_owner, get_ownership, initialize_owner, update_ownership, Action};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::SudoMsg,
     NeutronResult,
 };
@@ -40,7 +41,12 @@ pub fn instantiate(
 }
 
 #[entry_point]
-pub fn execute(deps: ExecuteDeps, env: Env, info: MessageInfo, msg: ExecuteMsg) -> OrbitalResult {
+pub fn execute(
+    deps: ExecuteDeps,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
         ExecuteMsg::UpdateOwnership(action) => {
             admin_update_ownership(deps, &env.block, &info.sender, action)
@@ -93,6 +99,10 @@ fn register_user(deps: ExecuteDeps, _env: Env, info: MessageInfo) -> OrbitalResu
         ContractError::UserAlreadyRegistered {}
     );
 
+    let min_ibc_fee = query_min_ibc_fee(deps.as_ref())
+        .map_err(|e| ContractError::DomainRegistrationError(e.to_string()))?;
+
+    println!("min ibc fee query result: {:?}", min_ibc_fee);
     // save an empty user config
     USER_CONFIGS.save(deps.storage, info.sender, &UserConfig::default())?;
 

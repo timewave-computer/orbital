@@ -7,6 +7,7 @@ use super::{
     consts::{ALL_DENOMS, CHAIN_PREFIX, DENOM_NTRN, FAUCET, NOTE, OWNER, USER_1},
     neutron_adapters::{
         custom_module::NeutronKeeper, neutron_type_contracts::orbital_core_contract,
+        stargate_module::StargateModule,
     },
     types::CustomApp,
 };
@@ -44,7 +45,7 @@ impl Default for SuiteBuilder {
     fn default() -> Self {
         let mut app = BasicAppBuilder::new_custom()
             .with_custom(NeutronKeeper::new(CHAIN_PREFIX))
-            .with_stargate(StargateAccepting)
+            .with_stargate(StargateModule)
             .with_api(MockApiBech32::new(CHAIN_PREFIX))
             .with_wasm(WasmKeeper::default().with_address_generator(SimpleAddressGenerator))
             .build(|r, _, s| {

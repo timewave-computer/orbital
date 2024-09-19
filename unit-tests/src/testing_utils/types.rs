@@ -12,6 +12,8 @@ use cw_multi_test::{
     StargateAccepting, WasmKeeper,
 };
 
+use super::neutron_adapters::stargate_module::StargateModule;
+
 // use super::neutron_adapters::custom_keepers::CustomStargateKeeper;
 
 #[non_exhaustive]
@@ -128,5 +130,5 @@ pub type CustomApp = App<
     FailingModule<Empty, Empty, Empty>,
     IbcFailingModule,
     GovFailingModule,
-    StargateAccepting, // CustomStargateKeeper<Empty, Empty, Empty>,
+    StargateModule, // StargateAccepting, // CustomStargateKeeper<Empty, Empty, Empty>,
 >;

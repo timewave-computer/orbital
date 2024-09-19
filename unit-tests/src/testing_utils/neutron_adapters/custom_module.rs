@@ -15,7 +15,7 @@ use neutron_sdk::{
     },
     interchain_txs::helpers::get_port_id,
     query::min_ibc_fee::MinIbcFeeResponse,
-    sudo::msg::RequestPacket,
+    sudo::msg::{RequestPacket, SudoMsg},
 };
 use prost::Message;
 use serde::de::DeserializeOwned;
@@ -175,7 +175,7 @@ impl NeutronKeeper {
 impl Module for NeutronKeeper {
     type ExecT = NeutronMsg;
     type QueryT = NeutronQuery;
-    type SudoT = neutron_sdk::sudo::msg::SudoMsg;
+    type SudoT = SudoMsg;
 
     /// Currently we only implement register ICA and ibcTransfer and SubmitTx,
     /// maybe we should implement other stuff as well?
@@ -192,6 +192,7 @@ impl Module for NeutronKeeper {
         ExecC: CustomMsg + DeserializeOwned + 'static,
         QueryC: CustomQuery + DeserializeOwned + 'static,
     {
+        println!("neutron keeper execute call: {:?}", msg);
         match msg {
             NeutronMsg::RegisterInterchainAccount {
                 connection_id,

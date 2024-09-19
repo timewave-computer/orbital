@@ -73,22 +73,22 @@
 //         _block: &BlockInfo,
 //         request: QueryT,
 //     ) -> AnyResult<Binary> {
-//         println!("custom keeper query request: {:?}", request);
+// println!("custom keeper query request: {:?}", request);
 
-//         let query: GrpcQuery = from_json(to_json_binary(&request).unwrap()).unwrap();
-//         if query.path == "/neutron.interchaintxs.v1.Query/Params" {
-//             let params = Params {
-//                 msg_submit_tx_max_messages: Uint64::new(1_000),
-//                 register_fee: coins(1_000_000, "untrn"),
-//             };
+// let query: GrpcQuery = from_json(to_json_binary(&request).unwrap()).unwrap();
+// if query.path == "/neutron.interchaintxs.v1.Query/Params" {
+//     let params = Params {
+//         msg_submit_tx_max_messages: Uint64::new(1_000),
+//         register_fee: coins(1_000_000, "untrn"),
+//     };
 
-//             let response = QueryParamsResponse {
-//                 params: Some(params),
-//             };
+//     let response = QueryParamsResponse {
+//         params: Some(params),
+//     };
 
-//             return Ok(to_json_binary(&response).unwrap());
-//         }
+//     return Ok(to_json_binary(&response).unwrap());
+// }
 
-//         Err(AnyError::msg(self.2))
+// Err(AnyError::msg(self.2))
 //     }
 // }

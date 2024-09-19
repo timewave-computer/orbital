@@ -1,12 +1,16 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    coins, ensure, Addr, Binary, Coin, GrpcQuery, MessageInfo, QueryRequest, Uint128, Uint64,
+    coins, ensure, to_json_vec, Addr, Binary, Coin, GrpcQuery, MessageInfo, QuerierWrapper,
+    QueryRequest, Response, StdResult, Uint128, Uint64,
 };
 use cw_storage_plus::Map;
 use cw_utils::must_pay;
-use neutron_sdk::bindings::{
-    msg::{IbcFee, NeutronMsg},
-    query::NeutronQuery,
+use neutron_sdk::{
+    bindings::{
+        msg::{IbcFee, NeutronMsg},
+        query::NeutronQuery,
+    },
+    NeutronResult,
 };
 
 use crate::{contract::ExecuteDeps, error::ContractError};
@@ -56,20 +60,29 @@ fn flatten_ibc_fees_amt(fee_response: IbcFee) -> Uint128 {
         .sum()
 }
 
-pub fn get_ictxs_module_params_query_msg() -> QueryRequest<NeutronQuery> {
-    QueryRequest::Grpc(GrpcQuery {
+pub fn get_ictxs_module_params_grpc_query_msg() -> GrpcQuery {
+    GrpcQuery {
         path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
         data: Binary::new(Vec::new()),
-    })
+    }
 }
 
-// pub fn query_ica_registration_fee(
-//     querier: QuerierWrapper<'_, NeutronQuery>,
-// ) -> StdResult<Vec<Coin>> {
-//     let query_msg = get_ictxs_module_params_query_msg();
-//     let response: QueryParamsResponse = querier.query(&query_msg)?;
-//     Ok(response.params.into().register_fee)
-// }
+pub fn get_ictxs_module_params_query_msg() -> QueryRequest<NeutronQuery> {
+    QueryRequest::Stargate {
+        path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
+        data: Binary::new(Vec::new()),
+    }
+}
+
+pub fn query_ica_registration_fee(
+    querier: QuerierWrapper<'_, NeutronQuery>,
+) -> StdResult<Vec<Coin>> {
+    let query_msg = get_ictxs_module_params_query_msg();
+    println!("query message: {:?}", query_msg);
+    let response: QueryParamsResponse = querier.query(&query_msg)?;
+    println!("response: {:?}", response);
+    Ok(response.params.unwrap().register_fee)
+}
 
 fn assert_fee_payment(info: &MessageInfo, expected_fee: Uint128) -> Result<(), ContractError> {
     match must_pay(info, "untrn") {
@@ -99,23 +112,24 @@ impl OrbitalDomainConfig {
         deps: ExecuteDeps,
         info: &MessageInfo,
         domain: String,
-    ) -> Result<NeutronMsg, ContractError> {
+    ) -> StdResult<NeutronMsg> {
         let msg = match self {
             OrbitalDomainConfig::InterchainAccount { connection_id, .. } => {
-                // let min_ibc_fee = query_min_ibc_fee(deps.as_ref())
-                //     .map_err(|e| ContractError::DomainRegistrationError(e.to_string()))?;
-
-                let query_request = get_ictxs_module_params_query_msg();
-
-                let query_response: QueryParamsResponse =
-                    deps.as_ref().querier.query(&query_request)?;
-
-                println!("query response: {:?}", query_response);
-
-                // let expected_fee_payment = flatten_ibc_fees_amt(min_ibc_fee.min_fee);
-
-                // assert_fee_payment(info, expected_fee_payment)?;
-
+                println!("getting registration message\n\n");
+                // match deps.as_ref().into_empty().querier.query_grpc(
+                //     "/neutron.interchaintxs.v1.Query/Params".to_string(),
+                //     Binary::new(Vec::new()),
+                // ) {
+                //     Ok(r) => println!("grpc query success: {:?}", r),
+                //     Err(e) => println!("grpc query error: {:?}", e),
+                // };
+                let grpc_query_msg = get_ictxs_module_params_grpc_query_msg();
+                let query_request: QueryRequest<NeutronQuery> = QueryRequest::Grpc(grpc_query_msg);
+                let resp = deps
+                    .querier
+                    .into_empty()
+                    .raw_query(&to_json_vec(&query_request)?);
+                println!("response: {:?}", resp);
                 NeutronMsg::register_interchain_account(
                     connection_id.to_string(),
                     info.sender.to_string(),
