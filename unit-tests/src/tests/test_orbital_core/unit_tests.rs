@@ -270,4 +270,11 @@ fn test_register_user_new_ica_domain_happy() {
     suite
         .register_user_to_new_domain(USER_1, GAIA_DOMAIN, coins(1, DENOM_NTRN))
         .unwrap();
+
+    let user_domains = suite.query_user_domains(USER_1).unwrap();
+    let clearing_account = suite.query_clearing_account(GAIA_DOMAIN, USER_1).unwrap();
+
+    assert_eq!(user_domains.len(), 1);
+    assert_eq!(user_domains.first(), Some(&GAIA_DOMAIN.to_string()));
+    assert_eq!(clearing_account, None);
 }

@@ -107,6 +107,25 @@ impl Suite {
         )
     }
 
+    pub fn query_clearing_account(&mut self, domain: &str, user: &str) -> StdResult<Option<Addr>> {
+        self.app.wrap().query_wasm_smart(
+            self.orbital_core.clone(),
+            &QueryMsg::ClearingAccountAddress {
+                addr: user.to_string(),
+                domain: domain.to_string(),
+            },
+        )
+    }
+
+    pub fn query_user_domains(&mut self, user: &str) -> StdResult<Vec<String>> {
+        self.app.wrap().query_wasm_smart(
+            self.orbital_core.clone(),
+            &QueryMsg::UserRegisteredDomains {
+                addr: make_addr(&self.app, user).to_string(),
+            },
+        )
+    }
+
     pub fn register_new_domain(
         &mut self,
         domain: &str,
