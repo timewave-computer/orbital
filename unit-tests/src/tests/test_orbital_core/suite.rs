@@ -33,7 +33,6 @@ impl OrbitalCoreBuilder {
     pub fn build(mut self) -> Suite {
         let owner = self.builder.admin.clone();
         let note = self.builder.note.clone();
-        let user = self.builder.user_addr.clone();
 
         let orbital_core_addr = self
             .builder
@@ -53,7 +52,6 @@ impl OrbitalCoreBuilder {
             note,
             owner,
             orbital_core: orbital_core_addr,
-            user_addr: user,
         }
     }
 }
@@ -63,7 +61,6 @@ pub struct Suite {
     pub owner: Addr,
     pub orbital_core: Addr,
     pub note: Addr,
-    pub user_addr: Addr,
 }
 
 impl Suite {

@@ -41,7 +41,7 @@ thiserror       = "1.0.63"
 cw-ownable      = "2.0.0"
 neutron-sdk     = "0.11.0"
 anyhow          = "1.0.86"
-cw-multi-test   = "2.1.1"
+cw-multi-test   = { version = "2.1.1", features = [ "stargate", "cosmwasm_2_0" ] }
 orbital-core    = { path = "contracts/orbital-core" }
 
 hex             = "0.4.3"
@@ -51,4 +51,6 @@ env_logger      = "0.11.5"
 log             = "0.4.22"
 unit-tests      = { path = "unit-tests" }
 prost           = "0.11"
-cosmos-sdk-proto = { version = "0.14.0", default-features = false }
+protobuf = { version = "3.2.0", features = ["with-bytes"] }
+prost-types = "0.11"
+cosmos-sdk-proto = { version = "0.20.0", default-features = false }

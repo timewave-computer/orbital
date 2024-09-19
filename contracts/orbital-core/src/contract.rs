@@ -82,15 +82,20 @@ fn register_new_user_domain(
 
     let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain.to_string())?;
 
-    // TODO: query and assert registration fee payment for the domain (if applicable)
-
     // TODO: fire a registration message
-    let registration_msg = domain_config.get_registration_message(deps, &info, domain)?;
+    let _registration_msg = domain_config.get_registration_message(deps, &info, domain)?;
 
     Ok(Response::new()
-        .add_message(registration_msg)
+        // .add_message(registration_msg)
         .add_attribute("method", "register_user_domain"))
 }
+
+// pub fn get_ictxs_module_params_query_msg() -> QueryRequest<NeutronQuery> {
+//     QueryRequest::Grpc(()) {
+//         path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
+//         data: Default::default(),
+//     }
+// }
 
 fn register_user(deps: ExecuteDeps, _env: Env, info: MessageInfo) -> OrbitalResult {
     // user can only register once

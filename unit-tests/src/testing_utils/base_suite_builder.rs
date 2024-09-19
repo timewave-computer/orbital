@@ -1,7 +1,5 @@
 use cosmwasm_std::{coin, coins, Addr, Coin};
-use cw_multi_test::{
-    BasicAppBuilder, Executor, MockApiBech32, SimpleAddressGenerator, StargateAccepting, WasmKeeper,
-};
+use cw_multi_test::{BasicAppBuilder, Executor, MockApiBech32, SimpleAddressGenerator, WasmKeeper};
 
 use super::{
     consts::{ALL_DENOMS, CHAIN_PREFIX, DENOM_NTRN, FAUCET, NOTE, OWNER, USER_1},
