@@ -34,11 +34,11 @@ pub enum QueryMsg {
     #[returns(crate::state::UserConfig)]
     UserConfig { addr: String },
 
-    #[returns(Vec<crate::state::UserConfig>)]
-    UserRegisteredDomains { addr: String },
-
-    #[returns(Vec<crate::state::UserConfig>)]
+    #[returns(Option<String>)]
     ClearingAccountAddress { addr: String, domain: String },
+
+    #[returns(Vec<String>)]
+    UserAddresses {},
 }
 
 #[cw_serde]

@@ -43,13 +43,30 @@ impl Stargate for StargateModule {
         _querier: &dyn Querier,
         _block: &BlockInfo,
         path: String,
-        data: Binary,
+        _data: Binary,
     ) -> AnyResult<Binary> {
-        cw_multi_test::error::bail!(
-            "Unexpected stargate query in custom StargateModule impl: path={}, data={}",
-            path,
-            data
-        )
+        println!("stargate query mock received for path: {path}");
+        if path == "/neutron.interchaintxs.v1.Query/Params" {
+            let proto_coin = cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
+                denom: "untrn".to_string(),
+                amount: "1000000".to_string(),
+            };
+
+            let params = Params {
+                msg_submit_tx_max_messages: 1_000,
+                register_fee: vec![proto_coin],
+            };
+
+            let response = QueryParamsResponse {
+                params: Some(params),
+            };
+
+            let binary = Binary::from(response.to_bytes()?);
+
+            return Ok(binary);
+        }
+
+        Err(anyhow!("Unexpected query request"))
     }
 
     fn execute_any<ExecC, QueryC>(

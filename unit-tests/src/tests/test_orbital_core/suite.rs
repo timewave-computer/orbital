@@ -117,15 +117,6 @@ impl Suite {
         )
     }
 
-    pub fn query_user_domains(&mut self, user: &str) -> StdResult<Vec<String>> {
-        self.app.wrap().query_wasm_smart(
-            self.orbital_core.clone(),
-            &QueryMsg::UserRegisteredDomains {
-                addr: make_addr(&self.app, user).to_string(),
-            },
-        )
-    }
-
     pub fn register_new_domain(
         &mut self,
         domain: &str,

@@ -2,12 +2,9 @@ use std::str::FromStr;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    ensure, Api, Binary, Coin, GrpcQuery, MessageInfo, StdError, StdResult, Uint128, Uint64,
+    ensure, Api, Binary, Coin, MessageInfo, QueryRequest, StdError, StdResult, Uint128, Uint64,
 };
-use neutron_sdk::{
-    bindings::msg::NeutronMsg, interchain_txs::helpers::decode_message_response,
-    proto_types::neutron::interchaintxs::v1::QueryParamsResponse,
-};
+use neutron_sdk::bindings::{msg::NeutronMsg, query::NeutronQuery};
 
 use crate::{
     contract::ExecuteDeps, error::ContractError, state::OrbitalDomainConfig,
@@ -66,6 +63,17 @@ impl UncheckedOrbitalDomainConfig {
     }
 }
 
+#[cw_serde]
+struct Params {
+    pub msg_submit_tx_max_messages: Uint64,
+    pub register_fee: Vec<Coin>,
+}
+
+#[cw_serde]
+struct QueryParamsResponseCustom {
+    pub params: Option<Params>,
+}
+
 impl OrbitalDomainConfig {
     pub fn get_registration_message(
         &self,
@@ -75,26 +83,27 @@ impl OrbitalDomainConfig {
     ) -> Result<NeutronMsg, ContractError> {
         match self {
             OrbitalDomainConfig::InterchainAccount { connection_id, .. } => {
-                let grpc_query_msg = GrpcQuery {
+                let stargate_query_msg: QueryRequest<NeutronQuery> = QueryRequest::Stargate {
                     path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
                     data: Binary::new(Vec::new()),
                 };
-                let grpc_query_response: Binary = deps
-                    .as_ref()
-                    .querier
-                    .query_grpc(grpc_query_msg.path, grpc_query_msg.data)?;
-                let proto_vec = grpc_query_response.to_vec();
-                let query_params_response: QueryParamsResponse =
-                    decode_message_response(&proto_vec)?;
+
+                let response: QueryParamsResponseCustom =
+                    deps.querier.query(&stargate_query_msg)?;
+
+                println!("query response: {:?}", response);
+                // let proto_vec = stargate_query_response.to_vec();
+                // let query_params_response: QueryParamsResponse =
+                //     decode_message_response(&proto_vec)?;
 
                 // if fee_coins is empty, set value to None; otherwise - set it to Some(fee_coins)
-                let registration_fees = match query_params_response.params {
+                let registration_fees = match response.params {
                     Some(val) => {
                         let mut fee_coins = vec![];
                         for coin in val.register_fee.iter() {
                             // map from proto coin
                             let fee_coin = Coin {
-                                amount: Uint128::from_str(&coin.amount)?,
+                                amount: Uint128::from_str(&coin.amount.to_string())?,
                                 denom: coin.denom.to_string(),
                             };
                             // assert its covered by the sender

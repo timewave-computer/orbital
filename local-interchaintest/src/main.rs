@@ -1,12 +1,14 @@
 use cosmwasm_std::Uint64;
-use localic_std::modules::cosmwasm::{contract_execute, contract_instantiate};
+use localic_std::modules::cosmwasm::{contract_execute, contract_instantiate, contract_query};
 use localic_utils::{
     ConfigChainBuilder, TestContextBuilder, DEFAULT_KEY, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME,
-    LOCAL_IC_API_URL, NEUTRON_CHAIN_NAME,
+    NEUTRON_CHAIN_NAME,
 };
 use log::info;
-use orbital_core::orbital_domain::UncheckedOrbitalDomainConfig;
-use std::{env, error::Error};
+use orbital_core::{
+    msg::QueryMsg, orbital_domain::UncheckedOrbitalDomainConfig, state::UserConfig,
+};
+use std::{env, error::Error, time::Duration};
 
 pub const POLYTONE_PATH: &str = "local-interchaintest/wasms/polytone";
 pub const LOGS_FILE_PATH: &str = "local-interchaintest/configs/logs.json";
@@ -18,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut test_ctx = TestContextBuilder::default()
         .with_unwrap_raw_logs(true)
-        .with_api_url(LOCAL_IC_API_URL)
+        .with_api_url("http://localhost:8080/")
         .with_artifacts_dir("artifacts")
         .with_chain(ConfigChainBuilder::default_neutron().build()?)
         .with_chain(ConfigChainBuilder::default_gaia().build()?)
@@ -99,7 +101,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "",
     )
     .unwrap();
-
+    info!("registered gaia domain");
+    std::thread::sleep(Duration::from_secs(5));
     let _user_registration_resp = contract_execute(
         test_ctx
             .get_request_builder()
@@ -110,7 +113,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "",
     )
     .unwrap();
+    info!("registered user acc1");
 
+    std::thread::sleep(Duration::from_secs(5));
     let user_domain_registration_resp = contract_execute(
         test_ctx
             .get_request_builder()
@@ -124,11 +129,71 @@ fn main() -> Result<(), Box<dyn Error>> {
         "--gas 100000000",
     )
     .unwrap();
+    info!("registered user acc1 to gaia domain");
+    std::thread::sleep(Duration::from_secs(5));
 
-    println!(
+    info!(
         "user domain registration response: {:?}",
         user_domain_registration_resp
     );
+
+    let tx_res = test_ctx
+        .get_request_builder()
+        .get_request_builder(NEUTRON_CHAIN_NAME)
+        .query_tx_hash(&user_domain_registration_resp.tx_hash.unwrap());
+
+    info!("tx hash response: {:?}", tx_res);
+
+    let registered_users_query_response = contract_query(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core.address,
+        &serde_json::to_string(&QueryMsg::UserAddresses {}).unwrap(),
+    )["data"]
+        .clone();
+
+    info!(
+        "registered users query response: {:?}",
+        registered_users_query_response
+    );
+
+    let query_response = contract_query(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core.address,
+        &serde_json::to_string(&QueryMsg::UserConfig {
+            addr: "neutron1kljf09rj77uxeu5lye7muejx6ajsu55cuw2mws".to_string(),
+        })
+        .unwrap(),
+    )["data"]
+        .clone();
+    info!("user config query response: {:?}", query_response);
+    // let registered_user_config: UserConfig = serde_json::from_value(query_response).unwrap();
+
+    // info!("registered user config: {:?}", registered_user_config);
+
+    let clearing_acc_response = contract_query(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core.address,
+        &serde_json::to_string(&QueryMsg::ClearingAccountAddress {
+            addr: "neutron1kljf09rj77uxeu5lye7muejx6ajsu55cuw2mws".to_string(),
+            domain: "gaia".to_string(),
+        })
+        .unwrap(),
+    )["data"]
+        .clone();
+    info!(
+        "clearing account query response: {:?}",
+        clearing_acc_response
+    );
+    let user_gaia_clearing_acc: Option<String> =
+        serde_json::from_value(clearing_acc_response).unwrap();
+
+    info!("user gaia clearing account: {:?}", user_gaia_clearing_acc);
 
     Ok(())
 }

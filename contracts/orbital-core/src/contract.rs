@@ -1,5 +1,6 @@
 use crate::{
     admin_logic::admin,
+    state::{OrbitalDomainConfig, UserConfig},
     user_logic::user,
     utils::{extract_ica_identifier_from_port, get_ica_identifier, OpenAckVersion},
 };
@@ -18,7 +19,8 @@ use crate::{
     state::{CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult,
+    to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
+    StdResult,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
@@ -68,42 +70,48 @@ pub fn execute(
 }
 
 #[entry_point]
-pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> NeutronResult<Binary> {
+pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::OrbitalDomain { domain } => query_orbital_domain(deps, domain),
-        QueryMsg::UserConfig { addr } => query_user_config(deps, addr),
-        QueryMsg::Ownership {} => query_ownership(deps),
-        QueryMsg::UserRegisteredDomains { addr } => query_registered_domains(deps, addr),
+        QueryMsg::OrbitalDomain { domain } => to_json_binary(&query_orbital_domain(deps, domain)?),
+        QueryMsg::UserConfig { addr } => to_json_binary(&query_user_config(deps, addr)?),
+        QueryMsg::Ownership {} => to_json_binary(&query_ownership(deps)?),
         QueryMsg::ClearingAccountAddress { addr, domain } => {
-            query_clearing_account(deps, domain, addr)
+            to_json_binary(&query_clearing_account(deps, domain, addr)?)
         }
+        QueryMsg::UserAddresses {} => to_json_binary(&query_user_addresses(deps)?),
     }
 }
 
-fn query_registered_domains(deps: QueryDeps, addr: String) -> NeutronResult<Binary> {
-    let user_config = USER_CONFIGS.load(deps.storage, addr)?;
-    Ok(to_json_binary(&user_config.registered_domains)?)
+fn query_user_addresses(deps: QueryDeps) -> StdResult<Vec<String>> {
+    let users = USER_CONFIGS.range(deps.storage, None, None, cosmwasm_std::Order::Ascending);
+
+    let mut user_addrs = vec![];
+    for user_entry in users {
+        user_addrs.push(user_entry?.0);
+    }
+
+    Ok(user_addrs)
 }
 
-fn query_clearing_account(deps: QueryDeps, domain: String, addr: String) -> NeutronResult<Binary> {
+fn query_clearing_account(
+    deps: QueryDeps,
+    domain: String,
+    addr: String,
+) -> StdResult<Option<String>> {
     let ica_id = get_ica_identifier(addr, domain);
-    let clearing_account = CLEARING_ACCOUNTS.load(deps.storage, ica_id)?;
-    Ok(to_json_binary(&clearing_account)?)
+    CLEARING_ACCOUNTS.load(deps.storage, ica_id)
 }
 
-fn query_ownership(deps: QueryDeps) -> NeutronResult<Binary> {
-    let ownership = get_ownership(deps.storage)?;
-    Ok(to_json_binary(&ownership)?)
+fn query_ownership(deps: QueryDeps) -> StdResult<cw_ownable::Ownership<Addr>> {
+    get_ownership(deps.storage)
 }
 
-fn query_orbital_domain(deps: QueryDeps, domain: String) -> NeutronResult<Binary> {
-    let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain)?;
-    Ok(to_json_binary(&domain_config)?)
+fn query_orbital_domain(deps: QueryDeps, domain: String) -> StdResult<OrbitalDomainConfig> {
+    ORBITAL_DOMAINS.load(deps.storage, domain)
 }
 
-fn query_user_config(deps: QueryDeps, user: String) -> NeutronResult<Binary> {
-    let user_config = USER_CONFIGS.load(deps.storage, user)?;
-    Ok(to_json_binary(&user_config)?)
+fn query_user_config(deps: QueryDeps, user: String) -> StdResult<UserConfig> {
+    USER_CONFIGS.load(deps.storage, user)
 }
 
 #[entry_point]
