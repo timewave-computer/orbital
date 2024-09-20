@@ -3,9 +3,9 @@ pub(crate) mod admin {
     use cw_ownable::{assert_owner, update_ownership, Action};
 
     use crate::{
-        account_types::UncheckedOrbitalDomainConfig,
         contract::{ExecuteDeps, OrbitalResult},
         error::ContractError,
+        orbital_domain::UncheckedOrbitalDomainConfig,
         state::ORBITAL_DOMAINS,
     };
 

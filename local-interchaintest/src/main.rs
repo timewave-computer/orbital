@@ -5,7 +5,7 @@ use localic_utils::{
     LOCAL_IC_API_URL, NEUTRON_CHAIN_NAME,
 };
 use log::info;
-use orbital_core::account_types::UncheckedOrbitalDomainConfig;
+use orbital_core::orbital_domain::UncheckedOrbitalDomainConfig;
 use std::{env, error::Error};
 
 pub const POLYTONE_PATH: &str = "local-interchaintest/wasms/polytone";
@@ -110,6 +110,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         "",
     )
     .unwrap();
+
+    let user_domain_registration_resp = contract_execute(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core.address,
+        "acc1",
+        &serde_json::to_string(&orbital_core::msg::ExecuteMsg::RegisterUserDomain {
+            domain: "gaia".to_string(),
+        })
+        .unwrap(),
+        "--gas 100000000",
+    )
+    .unwrap();
+
+    println!(
+        "user domain registration response: {:?}",
+        user_domain_registration_resp
+    );
 
     Ok(())
 }

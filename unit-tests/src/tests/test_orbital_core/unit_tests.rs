@@ -3,8 +3,8 @@ use cw_multi_test::Executor;
 use cw_ownable::Ownership;
 
 use orbital_core::{
-    account_types::UncheckedOrbitalDomainConfig,
     msg::{ExecuteMsg, QueryMsg},
+    orbital_domain::UncheckedOrbitalDomainConfig,
     state::{OrbitalDomainConfig, UserConfig},
 };
 
@@ -252,7 +252,6 @@ fn test_register_user_new_ica_domain_asserts_insufficient_fee() {
 }
 
 #[test]
-#[should_panic(expected = "Domain registration error: insufficient fee")]
 fn test_register_user_new_ica_domain_happy() {
     let mut suite = OrbitalCoreBuilder::default().build();
     suite.register_user(USER_1).unwrap();

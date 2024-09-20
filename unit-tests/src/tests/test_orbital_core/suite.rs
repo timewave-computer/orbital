@@ -1,8 +1,8 @@
 use cosmwasm_std::{Addr, Coin, StdResult};
 use cw_multi_test::{error::AnyResult, AppResponse, Executor};
 use orbital_core::{
-    account_types::UncheckedOrbitalDomainConfig,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    orbital_domain::UncheckedOrbitalDomainConfig,
     state::{OrbitalDomainConfig, UserConfig},
 };
 

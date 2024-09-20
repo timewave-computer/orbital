@@ -1,4 +1,8 @@
-use crate::{admin_logic::admin, user_logic::user};
+use crate::{
+    admin_logic::admin,
+    user_logic::user,
+    utils::{extract_ica_identifier_from_port, get_ica_identifier, OpenAckVersion},
+};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
@@ -14,7 +18,7 @@ use crate::{
     state::{CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult,
+    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
@@ -82,7 +86,8 @@ fn query_registered_domains(deps: QueryDeps, addr: String) -> NeutronResult<Bina
 }
 
 fn query_clearing_account(deps: QueryDeps, domain: String, addr: String) -> NeutronResult<Binary> {
-    let clearing_account = CLEARING_ACCOUNTS.load(deps.storage, (domain, addr))?;
+    let ica_id = get_ica_identifier(addr, domain);
+    let clearing_account = CLEARING_ACCOUNTS.load(deps.storage, ica_id)?;
     Ok(to_json_binary(&clearing_account)?)
 }
 
@@ -112,6 +117,45 @@ pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> StdResult<Res
 }
 
 #[entry_point]
-pub fn sudo(_deps: ExecuteDeps, _env: Env, _msg: SudoMsg) -> StdResult<Response<NeutronMsg>> {
+pub fn sudo(deps: ExecuteDeps, env: Env, msg: SudoMsg) -> StdResult<Response<NeutronMsg>> {
+    match msg {
+        // For handling successful registering of ICA
+        SudoMsg::OpenAck {
+            port_id,
+            channel_id,
+            counterparty_channel_id,
+            counterparty_version,
+        } => sudo_open_ack(
+            deps,
+            env,
+            port_id,
+            channel_id,
+            counterparty_channel_id,
+            counterparty_version,
+        ),
+        _ => Ok(Response::default()),
+    }
+}
+
+// handler
+fn sudo_open_ack(
+    deps: ExecuteDeps,
+    _env: Env,
+    port_id: String,
+    _channel_id: String,
+    _counterparty_channel_id: String,
+    counterparty_version: String,
+) -> StdResult<Response<NeutronMsg>> {
+    // parse the response
+    let parsed_version: OpenAckVersion =
+        serde_json_wasm::from_str(counterparty_version.as_str())
+            .map_err(|_| StdError::generic_err("Can't parse counterparty_version"))?;
+
+    // extract the ICA identifier from the port
+    let ica_identifier = extract_ica_identifier_from_port(port_id)?;
+    println!("ica identifier: {ica_identifier}");
+    // Update the storage record associated with the interchain account.
+    CLEARING_ACCOUNTS.save(deps.storage, ica_identifier, &Some(parsed_version.address))?;
+
     Ok(Response::default())
 }

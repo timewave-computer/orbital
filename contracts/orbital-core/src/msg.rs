@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
-use crate::account_types::UncheckedOrbitalDomainConfig;
+use crate::orbital_domain::UncheckedOrbitalDomainConfig;
 
 #[cw_serde]
 pub struct InstantiateMsg {

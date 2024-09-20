@@ -5,6 +5,7 @@ pub(crate) mod user {
         contract::{ExecuteDeps, OrbitalResult},
         error::ContractError,
         state::{UserConfig, CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS},
+        utils::get_ica_identifier,
     };
 
     pub fn register_new_domain(
@@ -28,17 +29,20 @@ pub(crate) mod user {
         let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain.to_string())?;
         let mut user_config = USER_CONFIGS.load(deps.storage, info.sender.to_string())?;
 
+        // get the ica identifier
+        let ica_identifier = get_ica_identifier(info.sender.to_string(), domain.to_string());
+
         // update the registered domains for the caller
         user_config.registered_domains.push(domain.to_string());
 
         // store `None` as the clearing account until the callback is received
         // from the registration message, which will fill the clearing account
-        CLEARING_ACCOUNTS.save(deps.storage, (domain, info.sender.to_string()), &None)?;
+        CLEARING_ACCOUNTS.save(deps.storage, ica_identifier.to_string(), &None)?;
         //save the updated user config
         USER_CONFIGS.save(deps.storage, info.sender.to_string(), &user_config)?;
 
         Ok(Response::new()
-            .add_message(domain_config.get_registration_message(deps, &info)?)
+            .add_message(domain_config.get_registration_message(deps, &info, ica_identifier)?)
             .add_attribute("method", "register_user_domain"))
     }
 
