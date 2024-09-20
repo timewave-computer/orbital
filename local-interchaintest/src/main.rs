@@ -123,7 +123,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .get_request_builder()
             .get_request_builder(NEUTRON_CHAIN_NAME),
         &orbital_core.address,
-        ACC0_KEY, // TODO: use ACC1_KEY,
+        ACC1_KEY,
         &serde_json::to_string(&ExecuteMsg::RegisterUser {})?,
         "",
     )?;
@@ -137,7 +137,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .get_request_builder()
             .get_request_builder(NEUTRON_CHAIN_NAME),
         &orbital_core.address,
-        ACC0_KEY, // TODO: use ACC1_KEY,
+        ACC1_KEY,
         &serde_json::to_string(&ExecuteMsg::RegisterUserDomain {
             domain: GAIA_CHAIN_NAME.to_string(),
         })?,
@@ -177,7 +177,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .get_request_builder(NEUTRON_CHAIN_NAME),
         &orbital_core.address,
         &serde_json::to_string(&QueryMsg::UserConfig {
-            addr: ACC0_ADDR.to_string(), // TODO: use ACC1_ADDR.to_string(),
+            addr: ACC1_ADDR.to_string(),
         })?,
     )["data"]
         .clone();
@@ -189,7 +189,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .get_request_builder(NEUTRON_CHAIN_NAME),
         &orbital_core.address,
         &serde_json::to_string(&QueryMsg::ClearingAccountAddress {
-            addr: ACC0_ADDR.to_string(), // TODO: use ACC1_ADDR.to_string(),
+            addr: ACC1_ADDR.to_string(),
             domain: GAIA_CHAIN_NAME.to_string(),
         })?,
     )["data"]

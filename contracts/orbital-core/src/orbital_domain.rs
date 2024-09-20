@@ -69,6 +69,7 @@ struct Params {
     pub register_fee: Vec<Coin>,
 }
 
+// TODO: remove these in favor for neutron-sdk proto types later
 #[cw_serde]
 struct QueryParamsResponseCustom {
     pub params: Option<Params>,
@@ -90,11 +91,6 @@ impl OrbitalDomainConfig {
 
                 let response: QueryParamsResponseCustom =
                     deps.querier.query(&stargate_query_msg)?;
-
-                println!("query response: {:?}", response);
-                // let proto_vec = stargate_query_response.to_vec();
-                // let query_params_response: QueryParamsResponse =
-                //     decode_message_response(&proto_vec)?;
 
                 // if fee_coins is empty, set value to None; otherwise - set it to Some(fee_coins)
                 let registration_fees = match response.params {
