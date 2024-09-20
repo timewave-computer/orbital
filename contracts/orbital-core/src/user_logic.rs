@@ -26,7 +26,7 @@ pub(crate) mod user {
             ContractError::UnknownDomain(domain)
         );
 
-        let _domain_config = ORBITAL_DOMAINS.load(deps.storage, domain.to_string())?;
+        let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain.to_string())?;
         let mut user_config = USER_CONFIGS.load(deps.storage, info.sender.to_string())?;
 
         // get the ica identifier
@@ -42,7 +42,7 @@ pub(crate) mod user {
         USER_CONFIGS.save(deps.storage, info.sender.to_string(), &user_config)?;
 
         Ok(Response::new()
-            // .add_message(domain_config.get_registration_message(deps, &info, ica_identifier)?)
+            .add_message(domain_config.get_registration_message(deps, &info, ica_identifier)?)
             .add_attribute("method", "register_user_domain"))
     }
 

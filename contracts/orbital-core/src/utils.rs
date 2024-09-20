@@ -13,7 +13,12 @@ pub fn assert_fee_payment(info: &MessageInfo, expected_fee: &Coin) -> Result<(),
             amt >= expected_fee.amount,
             ContractError::DomainRegistrationError("insufficient fee".to_string())
         ),
-        Err(e) => return Err(ContractError::DomainRegistrationError(e.to_string())),
+        Err(_) => {
+            return Err(ContractError::DomainRegistrationError(format!(
+                "no funds sent. expected {}",
+                expected_fee.amount
+            )))
+        }
     };
     Ok(())
 }
