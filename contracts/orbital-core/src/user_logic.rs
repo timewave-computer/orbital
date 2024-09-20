@@ -1,10 +1,10 @@
 pub(crate) mod user {
-    use cosmwasm_std::{ensure, Env, MessageInfo, Response};
+    use cosmwasm_std::{ensure, Env, MessageInfo, Response, Uint64};
 
     use crate::{
         contract::{ExecuteDeps, OrbitalResult},
         error::ContractError,
-        state::{UserConfig, CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS},
+        state::{UserConfig, CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS, USER_NONCE},
         utils::get_ica_identifier,
     };
 
@@ -30,7 +30,7 @@ pub(crate) mod user {
         let mut user_config = USER_CONFIGS.load(deps.storage, info.sender.to_string())?;
 
         // get the ica identifier
-        let ica_identifier = get_ica_identifier(info.sender.to_string(), domain.to_string());
+        let ica_identifier = get_ica_identifier(user_config.id, domain.to_string());
 
         // update the registered domains for the caller
         user_config.registered_domains.push(domain.to_string());
@@ -53,12 +53,19 @@ pub(crate) mod user {
             ContractError::UserAlreadyRegistered {}
         );
 
+        let user_nonce = USER_NONCE.load(deps.storage)?;
+
         // save an empty user config
         USER_CONFIGS.save(
             deps.storage,
             info.sender.to_string(),
-            &UserConfig::default(),
+            &UserConfig {
+                id: user_nonce,
+                registered_domains: vec![],
+            },
         )?;
+        // increment the nonce
+        USER_NONCE.save(deps.storage, &user_nonce.checked_add(Uint64::one())?)?;
 
         Ok(Response::new().add_attribute("method", "register_user"))
     }

@@ -1,6 +1,8 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint64};
-use cw_storage_plus::Map;
+use cw_storage_plus::{Item, Map};
+
+pub const USER_NONCE: Item<Uint64> = Item::new("user_nonce");
 
 /// map of users with their respective configurations
 pub const USER_CONFIGS: Map<String, UserConfig> = Map::new("user_configs");
@@ -16,8 +18,8 @@ pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains"
 pub const CLEARING_ACCOUNTS: Map<String, Option<String>> = Map::new("clearing_accounts");
 
 #[cw_serde]
-#[derive(Default)]
 pub struct UserConfig {
+    pub id: Uint64,
     pub registered_domains: Vec<String>,
 }
 

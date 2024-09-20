@@ -1,7 +1,8 @@
 use cosmwasm_std::Uint64;
 use localic_std::modules::cosmwasm::{contract_execute, contract_instantiate, contract_query};
 use localic_utils::{
-    ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
+    ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME, LOCAL_IC_API_URL,
+    NEUTRON_CHAIN_NAME,
 };
 use log::info;
 use orbital_core::{
@@ -26,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut test_ctx = TestContextBuilder::default()
         .with_unwrap_raw_logs(true)
-        .with_api_url("http://localhost:8080/")
+        .with_api_url("http://localhost:42069/")
         .with_artifacts_dir("artifacts")
         .with_chain(ConfigChainBuilder::default_neutron().build()?)
         .with_chain(ConfigChainBuilder::default_gaia().build()?)
@@ -140,7 +141,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &serde_json::to_string(&ExecuteMsg::RegisterUserDomain {
             domain: GAIA_CHAIN_NAME.to_string(),
         })?,
-        "--amount 1000000untrn",
+        "--amount 1000000untrn --gas 5000000",
     )?;
     std::thread::sleep(Duration::from_secs(5));
 

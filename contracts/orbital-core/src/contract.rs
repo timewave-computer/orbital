@@ -1,6 +1,6 @@
 use crate::{
     admin_logic::admin,
-    state::{OrbitalDomainConfig, UserConfig},
+    state::{OrbitalDomainConfig, UserConfig, USER_NONCE},
     user_logic::user,
     utils::{extract_ica_identifier_from_port, get_ica_identifier, OpenAckVersion},
 };
@@ -20,7 +20,7 @@ use crate::{
 };
 use cosmwasm_std::{
     to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
-    StdResult,
+    StdResult, Uint64,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
@@ -40,6 +40,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
 
+    USER_NONCE.save(deps.storage, &Uint64::zero())?;
     Ok(Response::new())
 }
 
@@ -98,7 +99,8 @@ fn query_clearing_account(
     domain: String,
     addr: String,
 ) -> StdResult<Option<String>> {
-    let ica_id = get_ica_identifier(addr, domain);
+    let user_config = USER_CONFIGS.load(deps.storage, addr)?;
+    let ica_id = get_ica_identifier(user_config.id, domain);
     CLEARING_ACCOUNTS.load(deps.storage, ica_id)
 }
 

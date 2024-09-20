@@ -23,7 +23,7 @@ optimize: build
   fi
 
 local-ic-start:
-    cd local-interchaintest && local-ic start neutron_gaia_juno
+    cd local-interchaintest && local-ic start neutron_gaia_juno --api-port 42069
 
 local-ic-run: optimize
     RUST_LOG=debug cargo run --package local-interchaintest --bin local-interchaintest

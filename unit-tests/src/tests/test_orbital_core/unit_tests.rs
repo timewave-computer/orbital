@@ -185,7 +185,13 @@ fn test_register_user_happy() {
 
     let user_config = suite.query_user(USER_1).unwrap();
 
-    assert!(user_config == UserConfig::default());
+    assert!(
+        user_config
+            == UserConfig {
+                id: Uint64::zero(),
+                registered_domains: vec![]
+            }
+    );
 }
 
 #[test]

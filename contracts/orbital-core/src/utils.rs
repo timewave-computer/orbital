@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{ensure, Coin, MessageInfo, StdError, StdResult, Uint128};
+use cosmwasm_std::{ensure, Coin, MessageInfo, StdError, StdResult, Uint128, Uint64};
 use cw_utils::must_pay;
 use neutron_sdk::bindings::msg::IbcFee;
 use schemars::JsonSchema;
@@ -47,8 +47,9 @@ pub(crate) struct OpenAckVersion {
 
 /// returns the ICA identifier for this specific (user, domain) combination.
 /// it can be any string.
-pub fn get_ica_identifier(user: String, domain: String) -> String {
-    format!("{domain}{user}")
+pub fn get_ica_identifier(user_id: Uint64, domain: String) -> String {
+    let id = user_id.to_string();
+    format!("{domain}{id}")
 }
 
 /// inverse of neutron_sdk::interchain_txs::helpers::get_port_id,
@@ -74,9 +75,9 @@ impl AccountIdentifier {
         })
     }
 
-    pub fn new(user: String, domain: String) -> AccountIdentifier {
+    pub fn new(user_id: Uint64, domain: String) -> AccountIdentifier {
         AccountIdentifier {
-            id: get_ica_identifier(user, domain),
+            id: get_ica_identifier(user_id, domain),
         }
     }
 }
