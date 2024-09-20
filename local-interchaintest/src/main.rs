@@ -1,12 +1,12 @@
 use cosmwasm_std::Uint64;
 use localic_std::modules::cosmwasm::{contract_execute, contract_instantiate, contract_query};
 use localic_utils::{
-    ConfigChainBuilder, TestContextBuilder, DEFAULT_KEY, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME,
-    NEUTRON_CHAIN_NAME,
+    ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
 };
 use log::info;
 use orbital_core::{
-    msg::QueryMsg, orbital_domain::UncheckedOrbitalDomainConfig, state::UserConfig,
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    orbital_domain::UncheckedOrbitalDomainConfig,
 };
 use std::{env, error::Error, time::Duration};
 
@@ -14,6 +14,11 @@ pub const POLYTONE_PATH: &str = "local-interchaintest/wasms/polytone";
 pub const LOGS_FILE_PATH: &str = "local-interchaintest/configs/logs.json";
 pub const LOCAL_CODE_ID_CACHE_PATH_NEUTRON: &str =
     "local-interchaintest/code_id_cache_neutron.json";
+
+pub const ACC0_KEY: &str = "acc0";
+pub const ACC0_ADDR: &str = "neutron1hj5fveer5cjtn4wd6wstzugjfdxzl0xpznmsky";
+pub const ACC1_KEY: &str = "acc1";
+pub const ACC1_ADDR: &str = "neutron1kljf09rj77uxeu5lye7muejx6ajsu55cuw2mws";
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
@@ -32,15 +37,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut uploader = test_ctx.build_tx_upload_contracts();
 
-    uploader
-        .send_with_local_cache(POLYTONE_PATH, LOCAL_CODE_ID_CACHE_PATH_NEUTRON)
-        .unwrap();
+    // TODO: uncomment to deploy polytone
+    // uploader
+    //     .with_key(ACC0_KEY)
+    //     .send_with_local_cache(POLYTONE_PATH, LOCAL_CODE_ID_CACHE_PATH_NEUTRON)
+    //     .unwrap();
 
     let current_dir = env::current_dir()?;
 
     let orbital_core_local_path = format!("{}/artifacts/orbital_core.wasm", current_dir.display());
 
     uploader
+        .with_key(ACC0_KEY)
         .with_chain_name(NEUTRON_CHAIN_NAME)
         .send_single_contract(&orbital_core_local_path)?;
 
@@ -53,7 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     info!("orbital core code id: {orbital_core_code_id}");
 
-    let orbital_instantiate_msg = orbital_core::msg::InstantiateMsg {
+    let orbital_instantiate_msg = InstantiateMsg {
         owner: test_ctx
             .get_chain(NEUTRON_CHAIN_NAME)
             .admin_addr
@@ -64,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         test_ctx
             .get_request_builder()
             .get_request_builder(NEUTRON_CHAIN_NAME),
-        DEFAULT_KEY,
+        ACC0_KEY,
         orbital_core_code_id,
         &serde_json::to_string(&orbital_instantiate_msg).unwrap(),
         "orbital_core",
@@ -75,8 +83,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     info!("orbital core: {}", orbital_core.address);
 
-    let register_gaia_domain_msg = orbital_core::msg::ExecuteMsg::RegisterNewDomain {
-        domain: "gaia".to_string(),
+    let register_gaia_domain_msg = ExecuteMsg::RegisterNewDomain {
+        domain: GAIA_CHAIN_NAME.to_string(),
         account_type: UncheckedOrbitalDomainConfig::InterchainAccount {
             connection_id: test_ctx
                 .get_connections()
@@ -96,7 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .get_request_builder()
             .get_request_builder(NEUTRON_CHAIN_NAME),
         &orbital_core.address,
-        DEFAULT_KEY,
+        ACC0_KEY,
         &serde_json::to_string(&register_gaia_domain_msg).unwrap(),
         "",
     )
@@ -108,8 +116,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .get_request_builder()
             .get_request_builder(NEUTRON_CHAIN_NAME),
         &orbital_core.address,
-        "acc1",
-        &serde_json::to_string(&orbital_core::msg::ExecuteMsg::RegisterUser {}).unwrap(),
+        ACC1_KEY,
+        &serde_json::to_string(&ExecuteMsg::RegisterUser {}).unwrap(),
         "",
     )
     .unwrap();
@@ -121,12 +129,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             .get_request_builder()
             .get_request_builder(NEUTRON_CHAIN_NAME),
         &orbital_core.address,
-        "acc1",
-        &serde_json::to_string(&orbital_core::msg::ExecuteMsg::RegisterUserDomain {
-            domain: "gaia".to_string(),
+        ACC1_KEY,
+        &serde_json::to_string(&ExecuteMsg::RegisterUserDomain {
+            domain: GAIA_CHAIN_NAME.to_string(),
         })
         .unwrap(),
-        "--gas 100000000",
+        "",
     )
     .unwrap();
     info!("registered user acc1 to gaia domain");
@@ -164,7 +172,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .get_request_builder(NEUTRON_CHAIN_NAME),
         &orbital_core.address,
         &serde_json::to_string(&QueryMsg::UserConfig {
-            addr: "neutron1kljf09rj77uxeu5lye7muejx6ajsu55cuw2mws".to_string(),
+            addr: ACC1_ADDR.to_string(),
         })
         .unwrap(),
     )["data"]
@@ -180,8 +188,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .get_request_builder(NEUTRON_CHAIN_NAME),
         &orbital_core.address,
         &serde_json::to_string(&QueryMsg::ClearingAccountAddress {
-            addr: "neutron1kljf09rj77uxeu5lye7muejx6ajsu55cuw2mws".to_string(),
-            domain: "gaia".to_string(),
+            addr: ACC1_ADDR.to_string(),
+            domain: GAIA_CHAIN_NAME.to_string(),
         })
         .unwrap(),
     )["data"]
