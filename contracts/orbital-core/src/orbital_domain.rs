@@ -84,6 +84,8 @@ impl OrbitalDomainConfig {
     ) -> Result<NeutronMsg, ContractError> {
         match self {
             OrbitalDomainConfig::InterchainAccount { connection_id, .. } => {
+                // TODO: remove this explicit allow
+                #[allow(deprecated)]
                 let stargate_query_msg: QueryRequest<NeutronQuery> = QueryRequest::Stargate {
                     path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
                     data: Binary::new(Vec::new()),

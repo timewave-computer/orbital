@@ -1,15 +1,16 @@
-use cosmwasm_std::Uint64;
-use localic_std::modules::cosmwasm::{contract_execute, contract_instantiate, contract_query};
+use localic_std::modules::cosmwasm::contract_instantiate;
 use localic_utils::{
-    ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME, LOCAL_IC_API_URL,
-    NEUTRON_CHAIN_NAME,
+    ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
 };
 use log::info;
-use orbital_core::{
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
-    orbital_domain::UncheckedOrbitalDomainConfig,
-};
+use orbital_core::msg::InstantiateMsg;
 use std::{env, error::Error, time::Duration};
+use utils::{
+    admin_register_domain, query_registered_users, query_user_clearing_acc_addr_on_domain,
+    query_user_config, user_register_orbital_core, user_register_to_new_domain,
+};
+
+mod utils;
 
 pub const POLYTONE_PATH: &str = "local-interchaintest/wasms/polytone";
 pub const LOGS_FILE_PATH: &str = "local-interchaintest/configs/logs.json";
@@ -20,6 +21,9 @@ pub const ACC0_KEY: &str = "acc0";
 pub const ACC0_ADDR: &str = "neutron1hj5fveer5cjtn4wd6wstzugjfdxzl0xpznmsky";
 pub const ACC1_KEY: &str = "acc1";
 pub const ACC1_ADDR: &str = "neutron1kljf09rj77uxeu5lye7muejx6ajsu55cuw2mws";
+pub const ACC2_KEY: &str = "acc2";
+pub const ACC2_ADDR: &str = "neutron17lp3n649rxt2jadn455frcj0q6anjnds2s0ve9";
+
 pub const GAS_FLAGS: &str = "--gas=auto --gas-adjustment=3.0";
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -50,7 +54,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let orbital_core_local_path = format!("{}/artifacts/orbital_core.wasm", current_dir.display());
 
     uploader
-        // .with_key(ACC0_KEY)
         .with_chain_name(NEUTRON_CHAIN_NAME)
         .send_single_contract(&orbital_core_local_path)?;
 
@@ -85,122 +88,74 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     info!("orbital core: {}", orbital_core.address);
 
-    let admin_register_gaia_domain_msg = ExecuteMsg::RegisterNewDomain {
-        domain: GAIA_CHAIN_NAME.to_string(),
-        account_type: UncheckedOrbitalDomainConfig::InterchainAccount {
-            connection_id: test_ctx
-                .get_connections()
-                .src(NEUTRON_CHAIN_NAME)
-                .dest(GAIA_CHAIN_NAME)
-                .get(),
-            channel_id: test_ctx
-                .get_transfer_channels()
-                .src(NEUTRON_CHAIN_NAME)
-                .dest(GAIA_CHAIN_NAME)
-                .get(),
-            timeout: Uint64::new(100),
-        },
-    };
-
-    // register the gaia domain on orbital-core (admin gated)
-    info!("admin registering orbital-level gaia domain...");
-    contract_execute(
-        test_ctx
-            .get_request_builder()
-            .get_request_builder(NEUTRON_CHAIN_NAME),
-        &orbital_core.address,
-        ACC0_KEY,
-        &serde_json::to_string(&admin_register_gaia_domain_msg)?,
-        "",
+    admin_register_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        GAIA_CHAIN_NAME.to_string(),
     )?;
-
     std::thread::sleep(Duration::from_secs(5));
 
-    // user 1 registers to orbital-core
-    info!("user_1 registering to orbital-core...");
-    contract_execute(
-        test_ctx
-            .get_request_builder()
-            .get_request_builder(NEUTRON_CHAIN_NAME),
-        &orbital_core.address,
+    admin_register_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        JUNO_CHAIN_NAME.to_string(),
+    )?;
+
+    std::thread::sleep(Duration::from_secs(3));
+
+    // first we register users to orbital-core
+    user_register_orbital_core(&test_ctx, ACC1_KEY, orbital_core.address.to_string())?;
+    user_register_orbital_core(&test_ctx, ACC2_KEY, orbital_core.address.to_string())?;
+
+    std::thread::sleep(Duration::from_secs(3));
+
+    // then we register them to gaia domain
+    user_register_to_new_domain(
+        &test_ctx,
         ACC1_KEY,
-        &serde_json::to_string(&ExecuteMsg::RegisterUser {})?,
-        "",
+        orbital_core.address.to_string(),
+        GAIA_CHAIN_NAME.to_string(),
+    )?;
+    user_register_to_new_domain(
+        &test_ctx,
+        ACC2_KEY,
+        orbital_core.address.to_string(),
+        GAIA_CHAIN_NAME.to_string(),
     )?;
 
-    std::thread::sleep(Duration::from_secs(5));
+    std::thread::sleep(Duration::from_secs(7));
 
-    // user 1 registers to gaia domain
-    info!("user_1 registering to gaia domain...");
-    let user_domain_registration_resp = contract_execute(
-        test_ctx
-            .get_request_builder()
-            .get_request_builder(NEUTRON_CHAIN_NAME),
-        &orbital_core.address,
+    user_register_to_new_domain(
+        &test_ctx,
         ACC1_KEY,
-        &serde_json::to_string(&ExecuteMsg::RegisterUserDomain {
-            domain: GAIA_CHAIN_NAME.to_string(),
-        })?,
-        "--amount 1000000untrn --gas 5000000",
+        orbital_core.address.to_string(),
+        JUNO_CHAIN_NAME.to_string(),
     )?;
-    std::thread::sleep(Duration::from_secs(5));
+    user_register_to_new_domain(
+        &test_ctx,
+        ACC2_KEY,
+        orbital_core.address.to_string(),
+        JUNO_CHAIN_NAME.to_string(),
+    )?;
 
-    info!(
-        "user domain registration response: {:?}",
-        user_domain_registration_resp
-    );
+    std::thread::sleep(Duration::from_secs(10));
 
-    let tx_res = test_ctx
-        .get_request_builder()
-        .get_request_builder(NEUTRON_CHAIN_NAME)
-        .query_tx_hash(&user_domain_registration_resp.tx_hash.unwrap());
+    query_registered_users(&test_ctx, orbital_core.address.to_string())?;
 
-    info!("tx hash response: {:?}", tx_res);
+    query_user_config(&test_ctx, orbital_core.address.to_string(), ACC1_ADDR)?;
 
-    let registered_users_query_response = contract_query(
-        test_ctx
-            .get_request_builder()
-            .get_request_builder(NEUTRON_CHAIN_NAME),
-        &orbital_core.address,
-        &serde_json::to_string(&QueryMsg::UserAddresses {})?,
-    )["data"]
-        .clone();
+    query_user_clearing_acc_addr_on_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC1_ADDR,
+        GAIA_CHAIN_NAME.to_string(),
+    )?;
 
-    info!(
-        "registered users query response: {:?}",
-        registered_users_query_response
-    );
-
-    let query_response = contract_query(
-        test_ctx
-            .get_request_builder()
-            .get_request_builder(NEUTRON_CHAIN_NAME),
-        &orbital_core.address,
-        &serde_json::to_string(&QueryMsg::UserConfig {
-            addr: ACC1_ADDR.to_string(),
-        })?,
-    )["data"]
-        .clone();
-    info!("user config query response: {:?}", query_response);
-
-    let clearing_acc_response = contract_query(
-        test_ctx
-            .get_request_builder()
-            .get_request_builder(NEUTRON_CHAIN_NAME),
-        &orbital_core.address,
-        &serde_json::to_string(&QueryMsg::ClearingAccountAddress {
-            addr: ACC1_ADDR.to_string(),
-            domain: GAIA_CHAIN_NAME.to_string(),
-        })?,
-    )["data"]
-        .clone();
-    info!(
-        "clearing account query response: {:?}",
-        clearing_acc_response
-    );
-    let user_gaia_clearing_acc: Option<String> = serde_json::from_value(clearing_acc_response)?;
-
-    info!("user gaia clearing account: {:?}", user_gaia_clearing_acc);
-
+    query_user_clearing_acc_addr_on_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC1_ADDR,
+        JUNO_CHAIN_NAME.to_string(),
+    )?;
     Ok(())
 }
