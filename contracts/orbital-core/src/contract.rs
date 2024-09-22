@@ -163,7 +163,7 @@ fn sudo_open_ack(
 
     // extract the ICA identifier from the port
     let ica_identifier = extract_ica_identifier_from_port(port_id)?;
-    println!("ica identifier: {ica_identifier}");
+
     // Update the storage record associated with the interchain account.
     CLEARING_ACCOUNTS.save(deps.storage, ica_identifier, &Some(parsed_version.address))?;
 

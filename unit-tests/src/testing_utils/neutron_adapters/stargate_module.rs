@@ -1,7 +1,8 @@
 use cosmos_sdk_proto::traits::MessageExt;
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    from_json, to_json_binary, Addr, AnyMsg, Api, Binary, BlockInfo, CustomMsg, CustomQuery,
-    GrpcQuery, Querier, Storage,
+    coins, from_json, to_json_binary, Addr, AnyMsg, Api, Binary, BlockInfo, Coin, CustomMsg,
+    CustomQuery, GrpcQuery, Querier, Storage, Uint64,
 };
 use cw_multi_test::{
     error::{anyhow, AnyResult},
@@ -47,26 +48,44 @@ impl Stargate for StargateModule {
     ) -> AnyResult<Binary> {
         println!("stargate query mock received for path: {path}");
         if path == "/neutron.interchaintxs.v1.Query/Params" {
-            let proto_coin = cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
-                denom: "untrn".to_string(),
-                amount: "1000000".to_string(),
+            // let proto_coin = cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
+            //     denom: "untrn".to_string(),
+            //     amount: "1000000".to_string(),
+            // };
+
+            // let params = Params {
+            //     msg_submit_tx_max_messages: 1_000,
+            //     register_fee: vec![proto_coin],
+            // };
+
+            // let response = QueryParamsResponse {
+            //     params: Some(params),
+            // };
+
+            // Ok(response.to_bytes().map(Binary::new)?)
+
+            #[cw_serde]
+            struct Params {
+                pub msg_submit_tx_max_messages: Uint64,
+                pub register_fee: Vec<Coin>,
+            }
+
+            #[cw_serde]
+            struct QueryParamsResponseCustom {
+                pub params: Option<Params>,
+            }
+
+            let response = QueryParamsResponseCustom {
+                params: Some(Params {
+                    msg_submit_tx_max_messages: Uint64::new(1_000),
+                    register_fee: coins(1_000_000, "untrn"),
+                }),
             };
 
-            let params = Params {
-                msg_submit_tx_max_messages: 1_000,
-                register_fee: vec![proto_coin],
-            };
-
-            let response = QueryParamsResponse {
-                params: Some(params),
-            };
-
-            let binary = Binary::from(response.to_bytes()?);
-
-            return Ok(binary);
+            Ok(to_json_binary(&response)?)
+        } else {
+            Err(anyhow!("Unexpected query request"))
         }
-
-        Err(anyhow!("Unexpected query request"))
     }
 
     fn execute_any<ExecC, QueryC>(

@@ -11,8 +11,8 @@ pub const USER_CONFIGS: Map<String, UserConfig> = Map::new("user_configs");
 pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains");
 
 /// map of clearing accounts registered with orbital.
-/// key is a composite of (domain_identifier, owner_neutron_addr).
-/// value is an optional address where:
+/// key is a composite of (user_id, domain) generated with
+/// `utils::get_ica_identifier`. value is an optional address where:
 /// - None: clearing account is being registered and awaiting callback
 /// - Some: clearing account has been registered and is ready for use
 pub const CLEARING_ACCOUNTS: Map<String, Option<String>> = Map::new("clearing_accounts");

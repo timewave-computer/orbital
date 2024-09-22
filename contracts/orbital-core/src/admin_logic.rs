@@ -38,6 +38,9 @@ pub(crate) mod admin {
             ContractError::OrbitalDomainAlreadyExists(domain.to_string())
         );
 
+        // TODO: ensure that the domain identifier is fine to use as part of
+        // ica identifier?
+
         // store the validated domain config in state
         ORBITAL_DOMAINS.save(deps.storage, domain.to_string(), &orbital_domain)?;
 

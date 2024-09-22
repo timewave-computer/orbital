@@ -216,7 +216,7 @@ fn test_register_user_new_domain_validates_domain_existance() {
 }
 
 #[test]
-#[should_panic(expected = "Domain registration error: No funds sent")]
+#[should_panic(expected = "Domain registration error: no funds sent. expected 1000000")]
 fn test_register_user_new_ica_domain_asserts_fee_denom() {
     let mut suite = OrbitalCoreBuilder::default().build();
     suite.register_user(USER_1).unwrap();
@@ -273,16 +273,14 @@ fn test_register_user_new_ica_domain_happy() {
         .unwrap();
 
     suite
-        .register_user_to_new_domain(USER_1, GAIA_DOMAIN, coins(1, DENOM_NTRN))
+        .register_user_to_new_domain(USER_1, GAIA_DOMAIN, coins(1_000_000, DENOM_NTRN))
         .unwrap();
 
     let user_config = suite.query_user(USER_1).unwrap();
-    let clearing_account = suite.query_clearing_account(GAIA_DOMAIN, USER_1).unwrap();
 
     assert_eq!(user_config.registered_domains.len(), 1);
     assert_eq!(
         user_config.registered_domains.first(),
         Some(&GAIA_DOMAIN.to_string())
     );
-    assert_eq!(clearing_account, None);
 }

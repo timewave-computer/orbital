@@ -1,8 +1,6 @@
-use std::str::FromStr;
-
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    ensure, Api, Binary, Coin, MessageInfo, QueryRequest, StdError, StdResult, Uint128, Uint64,
+    ensure, Api, Binary, Coin, MessageInfo, QueryRequest, StdError, StdResult, Uint64,
 };
 use neutron_sdk::bindings::{msg::NeutronMsg, query::NeutronQuery};
 
@@ -63,18 +61,6 @@ impl UncheckedOrbitalDomainConfig {
     }
 }
 
-#[cw_serde]
-struct Params {
-    pub msg_submit_tx_max_messages: Uint64,
-    pub register_fee: Vec<Coin>,
-}
-
-// TODO: remove these in favor for neutron-sdk proto types later
-#[cw_serde]
-struct QueryParamsResponseCustom {
-    pub params: Option<Params>,
-}
-
 impl OrbitalDomainConfig {
     pub fn get_registration_message(
         &self,
@@ -91,8 +77,18 @@ impl OrbitalDomainConfig {
                     data: Binary::new(Vec::new()),
                 };
 
-                let response: QueryParamsResponseCustom =
-                    deps.querier.query(&stargate_query_msg)?;
+                #[cw_serde]
+                struct Params {
+                    pub msg_submit_tx_max_messages: Uint64,
+                    pub register_fee: Vec<Coin>,
+                }
+
+                #[cw_serde]
+                struct QueryParamsResponse {
+                    pub params: Option<Params>,
+                }
+
+                let response: QueryParamsResponse = deps.querier.query(&stargate_query_msg)?;
 
                 // if fee_coins is empty, set value to None; otherwise - set it to Some(fee_coins)
                 let registration_fees = match response.params {
@@ -101,7 +97,7 @@ impl OrbitalDomainConfig {
                         for coin in val.register_fee.iter() {
                             // map from proto coin
                             let fee_coin = Coin {
-                                amount: Uint128::from_str(&coin.amount.to_string())?,
+                                amount: coin.amount,
                                 denom: coin.denom.to_string(),
                             };
                             // assert its covered by the sender

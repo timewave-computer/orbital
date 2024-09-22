@@ -14,7 +14,7 @@ pub(crate) mod user {
         info: MessageInfo,
         domain: String,
     ) -> OrbitalResult {
-        // user must be registered to operate on domains
+        // user must be registered in order to operate on domains
         ensure!(
             USER_CONFIGS.has(deps.storage, info.sender.to_string()),
             ContractError::UserNotRegistered {}
