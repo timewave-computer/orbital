@@ -107,7 +107,7 @@ impl Suite {
         )
     }
 
-    pub fn query_clearing_account(&mut self, domain: &str, user: &str) -> StdResult<Option<Addr>> {
+    pub fn _query_clearing_account(&mut self, domain: &str, user: &str) -> StdResult<Option<Addr>> {
         self.app.wrap().query_wasm_smart(
             self.orbital_core.clone(),
             &QueryMsg::ClearingAccountAddress {

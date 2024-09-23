@@ -15,8 +15,8 @@ pub fn assert_fee_payment(info: &MessageInfo, expected_fee: &Coin) -> Result<(),
         ),
         Err(_) => {
             return Err(ContractError::DomainRegistrationError(format!(
-                "no funds sent. expected {}",
-                expected_fee.amount
+                "no funds sent; expected {}.",
+                expected_fee
             )))
         }
     };

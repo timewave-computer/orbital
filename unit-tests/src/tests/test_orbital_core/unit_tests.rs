@@ -216,7 +216,7 @@ fn test_register_user_new_domain_validates_domain_existance() {
 }
 
 #[test]
-#[should_panic(expected = "Domain registration error: no funds sent. expected 1000000")]
+#[should_panic(expected = "Domain registration error: no funds sent; expected 1000000untrn.")]
 fn test_register_user_new_ica_domain_asserts_fee_denom() {
     let mut suite = OrbitalCoreBuilder::default().build();
     suite.register_user(USER_1).unwrap();
