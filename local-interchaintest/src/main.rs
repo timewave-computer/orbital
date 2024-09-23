@@ -151,11 +151,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         GAIA_CHAIN_NAME.to_string(),
     )?;
 
-    query_user_clearing_acc_addr_on_domain(
+    let acc_1_juno_addr = query_user_clearing_acc_addr_on_domain(
         &test_ctx,
         orbital_core.address.to_string(),
         ACC1_ADDR,
         JUNO_CHAIN_NAME.to_string(),
-    )?;
+    )?
+    .unwrap();
+
+    // TODO:
+    // 1. register an ICQ to the juno address of acc1
+    // 2. send some juno to the acc1 juno address
+    // 3. query the state of orbital-core to confirm that the ICQ result was updated in storage
+
     Ok(())
 }

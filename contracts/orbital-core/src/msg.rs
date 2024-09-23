@@ -22,6 +22,14 @@ pub enum ExecuteMsg {
     RegisterUser {},
     /// register user to a specific domain
     RegisterUserDomain { domain: String },
+
+    // ICQ related messages
+    RegisterBalancesQuery {
+        connection_id: String,
+        update_period: u64,
+        addr: String,
+        denoms: Vec<String>,
+    },
 }
 
 #[cw_ownable_query]
@@ -39,6 +47,9 @@ pub enum QueryMsg {
 
     #[returns(Vec<String>)]
     UserAddresses {},
+
+    #[returns(neutron_sdk::interchain_queries::v047::queries::BalanceResponse)]
+    Balance { query_id: u64 },
 }
 
 #[cw_serde]
