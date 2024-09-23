@@ -48,22 +48,6 @@ impl Stargate for StargateModule {
     ) -> AnyResult<Binary> {
         println!("stargate query mock received for path: {path}");
         if path == "/neutron.interchaintxs.v1.Query/Params" {
-            // let proto_coin = cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
-            //     denom: "untrn".to_string(),
-            //     amount: "1000000".to_string(),
-            // };
-
-            // let params = Params {
-            //     msg_submit_tx_max_messages: 1_000,
-            //     register_fee: vec![proto_coin],
-            // };
-
-            // let response = QueryParamsResponse {
-            //     params: Some(params),
-            // };
-
-            // Ok(response.to_bytes().map(Binary::new)?)
-
             #[cw_serde]
             struct Params {
                 pub msg_submit_tx_max_messages: Uint64,
@@ -140,72 +124,3 @@ impl Stargate for StargateModule {
         Err(anyhow!("Unexpected query request"))
     }
 }
-
-// impl Module for StargateModule {
-//     type ExecT = AnyMsg;
-//     type QueryT = GrpcQuery;
-//     type SudoT = Empty;
-
-//     fn execute<ExecC, QueryC>(
-//         &self,
-//         _api: &dyn Api,
-//         _storage: &mut dyn Storage,
-//         _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
-//         _block: &BlockInfo,
-//         sender: Addr,
-//         msg: Self::ExecT,
-//     ) -> AnyResult<AppResponse>
-//     where
-//         ExecC: CustomMsg + DeserializeOwned + 'static,
-//         QueryC: CustomQuery + DeserializeOwned + 'static,
-//     {
-//         Err(anyhow!(
-//             "Unexpected exec msg {} from {sender:?}",
-//             msg.type_url
-//         ))
-//     }
-
-//     fn query(
-//         &self,
-//         _api: &dyn Api,
-//         _storage: &dyn Storage,
-//         _querier: &dyn Querier,
-//         _block: &BlockInfo,
-//         _request: Self::QueryT,
-//     ) -> AnyResult<Binary> {
-//         // println!("custom stargate query request: {:?}", request);
-
-//         // let query: GrpcQuery = from_json(to_json_binary(&request).unwrap()).unwrap();
-//         // if query.path == "/neutron.interchaintxs.v1.Query/Params" {
-//         //     let params = Params {
-//         //         msg_submit_tx_max_messages: Uint64::new(1_000),
-//         //         register_fee: coins(1_000_000, "untrn"),
-//         //     };
-
-//         //     let response = QueryParamsResponse {
-//         //         params: Some(params),
-//         //     };
-
-//         //     return Ok(to_json_binary(&response).unwrap());
-//         // }
-
-//         Err(anyhow!("Unexpected query request"))
-//     }
-
-//     fn sudo<ExecC, QueryC>(
-//         &self,
-//         _api: &dyn Api,
-//         _storage: &mut dyn Storage,
-//         _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
-//         _block: &BlockInfo,
-//         _msg: Self::SudoT,
-//     ) -> AnyResult<AppResponse>
-//     where
-//         ExecC: CustomMsg + DeserializeOwned + 'static,
-//         QueryC: CustomQuery + DeserializeOwned + 'static,
-//     {
-//         println!("custom stargate sudo call: {:?}", _msg);
-
-//         unimplemented!("Stargate sudo is not implemented")
-//     }
-// }

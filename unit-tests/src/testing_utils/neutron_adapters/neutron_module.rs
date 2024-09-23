@@ -92,27 +92,6 @@ impl NeutronKeeper {
         conn_id: String,
         account_id: String,
     ) -> Result<(), AnyError> {
-        // let mut ntrn_storage = prefixed(storage, NAMESPACE_NEUTRON);
-
-        // if ACCOUNTS.has(
-        //     &ntrn_storage,
-        //     (&sender, conn_id.clone(), account_id.clone()),
-        // ) {
-        //     bail!("Account already registered");
-        // }
-
-        // let addr = self
-        //     .api
-        //     .addr_make(format!("{sender}_{conn_id}_{account_id}").as_str());
-
-        // ACCOUNTS
-        //     .save(
-        //         &mut ntrn_storage,
-        //         (&sender, conn_id.clone(), account_id.clone()),
-        //         &addr,
-        //     )
-        //     .unwrap();
-        // Ok(())
         if ACCOUNTS.has(storage, (&sender, conn_id.clone(), account_id.clone())) {
             bail!("Account already registered");
         }
@@ -138,9 +117,6 @@ impl NeutronKeeper {
         conn_id: String,
         account_id: String,
     ) {
-        // let mut ntrn_storage = prefixed(storage, NAMESPACE_NEUTRON);
-
-        // ACCOUNTS.remove(&mut ntrn_storage, (sender, conn_id, account_id))
         ACCOUNTS.remove(storage, (sender, conn_id, account_id))
     }
 
@@ -151,12 +127,6 @@ impl NeutronKeeper {
         conn_id: &str,
         account_id: &str,
     ) -> StdResult<Addr> {
-        // let ntrn_storage = prefixed_read(storage, NAMESPACE_NEUTRON);
-
-        // ACCOUNTS.load(
-        //     &ntrn_storage,
-        //     (sender, conn_id.to_string(), account_id.to_string()),
-        // )
         ACCOUNTS.load(
             storage,
             (sender, conn_id.to_string(), account_id.to_string()),

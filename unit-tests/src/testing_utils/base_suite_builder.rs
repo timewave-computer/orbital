@@ -4,7 +4,7 @@ use cw_multi_test::{BasicAppBuilder, Executor, MockApiBech32, SimpleAddressGener
 use super::{
     consts::{ALL_DENOMS, CHAIN_PREFIX, DENOM_NTRN, FAUCET, NOTE, OWNER, USER_1},
     neutron_adapters::{
-        custom_module::NeutronKeeper, neutron_type_contracts::orbital_core_contract,
+        neutron_module::NeutronKeeper, neutron_type_contracts::orbital_core_contract,
         stargate_module::StargateModule,
     },
     types::CustomApp,
