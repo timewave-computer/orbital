@@ -1582,6 +1582,7 @@ dependencies = [
  "localic-std",
  "localic-utils",
  "log",
+ "neutron-sdk",
  "orbital-core",
  "serde_json",
 ]

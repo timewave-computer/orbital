@@ -1,4 +1,5 @@
-use localic_std::modules::cosmwasm::contract_instantiate;
+use cosmwasm_std::{coin, coins};
+use localic_std::modules::{bank::get_balance, cosmwasm::contract_instantiate};
 use localic_utils::{
     ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
 };
@@ -6,8 +7,9 @@ use log::info;
 use orbital_core::msg::InstantiateMsg;
 use std::{env, error::Error, time::Duration};
 use utils::{
-    admin_register_domain, query_registered_users, query_user_clearing_acc_addr_on_domain,
-    query_user_config, user_register_orbital_core, user_register_to_new_domain,
+    admin_register_domain, query_balance_query_id, query_registered_users,
+    query_user_clearing_acc_addr_on_domain, query_user_config, register_icq_balances_query,
+    user_register_orbital_core, user_register_to_new_domain,
 };
 
 mod utils;
@@ -50,8 +52,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     //     .unwrap();
 
     let current_dir = env::current_dir()?;
-
     let orbital_core_local_path = format!("{}/artifacts/orbital_core.wasm", current_dir.display());
+
+    // with test context set up, we can generate the .env file for the icq relayer
+    utils::generate_icq_relayer_config(
+        current_dir,
+        utils::RelayerDetails {
+            neutron_rpc: "todo".to_string(),
+            neutron_rest: "todo".to_string(),
+            home_dir: "todo".to_string(),
+            sign_key: "todo".to_string(),
+            connection_id: "todo".to_string(),
+            target_rpc: "todo".to_string(),
+        },
+    )?;
 
     uploader
         .with_chain_name(NEUTRON_CHAIN_NAME)
@@ -163,6 +177,73 @@ fn main() -> Result<(), Box<dyn Error>> {
     // 1. register an ICQ to the juno address of acc1
     // 2. send some juno to the acc1 juno address
     // 3. query the state of orbital-core to confirm that the ICQ result was updated in storage
+
+    let icq_registration_response = register_icq_balances_query(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        JUNO_CHAIN_NAME.to_string(),
+        acc_1_juno_addr.to_string(),
+        vec!["ujuno".to_string()],
+    )?;
+
+    info!(
+        "icq registration response: {:?}",
+        icq_registration_response.raw_log.unwrap()
+    );
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    let pre_transfer_balance = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_1_juno_addr.as_str(),
+    );
+    info!(
+        "funding juno address. pre_transfer_balance: {:?}",
+        pre_transfer_balance
+    );
+
+    let transfer_coins_str = coins(1_000_000, "ujuno")
+        .iter()
+        .map(|coin| format!("{}{}", coin.amount, coin.denom))
+        .collect::<Vec<String>>()
+        .join(",");
+
+    let fee_coin = coin(50_000, "ujuno");
+
+    let cmd = format!(
+        "tx bank send {ACC0_KEY} {acc_1_juno_addr} {transfer_coins_str} --fees={fee_coin} --output=json"
+    );
+    test_ctx
+        .get_request_builder()
+        .get_request_builder(JUNO_CHAIN_NAME)
+        .tx(&cmd, true)?;
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    info!("querying icq result for query id 1...");
+    let balance_query_response =
+        query_balance_query_id(&test_ctx, orbital_core.address.to_string(), 1)?;
+
+    info!("balance query response: {:?}", balance_query_response);
+
+    let post_transfer_balance = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_1_juno_addr.as_str(),
+    );
+    info!("post_transfer_balance: {:?}", post_transfer_balance);
+
+    Ok(())
+}
+
+fn setup_neutron_icq_relayer() -> Result<(), Box<dyn Error>> {
+    let docker_img = "neutron-org/neutron-query-relayer".to_string();
+
+    // e.g. execution:
+    // docker run --env-file .env.example -p 9999:9999 neutron-org/neutron-query-relayer
 
     Ok(())
 }
