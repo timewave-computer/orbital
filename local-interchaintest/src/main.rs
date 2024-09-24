@@ -9,7 +9,7 @@ use std::{env, error::Error, time::Duration};
 use utils::{
     admin_register_domain, query_balance_query_id, query_registered_users,
     query_user_clearing_acc_addr_on_domain, query_user_config, register_icq_balances_query,
-    user_register_orbital_core, user_register_to_new_domain,
+    start_icq_relayer, user_register_orbital_core, user_register_to_new_domain,
 };
 
 mod utils;
@@ -43,29 +43,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_transfer_channels(NEUTRON_CHAIN_NAME, JUNO_CHAIN_NAME)
         .build()?;
 
-    let mut uploader = test_ctx.build_tx_upload_contracts();
-
-    // TODO: uncomment to deploy polytone
-    // uploader
-    //     .with_key(ACC0_KEY)
-    //     .send_with_local_cache(POLYTONE_PATH, LOCAL_CODE_ID_CACHE_PATH_NEUTRON)
-    //     .unwrap();
-
     let current_dir = env::current_dir()?;
-    let orbital_core_local_path = format!("{}/artifacts/orbital_core.wasm", current_dir.display());
 
     // with test context set up, we can generate the .env file for the icq relayer
     utils::generate_icq_relayer_config(
-        current_dir,
-        utils::RelayerDetails {
-            neutron_rpc: "todo".to_string(),
-            neutron_rest: "todo".to_string(),
-            home_dir: "todo".to_string(),
-            sign_key: "todo".to_string(),
-            connection_id: "todo".to_string(),
-            target_rpc: "todo".to_string(),
-        },
+        &test_ctx,
+        current_dir.clone(),
+        JUNO_CHAIN_NAME.to_string(),
     )?;
+
+    // start the icq relayer. this runs in detached mode so we need
+    // to manually kill it before each run for now.
+    start_icq_relayer()?;
+
+    let mut uploader = test_ctx.build_tx_upload_contracts();
+    let orbital_core_local_path = format!("{}/artifacts/orbital_core.wasm", current_dir.display());
+
+    info!("sleeping to allow icq relayer to start...");
+    std::thread::sleep(Duration::from_secs(30));
 
     uploader
         .with_chain_name(NEUTRON_CHAIN_NAME)
@@ -173,11 +168,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?
     .unwrap();
 
-    // TODO:
-    // 1. register an ICQ to the juno address of acc1
-    // 2. send some juno to the acc1 juno address
-    // 3. query the state of orbital-core to confirm that the ICQ result was updated in storage
-
     let icq_registration_response = register_icq_balances_query(
         &test_ctx,
         orbital_core.address.to_string(),
@@ -186,10 +176,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         vec!["ujuno".to_string()],
     )?;
 
-    info!(
-        "icq registration response: {:?}",
-        icq_registration_response.raw_log.unwrap()
-    );
+    info!("icq registration response: {:?}", icq_registration_response);
 
     std::thread::sleep(Duration::from_secs(5));
 
@@ -236,14 +223,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     info!("post_transfer_balance: {:?}", post_transfer_balance);
 
-    Ok(())
-}
+    info!("sleeping for 5...");
+    std::thread::sleep(Duration::from_secs(5));
+    info!("transfering more juno");
+    test_ctx
+        .get_request_builder()
+        .get_request_builder(JUNO_CHAIN_NAME)
+        .tx(&cmd, true)?;
 
-fn setup_neutron_icq_relayer() -> Result<(), Box<dyn Error>> {
-    let docker_img = "neutron-org/neutron-query-relayer".to_string();
-
-    // e.g. execution:
-    // docker run --env-file .env.example -p 9999:9999 neutron-org/neutron-query-relayer
+    info!("sleeping for 60sec...");
+    std::thread::sleep(Duration::from_secs(60));
 
     Ok(())
 }

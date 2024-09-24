@@ -151,7 +151,7 @@ pub fn register_icq_balances_query(
             .src(NEUTRON_CHAIN_NAME)
             .dest(&domain)
             .get(),
-        update_period: 1,
+        update_period: 5,
         addr,
         denoms,
     };
@@ -222,27 +222,28 @@ pub fn admin_register_domain(
     )
 }
 
-pub struct RelayerDetails {
-    pub neutron_rpc: String,
-    pub neutron_rest: String,
-    pub home_dir: String,
-    pub sign_key: String,
-    pub connection_id: String,
-    pub target_rpc: String,
-}
-
 pub fn generate_icq_relayer_config(
+    test_ctx: &TestContext,
     current_path: PathBuf,
-    relayer_details: RelayerDetails,
+    target_domain: String,
 ) -> std::io::Result<()> {
+    let target_connection_id = test_ctx
+        .get_connections()
+        .src(NEUTRON_CHAIN_NAME)
+        .dest(&target_domain)
+        .get();
+
     // formatted according to neutron ICQ relayer docs
+    let target_chain_rpc = format!(
+        "tcp://local{}-1-val-0-neutron_gaia_junoic:26657",
+        target_domain
+    );
     let env_content = format!(
         r#"
 RELAYER_NEUTRON_CHAIN_RPC_ADDR={neutron_rpc}
 RELAYER_NEUTRON_CHAIN_REST_ADDR={neutron_rest}
-RELAYER_NEUTRON_CHAIN_HOME_DIR={home_dir}
-RELAYER_NEUTRON_CHAIN_SIGN_KEY_NAME={sign_key}
-RELAYER_NEUTRON_CHAIN_TIMEOUT=10s
+RELAYER_NEUTRON_CHAIN_HOME_DIR=/data
+RELAYER_NEUTRON_CHAIN_SIGN_KEY_NAME=acc3
 RELAYER_NEUTRON_CHAIN_GAS_PRICES=0.5untrn
 RELAYER_NEUTRON_CHAIN_GAS_LIMIT=10000000
 RELAYER_NEUTRON_CHAIN_GAS_ADJUSTMENT=2.0
@@ -252,12 +253,15 @@ RELAYER_NEUTRON_CHAIN_GAS_PRICE_MULTIPLIER=1.1
 RELAYER_NEUTRON_CHAIN_CONNECTION_ID={connection_id}
 RELAYER_NEUTRON_CHAIN_DEBUG=true
 RELAYER_NEUTRON_CHAIN_KEYRING_BACKEND=test
+RELAYER_NEUTRON_CHAIN_ACCOUNT_PREFIX=neutron
+RELAYER_NEUTRON_CHAIN_KEY=acc3
 RELAYER_NEUTRON_CHAIN_OUTPUT_FORMAT=json
 RELAYER_NEUTRON_CHAIN_SIGN_MODE_STR=direct
 
 RELAYER_TARGET_CHAIN_RPC_ADDR={target_rpc}
 RELAYER_TARGET_CHAIN_TIMEOUT=10s
 RELAYER_TARGET_CHAIN_DEBUG=true
+RELAYER_TARGET_CHAIN_KEYRING_BACKEND=test
 RELAYER_TARGET_CHAIN_OUTPUT_FORMAT=json
 
 RELAYER_REGISTRY_ADDRESSES=
@@ -265,24 +269,14 @@ RELAYER_REGISTRY_QUERY_IDS=
 
 RELAYER_ALLOW_TX_QUERIES=true
 RELAYER_ALLOW_KV_CALLBACKS=true
-RELAYER_MIN_KV_UPDATE_PERIOD=1
 RELAYER_STORAGE_PATH=storage/leveldb
-RELAYER_QUERIES_TASK_QUEUE_CAPACITY=10000
-RELAYER_CHECK_SUBMITTED_TX_STATUS_DELAY=10s
-RELAYER_INITIAL_TX_SEARCH_OFFSET=0
 RELAYER_WEBSERVER_PORT=127.0.0.1:9999
 RELAYER_IGNORE_ERRORS_REGEX=(execute wasm contract failed|failed to build tx query string)
-
-#LOGGER_LEVEL=info
-#LOGGER_OUTPUTPATHS=stdout, /tmp/logs
-#LOGGER_ERROROUTPUTPATHS=stderr
 "#,
-        neutron_rpc = relayer_details.neutron_rpc,
-        neutron_rest = relayer_details.neutron_rest,
-        home_dir = relayer_details.home_dir,
-        sign_key = relayer_details.sign_key,
-        connection_id = relayer_details.connection_id,
-        target_rpc = relayer_details.target_rpc
+        neutron_rpc = "tcp://localneutron-1-val-0-neutron_gaia_junoic:26657",
+        neutron_rest = "http://localneutron-1-val-0-neutron_gaia_junoic:1317",
+        connection_id = target_connection_id,
+        target_rpc = target_chain_rpc,
     );
 
     // create the env file and write the dynamically generated config there
@@ -292,5 +286,63 @@ RELAYER_IGNORE_ERRORS_REGEX=(execute wasm contract failed|failed to build tx que
         .join(".env");
     let mut file = File::create(path)?;
     file.write_all(env_content.as_bytes())?;
+
     Ok(())
+}
+
+pub fn start_icq_relayer() -> Result<(), Box<dyn std::error::Error>> {
+    let output = std::process::Command::new("docker")
+        .arg("inspect")
+        .arg("localneutron-1-val-0-neutron_gaia_junoic")
+        .output()
+        .expect("failed to inspect the neutron container");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let response: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Failed to parse JSON from docker inspect output");
+
+    // extract the docker network under which neutron container is spinning
+    let docker_network = response[0]["NetworkSettings"]["Networks"].clone();
+    let network_name = docker_network
+        .as_object()
+        .unwrap()
+        .keys()
+        .next()
+        .unwrap()
+        .to_string();
+
+    // extract the mount point of neutron chain on host machine
+    let mount_point = response[0]["Mounts"][0]["Source"].as_str().unwrap();
+
+    // this should be initiated by `just local-ic-run`, so we know the relpath
+    let env_relpath = "local-interchaintest/configs/.env";
+
+    let start_icq_relayer_cmd = std::process::Command::new("docker")
+        .arg("run")
+        .arg("-d") // detached mode to not block the main()
+        .arg("--env-file")
+        .arg(env_relpath) // passing the .env file we generated before
+        .arg("-p")
+        .arg("9999:9999") // the port binding for the relayer webserver, idk if it's needed
+        .arg("--network")
+        .arg(network_name) // docker network under which we want to run the relayer
+        .arg("-v")
+        .arg(format!("{}:/data", mount_point)) // neutron mount point to access the keyring
+        .arg("neutron-org/neutron-query-relayer")
+        .output()
+        .expect("failed to start icq relayer");
+
+    match start_icq_relayer_cmd.status.success() {
+        true => {
+            let container_id = String::from_utf8_lossy(&start_icq_relayer_cmd.stdout)
+                .trim()
+                .to_string();
+            info!("ICQ relayer container started with ID: {}", container_id);
+            Ok(())
+        }
+        false => {
+            let error = String::from_utf8_lossy(&start_icq_relayer_cmd.stderr);
+            Err(format!("Failed to start ICQ relayer: {}", error).into())
+        }
+    }
 }
