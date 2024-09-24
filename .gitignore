@@ -2,4 +2,5 @@ target
 artifacts
 
 local-interchaintest/*.json
-local-interchaintest/configs/logs.json
+local-interchaintest/configs
+.env*
