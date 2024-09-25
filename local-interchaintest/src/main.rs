@@ -6,8 +6,8 @@ use log::info;
 use orbital_core::msg::InstantiateMsg;
 use std::{env, error::Error, time::Duration};
 use utils::{
-    admin_register_domain, query_registered_users, query_user_clearing_acc_addr_on_domain,
-    query_user_config, user_register_orbital_core, user_register_to_new_domain,
+    admin_register_domain, query_user_clearing_acc_addr_on_domain, query_user_config,
+    user_register_orbital_core, user_register_to_new_domain,
 };
 
 mod utils;
@@ -139,8 +139,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     std::thread::sleep(Duration::from_secs(10));
-
-    query_registered_users(&test_ctx, orbital_core.address.to_string())?;
 
     query_user_config(&test_ctx, orbital_core.address.to_string(), ACC1_ADDR)?;
 

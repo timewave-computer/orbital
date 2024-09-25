@@ -78,19 +78,7 @@ pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ClearingAccountAddress { addr, domain } => {
             to_json_binary(&query_clearing_account(deps, domain, addr)?)
         }
-        QueryMsg::UserAddresses {} => to_json_binary(&query_user_addresses(deps)?),
     }
-}
-
-fn query_user_addresses(deps: QueryDeps) -> StdResult<Vec<String>> {
-    let users = USER_CONFIGS.range(deps.storage, None, None, cosmwasm_std::Order::Ascending);
-
-    let mut user_addrs = vec![];
-    for user_entry in users {
-        user_addrs.push(user_entry?.0);
-    }
-
-    Ok(user_addrs)
 }
 
 fn query_clearing_account(

@@ -36,9 +36,6 @@ pub enum QueryMsg {
 
     #[returns(Option<String>)]
     ClearingAccountAddress { addr: String, domain: String },
-
-    #[returns(Vec<String>)]
-    UserAddresses {},
 }
 
 #[cw_serde]
