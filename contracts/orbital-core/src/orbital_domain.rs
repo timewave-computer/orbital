@@ -74,7 +74,7 @@ impl OrbitalDomainConfig {
                 #[allow(deprecated)]
                 let stargate_query_msg: QueryRequest<NeutronQuery> = QueryRequest::Stargate {
                     path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
-                    data: Binary::new(Vec::new()),
+                    data: Binary::default(),
                 };
 
                 #[cw_serde]
