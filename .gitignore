@@ -3,3 +3,6 @@ artifacts
 
 local-interchaintest/*.json
 local-interchaintest/configs/logs.json
+
+# ignore raw schemas
+contracts/*/schema/raw/*
