@@ -113,6 +113,7 @@ pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> StdResult<Res
     unimplemented!()
 }
 
+// neutron uses the `sudo` entry point in their ICA/ICQ related logic
 #[entry_point]
 pub fn sudo(deps: ExecuteDeps, env: Env, msg: SudoMsg) -> StdResult<Response<NeutronMsg>> {
     match msg {

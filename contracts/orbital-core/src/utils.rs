@@ -1,6 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{ensure, Coin, MessageInfo, StdError, StdResult, Uint128, Uint64};
-use cw_utils::{must_pay, PaymentError};
+use cw_utils::must_pay;
 use neutron_sdk::bindings::msg::IbcFee;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
