@@ -91,23 +91,22 @@ impl OrbitalDomainConfig {
                 let response: QueryParamsResponse = deps.querier.query(&stargate_query_msg)?;
 
                 // if fee_coins is empty, set value to None; otherwise - set it to Some(fee_coins)
-                let registration_fees = match response.params {
-                    Some(val) => {
-                        let mut fee_coins = vec![];
-                        for coin in val.register_fee.iter() {
-                            // map from proto coin
-                            let fee_coin = Coin {
-                                amount: coin.amount,
-                                denom: coin.denom.to_string(),
-                            };
-                            // assert its covered by the sender
-                            assert_fee_payment(info, &fee_coin)?;
-                            // collect fee coins
-                            fee_coins.push(fee_coin);
-                        }
-                        Some(fee_coins)
+                let registration_fees = if let Some(val) = response.params {
+                    let mut fee_coins = vec![];
+                    for coin in val.register_fee.iter() {
+                        // map from proto coin
+                        let fee_coin = Coin {
+                            amount: coin.amount,
+                            denom: coin.denom.to_string(),
+                        };
+                        // assert its covered by the sender
+                        assert_fee_payment(info, &fee_coin)?;
+                        // collect fee coins
+                        fee_coins.push(fee_coin);
                     }
-                    None => None,
+                    Some(fee_coins)
+                } else {
+                    None
                 };
 
                 Ok(NeutronMsg::register_interchain_account(
