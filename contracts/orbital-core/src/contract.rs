@@ -105,12 +105,12 @@ fn query_user_config(deps: QueryDeps, user: String) -> StdResult<UserConfig> {
 
 #[entry_point]
 pub fn reply(_deps: ExecuteDeps, _env: Env, _msg: Reply) -> StdResult<Response<NeutronMsg>> {
-    Ok(Response::default())
+    unimplemented!()
 }
 
 #[entry_point]
 pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> StdResult<Response<NeutronMsg>> {
-    Ok(Response::default())
+    unimplemented!()
 }
 
 #[entry_point]
