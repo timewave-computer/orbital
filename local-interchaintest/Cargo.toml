@@ -1,9 +1,9 @@
 [package]
-name = "local-interchaintest"
-edition    = { workspace = true }
-license    = { workspace = true }
-version    = { workspace = true }
-repository = { workspace = true }
+name        = "local-interchaintest"
+edition     = { workspace = true }
+license     = { workspace = true }
+version     = { workspace = true }
+repository  = { workspace = true }
 
 [dependencies]
 localic-std     = { workspace = true }

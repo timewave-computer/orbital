@@ -6,18 +6,18 @@ version    = { workspace = true }
 repository = { workspace = true }
 
 [dependencies]
-hex             = { workspace = true }
-serde_json      = { workspace = true }
-env_logger      = { workspace = true }
-log             = { workspace = true }
-orbital-core    = { workspace = true }
-cosmwasm-std    = { workspace = true }
-cosmwasm-schema = { workspace = true }
-cw-multi-test   = { workspace = true }
-neutron-sdk     = { workspace = true }
-schemars        = { workspace = true }
-serde           = { workspace = true }
-cw-ownable      = { workspace = true }
-cw-storage-plus = { workspace = true }
-prost           = { workspace = true }
-cosmos-sdk-proto= { workspace = true }
+hex                 = { workspace = true }
+serde_json          = { workspace = true }
+env_logger          = { workspace = true }
+log                 = { workspace = true }
+orbital-core        = { workspace = true }
+cosmwasm-std        = { workspace = true }
+cosmwasm-schema     = { workspace = true }
+cw-multi-test       = { workspace = true }
+neutron-sdk         = { workspace = true }
+schemars            = { workspace = true }
+serde               = { workspace = true }
+cw-ownable          = { workspace = true }
+cw-storage-plus     = { workspace = true }
+prost               = { workspace = true }
+cosmos-sdk-proto    = { workspace = true }
