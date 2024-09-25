@@ -92,27 +92,6 @@ pub fn query_balance_query_id(
     Ok(balance_response)
 }
 
-pub fn query_registered_users(
-    test_ctx: &TestContext,
-    orbital_core: String,
-) -> Result<(), LocalError> {
-    let registered_users_query_response = contract_query(
-        test_ctx
-            .get_request_builder()
-            .get_request_builder(NEUTRON_CHAIN_NAME),
-        &orbital_core,
-        &serde_json::to_string(&QueryMsg::UserAddresses {})
-            .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
-    )["data"]
-        .clone();
-
-    info!(
-        "registered users query response: {:?}",
-        registered_users_query_response
-    );
-    Ok(())
-}
-
 pub fn user_register_orbital_core(
     test_ctx: &TestContext,
     user_key: &str,

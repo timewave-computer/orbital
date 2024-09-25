@@ -45,9 +45,6 @@ pub enum QueryMsg {
     #[returns(Option<String>)]
     ClearingAccountAddress { addr: String, domain: String },
 
-    #[returns(Vec<String>)]
-    UserAddresses {},
-
     #[returns(neutron_sdk::interchain_queries::v047::queries::BalanceResponse)]
     Balance { query_id: u64 },
 }

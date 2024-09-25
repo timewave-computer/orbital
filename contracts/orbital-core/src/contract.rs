@@ -84,24 +84,12 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ClearingAccountAddress { addr, domain } => {
             to_json_binary(&query_clearing_account(deps, domain, addr)?)
         }
-        QueryMsg::UserAddresses {} => to_json_binary(&query_user_addresses(deps)?),
         QueryMsg::Balance { query_id } => to_json_binary(&query_icq_balance(deps, env, query_id)?),
     }
 }
 
 fn query_icq_balance(deps: QueryDeps, env: Env, query_id: u64) -> StdResult<BalanceResponse> {
     query_balance(deps, env, query_id).map_err(|e| StdError::generic_err(e.to_string()))
-}
-
-fn query_user_addresses(deps: QueryDeps) -> StdResult<Vec<String>> {
-    let users = USER_CONFIGS.range(deps.storage, None, None, cosmwasm_std::Order::Ascending);
-
-    let mut user_addrs = vec![];
-    for user_entry in users {
-        user_addrs.push(user_entry?.0);
-    }
-
-    Ok(user_addrs)
 }
 
 fn query_clearing_account(
