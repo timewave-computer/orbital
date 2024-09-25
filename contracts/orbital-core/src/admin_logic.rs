@@ -9,7 +9,7 @@ pub(crate) mod admin {
         state::ORBITAL_DOMAINS,
     };
 
-    pub fn transfer_admin(
+    pub fn try_update_ownership(
         deps: ExecuteDeps,
         block: &BlockInfo,
         sender: &Addr,
@@ -20,7 +20,7 @@ pub(crate) mod admin {
         Ok(Response::default().add_attributes(resp.into_attributes()))
     }
 
-    pub fn register_new_domain(
+    pub fn try_register_new_domain(
         deps: ExecuteDeps,
         info: MessageInfo,
         domain: String,

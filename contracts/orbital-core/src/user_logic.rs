@@ -8,7 +8,7 @@ pub(crate) mod user {
         utils::get_ica_identifier,
     };
 
-    pub fn register_new_domain(
+    pub fn try_register_new_domain(
         deps: ExecuteDeps,
         _env: Env,
         info: MessageInfo,
@@ -46,7 +46,7 @@ pub(crate) mod user {
             .add_attribute("method", "register_user_domain"))
     }
 
-    pub fn register(deps: ExecuteDeps, _env: Env, info: MessageInfo) -> OrbitalResult {
+    pub fn try_register(deps: ExecuteDeps, _env: Env, info: MessageInfo) -> OrbitalResult {
         // user can only register once
         ensure!(
             !USER_CONFIGS.has(deps.storage, info.sender.to_string()),

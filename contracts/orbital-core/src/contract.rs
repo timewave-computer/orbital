@@ -54,18 +54,18 @@ pub fn execute(
     match msg {
         // admin action to manage ownership of orbital-core
         ExecuteMsg::UpdateOwnership(action) => {
-            admin::transfer_admin(deps, &env.block, &info.sender, action)
+            admin::try_update_ownership(deps, &env.block, &info.sender, action)
         }
         // admin action to enable new domain for user registration
         ExecuteMsg::RegisterNewDomain {
             domain,
             account_type,
-        } => admin::register_new_domain(deps, info, domain, account_type),
+        } => admin::try_register_new_domain(deps, info, domain, account_type),
         // user action to create a new user account which enables registration to domains
-        ExecuteMsg::RegisterUser {} => user::register(deps, env, info),
+        ExecuteMsg::RegisterUser {} => user::try_register(deps, env, info),
         // user action to register a new domain which creates their clearing account
         ExecuteMsg::RegisterUserDomain { domain } => {
-            user::register_new_domain(deps, env, info, domain)
+            user::try_register_new_domain(deps, env, info, domain)
         }
     }
 }
