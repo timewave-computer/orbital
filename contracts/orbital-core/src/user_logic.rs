@@ -1,8 +1,9 @@
 pub(crate) mod user {
     use cosmwasm_std::{ensure, Env, MessageInfo, Response, Uint64};
+    use neutron_sdk::{bindings::msg::NeutronMsg, NeutronResult};
 
     use crate::{
-        contract::{ExecuteDeps, OrbitalResult},
+        contract::ExecuteDeps,
         error::ContractError,
         state::{UserConfig, CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS, USER_NONCE},
         utils::get_ica_identifier,
@@ -13,7 +14,7 @@ pub(crate) mod user {
         _env: Env,
         info: MessageInfo,
         domain: String,
-    ) -> OrbitalResult {
+    ) -> NeutronResult<Response<NeutronMsg>> {
         // user must be registered in order to operate on domains
         ensure!(
             USER_CONFIGS.has(deps.storage, info.sender.to_string()),
@@ -46,7 +47,11 @@ pub(crate) mod user {
             .add_attribute("method", "register_user_domain"))
     }
 
-    pub fn try_register(deps: ExecuteDeps, _env: Env, info: MessageInfo) -> OrbitalResult {
+    pub fn try_register(
+        deps: ExecuteDeps,
+        _env: Env,
+        info: MessageInfo,
+    ) -> NeutronResult<Response<NeutronMsg>> {
         // user can only register once
         ensure!(
             !USER_CONFIGS.has(deps.storage, info.sender.to_string()),
