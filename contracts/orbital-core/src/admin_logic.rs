@@ -1,31 +1,30 @@
 pub(crate) mod admin {
     use cosmwasm_std::{ensure, Addr, BlockInfo, MessageInfo, Response};
     use cw_ownable::{assert_owner, update_ownership, Action};
+    use neutron_sdk::{bindings::msg::NeutronMsg, NeutronResult};
 
     use crate::{
-        contract::{ExecuteDeps, OrbitalResult},
-        error::ContractError,
-        orbital_domain::UncheckedOrbitalDomainConfig,
+        contract::ExecuteDeps, error::ContractError, orbital_domain::UncheckedOrbitalDomainConfig,
         state::ORBITAL_DOMAINS,
     };
 
-    pub fn transfer_admin(
+    pub fn try_update_ownership(
         deps: ExecuteDeps,
         block: &BlockInfo,
         sender: &Addr,
         action: Action,
-    ) -> OrbitalResult {
+    ) -> NeutronResult<Response<NeutronMsg>> {
         let resp = update_ownership(deps.into_empty(), block, sender, action)
             .map_err(ContractError::Ownership)?;
         Ok(Response::default().add_attributes(resp.into_attributes()))
     }
 
-    pub fn register_new_domain(
+    pub fn try_register_new_domain(
         deps: ExecuteDeps,
         info: MessageInfo,
         domain: String,
         account_type: UncheckedOrbitalDomainConfig,
-    ) -> OrbitalResult {
+    ) -> NeutronResult<Response<NeutronMsg>> {
         // only the owner can register new domains
         assert_owner(deps.storage, &info.sender).map_err(ContractError::Ownership)?;
 

@@ -28,7 +28,6 @@ use cosmwasm_std::{
 pub const CONTRACT_NAME: &str = "orbital-core";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub type OrbitalResult = NeutronResult<Response<NeutronMsg>>;
 pub type QueryDeps<'a> = Deps<'a, NeutronQuery>;
 pub type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 
@@ -38,7 +37,7 @@ pub fn instantiate(
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> OrbitalResult {
+) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
 
@@ -55,15 +54,17 @@ pub fn execute(
 ) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
         ExecuteMsg::UpdateOwnership(action) => {
-            admin::transfer_admin(deps, &env.block, &info.sender, action)
+            admin::try_update_ownership(deps, &env.block, &info.sender, action)
         }
         ExecuteMsg::RegisterNewDomain {
             domain,
             account_type,
-        } => admin::register_new_domain(deps, info, domain, account_type),
-        ExecuteMsg::RegisterUser {} => user::register(deps, env, info),
+        } => admin::try_register_new_domain(deps, info, domain, account_type),
+        // user action to create a new user account which enables registration to domains
+        ExecuteMsg::RegisterUser {} => user::try_register(deps, env, info),
+        // user action to register a new domain which creates their clearing account
         ExecuteMsg::RegisterUserDomain { domain } => {
-            user::register_new_domain(deps, env, info, domain)
+            user::try_register_new_domain(deps, env, info, domain)
         }
         ExecuteMsg::RegisterBalancesQuery {
             connection_id,
@@ -127,21 +128,15 @@ fn query_user_config(deps: QueryDeps, user: String) -> StdResult<UserConfig> {
 
 #[entry_point]
 pub fn reply(_deps: ExecuteDeps, _env: Env, _msg: Reply) -> StdResult<Response<NeutronMsg>> {
-    // match msg.id {
-    //     BALANCES_REPLY_ID => icq::write_balance_query_id_to_reply_id(deps, msg),
-    //     _ => Err(StdError::generic_err(format!(
-    //         "unsupported reply message id {}",
-    //         msg.id
-    //     ))),
-    // }
-    Ok(Response::default())
+    unimplemented!()
 }
 
 #[entry_point]
 pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> StdResult<Response<NeutronMsg>> {
-    Ok(Response::default())
+    unimplemented!()
 }
 
+// neutron uses the `sudo` entry point in their ICA/ICQ related logic
 #[entry_point]
 pub fn sudo(deps: ExecuteDeps, env: Env, msg: SudoMsg) -> StdResult<Response<NeutronMsg>> {
     match msg {

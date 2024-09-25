@@ -1,9 +1,4 @@
-use std::{
-    env,
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{fs::File, io::Write, path::PathBuf};
 
 use cosmwasm_std::Uint64;
 use localic_std::{
@@ -132,7 +127,7 @@ pub fn user_register_orbital_core(
         user_key,
         &serde_json::to_string(&ExecuteMsg::RegisterUser {})
             .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
-        "--amount 1000000untrn --gas 5000000",
+        "",
     )
 }
 

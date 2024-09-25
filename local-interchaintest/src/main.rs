@@ -7,9 +7,9 @@ use log::info;
 use orbital_core::msg::InstantiateMsg;
 use std::{env, error::Error, time::Duration};
 use utils::{
-    admin_register_domain, query_balance_query_id, query_registered_users,
-    query_user_clearing_acc_addr_on_domain, query_user_config, register_icq_balances_query,
-    start_icq_relayer, user_register_orbital_core, user_register_to_new_domain,
+    admin_register_domain, query_balance_query_id, query_user_clearing_acc_addr_on_domain,
+    query_user_config, register_icq_balances_query, start_icq_relayer, user_register_orbital_core,
+    user_register_to_new_domain,
 };
 
 mod utils;
@@ -102,21 +102,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         orbital_core.address.to_string(),
         GAIA_CHAIN_NAME.to_string(),
     )?;
-    std::thread::sleep(Duration::from_secs(5));
-
+    std::thread::sleep(Duration::from_secs(2));
     admin_register_domain(
         &test_ctx,
         orbital_core.address.to_string(),
         JUNO_CHAIN_NAME.to_string(),
     )?;
 
-    std::thread::sleep(Duration::from_secs(3));
-
     // first we register users to orbital-core
     user_register_orbital_core(&test_ctx, ACC1_KEY, orbital_core.address.to_string())?;
     user_register_orbital_core(&test_ctx, ACC2_KEY, orbital_core.address.to_string())?;
-
-    std::thread::sleep(Duration::from_secs(3));
 
     // then we register them to gaia domain
     user_register_to_new_domain(
@@ -132,7 +127,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         GAIA_CHAIN_NAME.to_string(),
     )?;
 
-    std::thread::sleep(Duration::from_secs(7));
+    std::thread::sleep(Duration::from_secs(5));
 
     user_register_to_new_domain(
         &test_ctx,
@@ -147,9 +142,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         JUNO_CHAIN_NAME.to_string(),
     )?;
 
-    std::thread::sleep(Duration::from_secs(10));
-
-    query_registered_users(&test_ctx, orbital_core.address.to_string())?;
+    std::thread::sleep(Duration::from_secs(5));
 
     query_user_config(&test_ctx, orbital_core.address.to_string(), ACC1_ADDR)?;
 

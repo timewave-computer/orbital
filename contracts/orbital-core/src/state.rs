@@ -2,6 +2,9 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint64};
 use cw_storage_plus::{Item, Map};
 
+/// keeping track of registered user IDs which get incremented
+/// with each new registration. it's needed to generate unique
+/// user clearing account identifiers.
 pub const USER_NONCE: Item<Uint64> = Item::new("user_nonce");
 
 /// map of users with their respective configurations
