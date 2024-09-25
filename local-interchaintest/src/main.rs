@@ -93,7 +93,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         orbital_core.address.to_string(),
         GAIA_CHAIN_NAME.to_string(),
     )?;
-    std::thread::sleep(Duration::from_secs(5));
 
     admin_register_domain(
         &test_ctx,
@@ -101,13 +100,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         JUNO_CHAIN_NAME.to_string(),
     )?;
 
-    std::thread::sleep(Duration::from_secs(3));
-
     // first we register users to orbital-core
     user_register_orbital_core(&test_ctx, ACC1_KEY, orbital_core.address.to_string())?;
     user_register_orbital_core(&test_ctx, ACC2_KEY, orbital_core.address.to_string())?;
-
-    std::thread::sleep(Duration::from_secs(3));
 
     // then we register them to gaia domain
     user_register_to_new_domain(
@@ -123,7 +118,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         GAIA_CHAIN_NAME.to_string(),
     )?;
 
-    std::thread::sleep(Duration::from_secs(7));
+    std::thread::sleep(Duration::from_secs(5));
 
     user_register_to_new_domain(
         &test_ctx,
@@ -138,7 +133,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         JUNO_CHAIN_NAME.to_string(),
     )?;
 
-    std::thread::sleep(Duration::from_secs(10));
+    std::thread::sleep(Duration::from_secs(5));
 
     query_user_config(&test_ctx, orbital_core.address.to_string(), ACC1_ADDR)?;
 
