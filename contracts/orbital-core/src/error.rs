@@ -1,5 +1,6 @@
 use cosmwasm_std::StdError;
 use cw_ownable::OwnershipError;
+use cw_utils::PaymentError;
 use neutron_sdk::NeutronError;
 use thiserror::Error;
 
@@ -10,6 +11,9 @@ pub enum ContractError {
 
     #[error(transparent)]
     Ownership(#[from] OwnershipError),
+
+    #[error(transparent)]
+    FeePaymentError(#[from] PaymentError),
 
     #[error("Orbital domain already registered: {0}")]
     OrbitalDomainAlreadyExists(String),
