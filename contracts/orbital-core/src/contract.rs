@@ -5,7 +5,8 @@ use crate::{
     state::{ClearingAccountConfig, OrbitalDomainConfig, UserConfig, USER_NONCE},
     user_logic::user,
     utils::{
-        extract_ica_identifier_from_port, flatten_ibc_fees_amt, get_ica_identifier, OpenAckVersion,
+        extract_ica_identifier_from_port, fees::flatten_ibc_fees_amt, get_ica_identifier,
+        OpenAckVersion,
     },
 };
 use crate::{
@@ -104,6 +105,7 @@ fn try_withdraw_from_remote_domain(
     let min_ibc_fee = query_min_ibc_fee(deps.as_ref())?;
     let total_fee_amt = flatten_ibc_fees_amt(&min_ibc_fee.min_fee);
     let paid_amt = must_pay(&info, "untrn").map_err(ContractError::FeePaymentError)?;
+
     ensure!(
         paid_amt >= total_fee_amt,
         ContractError::Std(StdError::generic_err("insufficient fee coverage"))

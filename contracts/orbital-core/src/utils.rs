@@ -1,37 +1,68 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{ensure, Coin, MessageInfo, StdError, StdResult, Uint128, Uint64};
-use cw_utils::must_pay;
-use neutron_sdk::bindings::msg::IbcFee;
+use cosmwasm_std::{StdError, StdResult, Uint64};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::error::ContractError;
+pub mod fees {
+    use cosmwasm_schema::cw_serde;
+    use cosmwasm_std::{
+        ensure, Binary, Coin, MessageInfo, QueryRequest, StdResult, Uint128, Uint64,
+    };
+    use cw_utils::must_pay;
+    use neutron_sdk::bindings::{msg::IbcFee, query::NeutronQuery};
 
-// /// queries the configured minimum IBC transaction fee from the Neutron chain
-// pub fn query_min_ibc_fee(deps: Deps<NeutronQuery>) -> NeutronResult<MinIbcFeeResponse> {
-//     let min_ibc_fee_response = deps.querier.query(&NeutronQuery::MinIbcFee {}.into())?;
-//     Ok(min_ibc_fee_response)
-// }
+    use crate::{contract::ExecuteDeps, error::ContractError};
 
-pub fn assert_fee_payment(info: &MessageInfo, expected_fee: &Coin) -> Result<(), ContractError> {
-    let paid_amt = must_pay(info, &expected_fee.denom)?;
-    ensure!(
-        paid_amt >= expected_fee.amount,
-        ContractError::DomainRegistrationError("insufficient fee".to_string())
-    );
+    #[cw_serde]
+    pub struct Params {
+        pub msg_submit_tx_max_messages: Uint64,
+        pub register_fee: Vec<Coin>,
+    }
 
-    Ok(())
-}
+    #[cw_serde]
+    pub struct QueryParamsResponse {
+        pub params: Option<Params>,
+    }
 
-/// assumes that fees are only denominated in untrn and flattens them into a single coin
-pub fn flatten_ibc_fees_amt(fee_response: &IbcFee) -> Uint128 {
-    fee_response
-        .ack_fee
-        .iter()
-        .chain(fee_response.recv_fee.iter())
-        .chain(fee_response.timeout_fee.iter())
-        .map(|fee| fee.amount)
-        .sum()
+    pub fn assert_fee_payment(
+        info: &MessageInfo,
+        expected_fee: &Coin,
+    ) -> Result<(), ContractError> {
+        let paid_amt = must_pay(info, &expected_fee.denom)?;
+        ensure!(
+            paid_amt >= expected_fee.amount,
+            ContractError::DomainRegistrationError("insufficient fee".to_string())
+        );
+
+        Ok(())
+    }
+
+    /// assumes that fees are only denominated in untrn and flattens them into a single coin
+    pub fn flatten_ibc_fees_amt(fee_response: &IbcFee) -> Uint128 {
+        fee_response
+            .ack_fee
+            .iter()
+            .chain(fee_response.recv_fee.iter())
+            .chain(fee_response.timeout_fee.iter())
+            .map(|fee| fee.amount)
+            .sum()
+    }
+
+    /// helper method to query the registration fee for the ICA
+    pub fn query_ica_registration_fee(deps: ExecuteDeps) -> StdResult<QueryParamsResponse> {
+        // TODO: remove this explicit allow
+        #[allow(deprecated)]
+        let stargate_query_msg: QueryRequest<NeutronQuery> = QueryRequest::Stargate {
+            path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
+            data: Binary::default(),
+        };
+
+        let response: QueryParamsResponse = deps.querier.query(&stargate_query_msg)?;
+
+        Ok(response)
+    }
+
+    // helper method to query the IBC fee
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
