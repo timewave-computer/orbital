@@ -18,7 +18,14 @@ pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains"
 /// `utils::get_ica_identifier`. value is an optional address where:
 /// - None: clearing account is being registered and awaiting callback
 /// - Some: clearing account has been registered and is ready for use
-pub const CLEARING_ACCOUNTS: Map<String, Option<String>> = Map::new("clearing_accounts");
+pub const CLEARING_ACCOUNTS: Map<String, Option<ClearingAccountConfig>> =
+    Map::new("clearing_accounts");
+
+#[cw_serde]
+pub struct ClearingAccountConfig {
+    pub addr: String,
+    pub controller_connection_id: String,
+}
 
 #[cw_serde]
 pub struct UserConfig {

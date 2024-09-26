@@ -49,7 +49,7 @@ localic-utils       = { git = "https://github.com/timewave-computer/localic-util
 env_logger          = "0.11.5"
 log                 = "0.4.22"
 unit-tests          = { path = "unit-tests" }
-prost               = "0.11"
+prost               = { version = "0.12.3", default-features = false }
 protobuf            = { version = "3.2.0", features = ["with-bytes"] }
-prost-types         = "0.11"
+prost-types         = { version = "0.12.3", default-features = false }
 cosmos-sdk-proto    = { version = "0.20.0", default-features = false }

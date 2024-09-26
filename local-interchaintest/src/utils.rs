@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write, path::PathBuf};
 
-use cosmwasm_std::Uint64;
+use cosmwasm_std::{coin, Uint64};
 use localic_std::{
     errors::LocalError,
     modules::cosmwasm::{contract_execute, contract_query},
@@ -11,7 +11,7 @@ use log::info;
 use orbital_core::{
     msg::{ExecuteMsg, QueryMsg},
     orbital_domain::UncheckedOrbitalDomainConfig,
-    state::UserConfig,
+    state::{ClearingAccountConfig, UserConfig},
 };
 
 use crate::ACC0_KEY;
@@ -21,7 +21,7 @@ pub fn query_user_clearing_acc_addr_on_domain(
     orbital_core: String,
     user_addr: &str,
     domain: String,
-) -> Result<Option<String>, LocalError> {
+) -> Result<Option<ClearingAccountConfig>, LocalError> {
     let clearing_acc_response = contract_query(
         test_ctx
             .get_request_builder()
@@ -34,8 +34,9 @@ pub fn query_user_clearing_acc_addr_on_domain(
         .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
     )["data"]
         .clone();
-    let user_clearing_acc: Option<String> = serde_json::from_value(clearing_acc_response)
-        .map_err(|e| LocalError::Custom { msg: e.to_string() })?;
+    let user_clearing_acc: Option<ClearingAccountConfig> =
+        serde_json::from_value(clearing_acc_response)
+            .map_err(|e| LocalError::Custom { msg: e.to_string() })?;
 
     info!(
         "user {user_addr} clearing account on {domain}: {:?}",
@@ -137,6 +138,35 @@ pub fn register_icq_balances_query(
         &orbital_core,
         ACC0_KEY,
         &serde_json::to_string(&register_icq_msg)
+            .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
+        "--amount 10000000untrn --gas 50000000",
+    )
+}
+
+pub fn user_withdraw_funds_from_domain(
+    test_ctx: &TestContext,
+    orbital_core: String,
+    user_key: &str,
+    domain: String,
+    addr: String,
+    amount: u128,
+    denom: &str,
+) -> Result<TransactionResponse, LocalError> {
+    info!("user {user_key} withdraw request on {domain} for {amount}{denom} to {addr}...");
+
+    let withdraw_funds_msg = ExecuteMsg::UserWithdrawFunds {
+        domain,
+        coin: coin(amount, denom),
+        dest: addr,
+    };
+
+    contract_execute(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core,
+        user_key,
+        &serde_json::to_string(&withdraw_funds_msg)
             .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
         "--amount 10000000untrn --gas 50000000",
     )
@@ -265,6 +295,17 @@ RELAYER_IGNORE_ERRORS_REGEX=(execute wasm contract failed|failed to build tx que
 }
 
 pub fn start_icq_relayer() -> Result<(), Box<dyn std::error::Error>> {
+    match std::process::Command::new("docker")
+        .arg("inspect")
+        .arg("icq-relayer")
+        .output()
+    {
+        Ok(r) => {
+            info!("ICQ relayer already running: {:?}", r);
+            return Ok(());
+        }
+        Err(e) => info!("inspect icq relayer error: {:?}", e),
+    };
     let output = std::process::Command::new("docker")
         .arg("inspect")
         .arg("localneutron-1-val-0-neutron_gaia_junoic")
@@ -294,6 +335,8 @@ pub fn start_icq_relayer() -> Result<(), Box<dyn std::error::Error>> {
     let start_icq_relayer_cmd = std::process::Command::new("docker")
         .arg("run")
         .arg("-d") // detached mode to not block the main()
+        .arg("--name")
+        .arg("icq-relayer")
         .arg("--env-file")
         .arg(env_relpath) // passing the .env file we generated before
         .arg("-p")

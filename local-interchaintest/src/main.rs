@@ -9,7 +9,7 @@ use std::{env, error::Error, time::Duration};
 use utils::{
     admin_register_domain, query_balance_query_id, query_user_clearing_acc_addr_on_domain,
     query_user_config, register_icq_balances_query, start_icq_relayer, user_register_orbital_core,
-    user_register_to_new_domain,
+    user_register_to_new_domain, user_withdraw_funds_from_domain,
 };
 
 mod utils;
@@ -113,6 +113,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     user_register_orbital_core(&test_ctx, ACC1_KEY, orbital_core.address.to_string())?;
     user_register_orbital_core(&test_ctx, ACC2_KEY, orbital_core.address.to_string())?;
 
+    std::thread::sleep(Duration::from_secs(5));
+
     // then we register them to gaia domain
     user_register_to_new_domain(
         &test_ctx,
@@ -159,7 +161,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         ACC1_ADDR,
         JUNO_CHAIN_NAME.to_string(),
     )?
-    .unwrap();
+    .unwrap()
+    .addr;
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    let acc_2_juno_addr = query_user_clearing_acc_addr_on_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC2_ADDR,
+        JUNO_CHAIN_NAME.to_string(),
+    )?
+    .unwrap()
+    .addr;
+
+    std::thread::sleep(Duration::from_secs(5));
 
     let icq_registration_response = register_icq_balances_query(
         &test_ctx,
@@ -202,19 +218,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     std::thread::sleep(Duration::from_secs(5));
 
-    info!("querying icq result for query id 1...");
     let balance_query_response =
         query_balance_query_id(&test_ctx, orbital_core.address.to_string(), 1)?;
-
-    info!("balance query response: {:?}", balance_query_response);
-
     let post_transfer_balance = get_balance(
         test_ctx
             .get_request_builder()
             .get_request_builder(JUNO_CHAIN_NAME),
         acc_1_juno_addr.as_str(),
     );
-    info!("post_transfer_balance: {:?}", post_transfer_balance);
+    info!("ICQ balance query response  : {:?}", balance_query_response);
+    info!("native bal query response   : {:?}", post_transfer_balance);
 
     info!("sleeping for 5...");
     std::thread::sleep(Duration::from_secs(5));
@@ -224,8 +237,51 @@ fn main() -> Result<(), Box<dyn Error>> {
         .get_request_builder(JUNO_CHAIN_NAME)
         .tx(&cmd, true)?;
 
-    info!("sleeping for 60sec...");
-    std::thread::sleep(Duration::from_secs(60));
+    let user_2_juno_bal = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_2_juno_addr.as_str(),
+    );
+    info!("user 2 juno acc balance   : {:?}", user_2_juno_bal);
+
+    user_withdraw_funds_from_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC1_KEY,
+        JUNO_CHAIN_NAME.to_string(),
+        acc_2_juno_addr.to_string(),
+        1_000_000,
+        "ujuno",
+    )?;
+
+    info!("sleeping for 5...");
+    std::thread::sleep(Duration::from_secs(5));
+
+    let balance_query_response =
+        query_balance_query_id(&test_ctx, orbital_core.address.to_string(), 1)?;
+    let post_transfer_balance = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_1_juno_addr.as_str(),
+    );
+    let user_2_juno_bal = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_2_juno_addr.as_str(),
+    );
+    info!(
+        "user1 ICQ balance query response  : {:?}",
+        balance_query_response
+    );
+    info!(
+        "user1 native bal query response   : {:?}",
+        post_transfer_balance
+    );
+
+    info!("user 2 juno acc balance   : {:?}", user_2_juno_bal);
 
     Ok(())
 }

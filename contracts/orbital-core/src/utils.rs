@@ -7,6 +7,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ContractError;
 
+// /// queries the configured minimum IBC transaction fee from the Neutron chain
+// pub fn query_min_ibc_fee(deps: Deps<NeutronQuery>) -> NeutronResult<MinIbcFeeResponse> {
+//     let min_ibc_fee_response = deps.querier.query(&NeutronQuery::MinIbcFee {}.into())?;
+//     Ok(min_ibc_fee_response)
+// }
+
 pub fn assert_fee_payment(info: &MessageInfo, expected_fee: &Coin) -> Result<(), ContractError> {
     let paid_amt = must_pay(info, &expected_fee.denom)?;
     ensure!(
@@ -18,7 +24,7 @@ pub fn assert_fee_payment(info: &MessageInfo, expected_fee: &Coin) -> Result<(),
 }
 
 /// assumes that fees are only denominated in untrn and flattens them into a single coin
-pub fn _flatten_ibc_fees_amt(fee_response: IbcFee) -> Uint128 {
+pub fn flatten_ibc_fees_amt(fee_response: &IbcFee) -> Uint128 {
     fee_response
         .ack_fee
         .iter()

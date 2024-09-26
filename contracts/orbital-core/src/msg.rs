@@ -1,7 +1,8 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::Coin;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
-use crate::orbital_domain::UncheckedOrbitalDomainConfig;
+use crate::{orbital_domain::UncheckedOrbitalDomainConfig, state::ClearingAccountConfig};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -22,6 +23,15 @@ pub enum ExecuteMsg {
     RegisterUser {},
     /// register user to a specific domain
     RegisterUserDomain { domain: String },
+    /// user action to withdraw funds from their clearing account
+    UserWithdrawFunds {
+        // domain from which to withdraw funds
+        domain: String,
+        // coin to withdraw denominated in target domain
+        coin: Coin,
+        // target address to send funds to
+        dest: String,
+    },
 
     // ICQ related messages
     RegisterBalancesQuery {
@@ -42,7 +52,7 @@ pub enum QueryMsg {
     #[returns(crate::state::UserConfig)]
     UserConfig { addr: String },
 
-    #[returns(Option<String>)]
+    #[returns(Option<ClearingAccountConfig>)]
     ClearingAccountAddress { addr: String, domain: String },
 
     #[returns(neutron_sdk::interchain_queries::v047::queries::BalanceResponse)]
