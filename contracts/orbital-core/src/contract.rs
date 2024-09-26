@@ -1,5 +1,6 @@
 use crate::{
     admin_logic::admin,
+    icq::{self},
     state::{OrbitalDomainConfig, UserConfig, USER_NONCE},
     user_logic::user,
     utils::{extract_ica_identifier_from_port, get_ica_identifier, OpenAckVersion},
@@ -10,6 +11,7 @@ use cw2::set_contract_version;
 use cw_ownable::{get_ownership, initialize_owner};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
+    interchain_queries::v047::queries::{query_balance, BalanceResponse},
     sudo::msg::SudoMsg,
     NeutronResult,
 };
@@ -51,11 +53,9 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
-        // admin action to manage ownership of orbital-core
         ExecuteMsg::UpdateOwnership(action) => {
             admin::try_update_ownership(deps, &env.block, &info.sender, action)
         }
-        // admin action to enable new domain for user registration
         ExecuteMsg::RegisterNewDomain {
             domain,
             account_type,
@@ -66,11 +66,17 @@ pub fn execute(
         ExecuteMsg::RegisterUserDomain { domain } => {
             user::try_register_new_domain(deps, env, info, domain)
         }
+        ExecuteMsg::RegisterBalancesQuery {
+            connection_id,
+            update_period,
+            addr,
+            denoms,
+        } => icq::register_balances_query(connection_id, addr, denoms, update_period),
     }
 }
 
 #[entry_point]
-pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::OrbitalDomain { domain } => to_json_binary(&query_orbital_domain(deps, domain)?),
         QueryMsg::UserConfig { addr } => to_json_binary(&query_user_config(deps, addr)?),
@@ -78,7 +84,12 @@ pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ClearingAccountAddress { addr, domain } => {
             to_json_binary(&query_clearing_account(deps, domain, addr)?)
         }
+        QueryMsg::Balance { query_id } => to_json_binary(&query_icq_balance(deps, env, query_id)?),
     }
+}
+
+fn query_icq_balance(deps: QueryDeps, env: Env, query_id: u64) -> StdResult<BalanceResponse> {
+    query_balance(deps, env, query_id).map_err(|e| StdError::generic_err(e.to_string()))
 }
 
 fn query_clearing_account(
@@ -131,6 +142,15 @@ pub fn sudo(deps: ExecuteDeps, env: Env, msg: SudoMsg) -> StdResult<Response<Neu
             counterparty_channel_id,
             counterparty_version,
         ),
+        // For handling tx query result
+        SudoMsg::TxQueryResult {
+            query_id,
+            height,
+            data,
+        } => icq::sudo_tx_query_result(deps, env, query_id, height, data),
+
+        // For handling kv query result
+        SudoMsg::KVQueryResult { query_id } => icq::sudo_kv_query_result(deps, env, query_id),
         _ => Ok(Response::default()),
     }
 }

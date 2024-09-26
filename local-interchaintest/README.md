@@ -18,36 +18,25 @@ cd local-interchain
 make install
 ```
 
-### set up path
-
-cd into this directory (`/orbital/local-interchaintest/`).
-
-for `zsh` users:
-
-```bash
-echo 'export ICTEST_HOME="$(pwd)"' >> ~/.zshrc && echo 'export PATH="$PATH:$ICTEST_HOME"' >> ~/.zshrc && source ~/.zshrc
-```
-
-for `bash` enjoyers:
-
-```bash
-echo 'export ICTEST_HOME="$(pwd)"' >> ~/.bashrc && echo 'export PATH="$PATH:$ICTEST_HOME"' >> ~/.bashrc && source ~/.bashrc
-```
-
-verify path:
-
-```bash
-echo $ICTEST_HOME #should print out the directory of local interchaintest
-```
-
 ### spinning up the env
 
 ```bash
-local-ic start neutron_gaia_juno 
+just local-ic-start
 ```
 
 ### running tests
 
 ```bash
-cargo run --package local-ictest-e2e --bin local-ictest-e2e
+just local-ic-run
+```
+> make sure you have the neutron ICQ relayer docker image available on your machine prior to running the tests
+
+# Neutron ICQ relayer setup
+
+Somewhere on your machine, execute the following commands:
+
+```sh
+git clone git@github.com:neutron-org/neutron-query-relayer.git
+cd neutron-query-relayer
+make build-docker
 ```

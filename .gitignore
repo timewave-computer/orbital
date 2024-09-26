@@ -2,6 +2,7 @@ target
 artifacts
 
 local-interchaintest/*.json
+.env*
 local-interchaintest/configs/logs.json
 
 # ignore raw schemas

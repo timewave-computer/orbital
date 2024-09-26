@@ -1,4 +1,5 @@
-use localic_std::modules::cosmwasm::contract_instantiate;
+use cosmwasm_std::{coin, coins};
+use localic_std::modules::{bank::get_balance, cosmwasm::contract_instantiate};
 use localic_utils::{
     ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
 };
@@ -6,8 +7,9 @@ use log::info;
 use orbital_core::msg::InstantiateMsg;
 use std::{env, error::Error, time::Duration};
 use utils::{
-    admin_register_domain, query_user_clearing_acc_addr_on_domain, query_user_config,
-    user_register_orbital_core, user_register_to_new_domain,
+    admin_register_domain, query_balance_query_id, query_user_clearing_acc_addr_on_domain,
+    query_user_config, register_icq_balances_query, start_icq_relayer, user_register_orbital_core,
+    user_register_to_new_domain,
 };
 
 mod utils;
@@ -41,17 +43,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_transfer_channels(NEUTRON_CHAIN_NAME, JUNO_CHAIN_NAME)
         .build()?;
 
-    let mut uploader = test_ctx.build_tx_upload_contracts();
-
-    // TODO: uncomment to deploy polytone
-    // uploader
-    //     .with_key(ACC0_KEY)
-    //     .send_with_local_cache(POLYTONE_PATH, LOCAL_CODE_ID_CACHE_PATH_NEUTRON)
-    //     .unwrap();
-
     let current_dir = env::current_dir()?;
 
+    // with test context set up, we can generate the .env file for the icq relayer
+    utils::generate_icq_relayer_config(
+        &test_ctx,
+        current_dir.clone(),
+        JUNO_CHAIN_NAME.to_string(),
+    )?;
+
+    // start the icq relayer. this runs in detached mode so we need
+    // to manually kill it before each run for now.
+    start_icq_relayer()?;
+
+    let mut uploader = test_ctx.build_tx_upload_contracts();
     let orbital_core_local_path = format!("{}/artifacts/orbital_core.wasm", current_dir.display());
+
+    info!("sleeping to allow icq relayer to start...");
+    std::thread::sleep(Duration::from_secs(30));
 
     uploader
         .with_chain_name(NEUTRON_CHAIN_NAME)
@@ -93,7 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         orbital_core.address.to_string(),
         GAIA_CHAIN_NAME.to_string(),
     )?;
-
+    std::thread::sleep(Duration::from_secs(2));
     admin_register_domain(
         &test_ctx,
         orbital_core.address.to_string(),
@@ -144,11 +153,79 @@ fn main() -> Result<(), Box<dyn Error>> {
         GAIA_CHAIN_NAME.to_string(),
     )?;
 
-    query_user_clearing_acc_addr_on_domain(
+    let acc_1_juno_addr = query_user_clearing_acc_addr_on_domain(
         &test_ctx,
         orbital_core.address.to_string(),
         ACC1_ADDR,
         JUNO_CHAIN_NAME.to_string(),
+    )?
+    .unwrap();
+
+    let icq_registration_response = register_icq_balances_query(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        JUNO_CHAIN_NAME.to_string(),
+        acc_1_juno_addr.to_string(),
+        vec!["ujuno".to_string()],
     )?;
+
+    info!("icq registration response: {:?}", icq_registration_response);
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    let pre_transfer_balance = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_1_juno_addr.as_str(),
+    );
+    info!(
+        "funding juno address. pre_transfer_balance: {:?}",
+        pre_transfer_balance
+    );
+
+    let transfer_coins_str = coins(1_000_000, "ujuno")
+        .iter()
+        .map(|coin| format!("{}{}", coin.amount, coin.denom))
+        .collect::<Vec<String>>()
+        .join(",");
+
+    let fee_coin = coin(50_000, "ujuno");
+
+    let cmd = format!(
+        "tx bank send {ACC0_KEY} {acc_1_juno_addr} {transfer_coins_str} --fees={fee_coin} --output=json"
+    );
+    test_ctx
+        .get_request_builder()
+        .get_request_builder(JUNO_CHAIN_NAME)
+        .tx(&cmd, true)?;
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    info!("querying icq result for query id 1...");
+    let balance_query_response =
+        query_balance_query_id(&test_ctx, orbital_core.address.to_string(), 1)?;
+
+    info!("balance query response: {:?}", balance_query_response);
+
+    let post_transfer_balance = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_1_juno_addr.as_str(),
+    );
+    info!("post_transfer_balance: {:?}", post_transfer_balance);
+
+    info!("sleeping for 5...");
+    std::thread::sleep(Duration::from_secs(5));
+    info!("transfering more juno");
+    test_ctx
+        .get_request_builder()
+        .get_request_builder(JUNO_CHAIN_NAME)
+        .tx(&cmd, true)?;
+
+    info!("sleeping for 60sec...");
+    std::thread::sleep(Duration::from_secs(60));
+
     Ok(())
 }
