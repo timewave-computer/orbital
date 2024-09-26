@@ -1,21 +1,29 @@
-use std::collections::HashMap;
-
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint64};
-use cw_storage_plus::Map;
+use cw_storage_plus::{Item, Map};
+
+/// keeping track of registered user IDs which get incremented
+/// with each new registration. it's needed to generate unique
+/// user clearing account identifiers.
+pub const USER_NONCE: Item<Uint64> = Item::new("user_nonce");
 
 /// map of users with their respective configurations
-pub const USER_CONFIGS: Map<Addr, UserConfig> = Map::new("user_configs");
+pub const USER_CONFIGS: Map<String, UserConfig> = Map::new("user_configs");
 
 /// map of registered remote domains and their configuration
 pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains");
 
+/// map of clearing accounts registered with orbital.
+/// key is a composite of (user_id, domain) generated with
+/// `utils::get_ica_identifier`. value is an optional address where:
+/// - None: clearing account is being registered and awaiting callback
+/// - Some: clearing account has been registered and is ready for use
+pub const CLEARING_ACCOUNTS: Map<String, Option<String>> = Map::new("clearing_accounts");
+
 #[cw_serde]
-#[derive(Default)]
 pub struct UserConfig {
-    // TODO: this may make more sense to have as a top level map
-    // with composite keys of (user, domain) -> clearing_addr
-    pub clearing_accounts: HashMap<String, String>,
+    pub id: Uint64,
+    pub registered_domains: Vec<String>,
 }
 
 /// remote domain configuration config which supports different types of account implementations.

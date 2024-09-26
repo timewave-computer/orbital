@@ -1,119 +1,159 @@
+use crate::{
+    admin_logic::admin,
+    state::{OrbitalDomainConfig, UserConfig, USER_NONCE},
+    user_logic::user,
+    utils::{extract_ica_identifier_from_port, get_ica_identifier, OpenAckVersion},
+};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
-use cw_ownable::{
-    assert_owner, get_ownership, initialize_owner, update_ownership, Action, OwnershipError,
+use cw_ownable::{get_ownership, initialize_owner};
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    sudo::msg::SudoMsg,
+    NeutronResult,
 };
 
 use crate::{
-    account_types::UncheckedOrbitalDomainConfig,
-    error::ContractError,
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
-    state::{UserConfig, ORBITAL_DOMAINS, USER_CONFIGS},
+    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
+    state::{CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
+    StdResult, Uint64,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub type QueryDeps<'a> = Deps<'a, NeutronQuery>;
+pub type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
+
 #[entry_point]
 pub fn instantiate(
-    deps: DepsMut,
+    deps: ExecuteDeps,
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> Result<Response, OwnershipError> {
+) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
 
+    USER_NONCE.save(deps.storage, &Uint64::zero())?;
     Ok(Response::new())
 }
 
 #[entry_point]
 pub fn execute(
-    deps: DepsMut,
+    deps: ExecuteDeps,
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<Response, ContractError> {
+) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
+        // admin action to manage ownership of orbital-core
         ExecuteMsg::UpdateOwnership(action) => {
-            admin_update_ownership(deps, &env.block, &info.sender, action)
+            admin::try_update_ownership(deps, &env.block, &info.sender, action)
         }
+        // admin action to enable new domain for user registration
         ExecuteMsg::RegisterNewDomain {
             domain,
             account_type,
-        } => admin_register_new_domain(deps, info, domain, account_type),
-        ExecuteMsg::RegisterUser {} => register_user(deps, env, info),
+        } => admin::try_register_new_domain(deps, info, domain, account_type),
+        // user action to create a new user account which enables registration to domains
+        ExecuteMsg::RegisterUser {} => user::try_register(deps, env, info),
+        // user action to register a new domain which creates their clearing account
+        ExecuteMsg::RegisterUserDomain { domain } => {
+            user::try_register_new_domain(deps, env, info, domain)
+        }
     }
-}
-
-fn register_user(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    // user can only register once
-    if USER_CONFIGS.has(deps.storage, info.sender.clone()) {
-        return Err(ContractError::UserAlreadyRegistered {});
-    }
-
-    // save an empty user config
-    USER_CONFIGS.save(deps.storage, info.sender, &UserConfig::default())?;
-
-    Ok(Response::new().add_attribute("method", "register_user"))
-}
-
-fn admin_update_ownership(
-    deps: DepsMut,
-    block: &BlockInfo,
-    sender: &Addr,
-    action: Action,
-) -> Result<Response, ContractError> {
-    let resp = update_ownership(deps, block, sender, action)?;
-    Ok(Response::default().add_attributes(resp.into_attributes()))
-}
-
-fn admin_register_new_domain(
-    deps: DepsMut,
-    info: MessageInfo,
-    domain: String,
-    account_type: UncheckedOrbitalDomainConfig,
-) -> Result<Response, ContractError> {
-    // only the owner can register new domains
-    assert_owner(deps.storage, &info.sender)?;
-
-    // validate the domain configuration
-    let orbital_domain = account_type.try_into_checked(deps.api)?;
-
-    // ensure the domain does not already exist
-    if ORBITAL_DOMAINS.has(deps.storage, domain.to_string()) {
-        return Err(ContractError::OrbitalDomainAlreadyExists(
-            domain.to_string(),
-        ));
-    }
-
-    // store the validated domain config in state
-    ORBITAL_DOMAINS.save(deps.storage, domain.to_string(), &orbital_domain)?;
-
-    Ok(Response::default()
-        .add_attribute("method", "register_new_domain")
-        .add_attribute("domain", domain))
 }
 
 #[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
-        QueryMsg::OrbitalDomain { domain } => query_orbital_domain(deps, domain),
-        QueryMsg::UserConfig { user } => query_user_config(deps, user),
+        QueryMsg::OrbitalDomain { domain } => to_json_binary(&query_orbital_domain(deps, domain)?),
+        QueryMsg::UserConfig { addr } => to_json_binary(&query_user_config(deps, addr)?),
+        QueryMsg::Ownership {} => to_json_binary(&query_ownership(deps)?),
+        QueryMsg::ClearingAccountAddress { addr, domain } => {
+            to_json_binary(&query_clearing_account(deps, domain, addr)?)
+        }
     }
 }
 
-fn query_orbital_domain(deps: Deps, domain: String) -> StdResult<Binary> {
-    let domain_config = ORBITAL_DOMAINS.load(deps.storage, domain)?;
-    to_json_binary(&domain_config)
+fn query_clearing_account(
+    deps: QueryDeps,
+    domain: String,
+    addr: String,
+) -> StdResult<Option<String>> {
+    let user_config = USER_CONFIGS.load(deps.storage, addr)?;
+    let ica_id = get_ica_identifier(user_config.id, domain);
+    CLEARING_ACCOUNTS.load(deps.storage, ica_id)
 }
 
-fn query_user_config(deps: Deps, user: String) -> StdResult<Binary> {
-    let user_config = USER_CONFIGS.load(deps.storage, Addr::unchecked(user))?;
-    to_json_binary(&user_config)
+fn query_ownership(deps: QueryDeps) -> StdResult<cw_ownable::Ownership<Addr>> {
+    get_ownership(deps.storage)
+}
+
+fn query_orbital_domain(deps: QueryDeps, domain: String) -> StdResult<OrbitalDomainConfig> {
+    ORBITAL_DOMAINS.load(deps.storage, domain)
+}
+
+fn query_user_config(deps: QueryDeps, user: String) -> StdResult<UserConfig> {
+    USER_CONFIGS.load(deps.storage, user)
+}
+
+#[entry_point]
+pub fn reply(_deps: ExecuteDeps, _env: Env, _msg: Reply) -> StdResult<Response<NeutronMsg>> {
+    unimplemented!()
+}
+
+#[entry_point]
+pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> StdResult<Response<NeutronMsg>> {
+    unimplemented!()
+}
+
+// neutron uses the `sudo` entry point in their ICA/ICQ related logic
+#[entry_point]
+pub fn sudo(deps: ExecuteDeps, env: Env, msg: SudoMsg) -> StdResult<Response<NeutronMsg>> {
+    match msg {
+        // For handling successful registering of ICA
+        SudoMsg::OpenAck {
+            port_id,
+            channel_id,
+            counterparty_channel_id,
+            counterparty_version,
+        } => sudo_open_ack(
+            deps,
+            env,
+            port_id,
+            channel_id,
+            counterparty_channel_id,
+            counterparty_version,
+        ),
+        _ => Ok(Response::default()),
+    }
+}
+
+// handler
+fn sudo_open_ack(
+    deps: ExecuteDeps,
+    _env: Env,
+    port_id: String,
+    _channel_id: String,
+    _counterparty_channel_id: String,
+    counterparty_version: String,
+) -> StdResult<Response<NeutronMsg>> {
+    // parse the response
+    let parsed_version: OpenAckVersion =
+        serde_json_wasm::from_str(counterparty_version.as_str())
+            .map_err(|_| StdError::generic_err("Can't parse counterparty_version"))?;
+
+    // extract the ICA identifier from the port
+    let ica_identifier = extract_ica_identifier_from_port(port_id)?;
+
+    // Update the storage record associated with the interchain account.
+    CLEARING_ACCOUNTS.save(deps.storage, ica_identifier, &Some(parsed_version.address))?;
+
+    Ok(Response::default())
 }

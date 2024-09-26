@@ -1,10 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
-use crate::{
-    account_types::UncheckedOrbitalDomainConfig,
-    state::{OrbitalDomainConfig, UserConfig},
-};
+use crate::orbital_domain::UncheckedOrbitalDomainConfig;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -21,17 +18,25 @@ pub enum ExecuteMsg {
         // type of account to be used
         account_type: UncheckedOrbitalDomainConfig,
     },
-
+    /// register user to orbital
     RegisterUser {},
+    /// register user to a specific domain
+    RegisterUserDomain { domain: String },
 }
 
 #[cw_ownable_query]
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(OrbitalDomainConfig)]
+    #[returns(crate::state::OrbitalDomainConfig)]
     OrbitalDomain { domain: String },
 
-    #[returns(UserConfig)]
-    UserConfig { user: String },
+    #[returns(crate::state::UserConfig)]
+    UserConfig { addr: String },
+
+    #[returns(Option<String>)]
+    ClearingAccountAddress { addr: String, domain: String },
 }
+
+#[cw_serde]
+pub enum MigrateMsg {}
