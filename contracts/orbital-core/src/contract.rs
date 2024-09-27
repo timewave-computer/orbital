@@ -1,6 +1,6 @@
 use crate::{
     admin_logic::admin,
-    icq::{self, Transfer, RECIPIENT_TXS, TRANSFERS},
+    icq::{self, RecipientTxsResponse, RECIPIENT_TXS, TRANSFERS},
     msg::GetTransfersAmountResponse,
     state::{ClearingAccountConfig, OrbitalDomainConfig, UserConfig, USER_NONCE},
     user_logic::user,
@@ -95,16 +95,19 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_json_binary(&query_clearing_account(deps, domain, addr)?)
         }
         QueryMsg::Balance { query_id } => to_json_binary(&query_icq_balance(deps, env, query_id)?),
-        QueryMsg::IcqTransfer {} => to_json_binary(&query_transfers_number(deps)?),
+        QueryMsg::IcqTransfersAmount {} => to_json_binary(&query_transfers_number(deps)?),
         QueryMsg::IcqRecipientTxs { recipient } => {
             to_json_binary(&query_recipient_txs(deps, recipient)?)
         }
     }
 }
 
-fn query_recipient_txs(deps: QueryDeps, recipient: String) -> StdResult<Vec<Transfer>> {
-    let txs = RECIPIENT_TXS.load(deps.storage, &recipient)?;
-    Ok(txs)
+fn query_recipient_txs(deps: QueryDeps, recipient: String) -> StdResult<RecipientTxsResponse> {
+    let txs = RECIPIENT_TXS
+        .may_load(deps.storage, recipient)?
+        .unwrap_or_default();
+
+    Ok(RecipientTxsResponse { transfers: txs })
 }
 
 fn query_transfers_number(deps: QueryDeps) -> StdResult<GetTransfersAmountResponse> {

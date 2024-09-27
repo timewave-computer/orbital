@@ -9,7 +9,8 @@ use localic_std::{
 use localic_utils::{utils::test_context::TestContext, NEUTRON_CHAIN_NAME};
 use log::info;
 use orbital_core::{
-    msg::{ExecuteMsg, QueryMsg},
+    icq::RecipientTxsResponse,
+    msg::{ExecuteMsg, GetTransfersAmountResponse, QueryMsg},
     orbital_domain::UncheckedOrbitalDomainConfig,
     state::{ClearingAccountConfig, UserConfig},
 };
@@ -93,6 +94,56 @@ pub fn query_balance_query_id(
     Ok(balance_response)
 }
 
+pub fn query_icq_transfer_amount(
+    test_ctx: &TestContext,
+    orbital_core: String,
+) -> Result<GetTransfersAmountResponse, LocalError> {
+    let query_response = contract_query(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core,
+        &serde_json::to_string(&QueryMsg::IcqTransfersAmount {})
+            .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
+    )["data"]
+        .clone();
+
+    let transfers_amount_response: GetTransfersAmountResponse =
+        serde_json::from_value(query_response).unwrap();
+
+    info!("ICQ transfer amount: {:?}", transfers_amount_response);
+
+    Ok(transfers_amount_response)
+}
+
+pub fn query_icq_recipient_txs(
+    test_ctx: &TestContext,
+    orbital_core: String,
+    recipient: String,
+) -> Result<RecipientTxsResponse, LocalError> {
+    let query_response = contract_query(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core,
+        &serde_json::to_string(&QueryMsg::IcqRecipientTxs {
+            recipient: recipient.to_string(),
+        })
+        .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
+    )["data"]
+        .clone();
+
+    let recipient_txs_response: RecipientTxsResponse = serde_json::from_value(query_response)
+        .map_err(|e| LocalError::Custom { msg: e.to_string() })?;
+
+    info!(
+        "ICQ recipient txs for {recipient}: {:?}",
+        recipient_txs_response
+    );
+
+    Ok(recipient_txs_response)
+}
+
 pub fn user_register_orbital_core(
     test_ctx: &TestContext,
     user_key: &str,
@@ -129,6 +180,37 @@ pub fn register_icq_balances_query(
         update_period: 5,
         addr,
         denoms,
+    };
+
+    contract_execute(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core,
+        ACC0_KEY,
+        &serde_json::to_string(&register_icq_msg)
+            .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
+        "--amount 10000000untrn --gas 50000000",
+    )
+}
+
+pub fn register_icq_transfers_query(
+    test_ctx: &TestContext,
+    orbital_core: String,
+    domain: String,
+    addr: String,
+) -> Result<TransactionResponse, LocalError> {
+    info!("registering ICQ transfers query on domain {domain} for {addr}...");
+
+    let register_icq_msg = ExecuteMsg::RegisterTransfersQuery {
+        connection_id: test_ctx
+            .get_connections()
+            .src(NEUTRON_CHAIN_NAME)
+            .dest(&domain)
+            .get(),
+        update_period: 5,
+        recipient: addr,
+        min_height: None,
     };
 
     contract_execute(
@@ -250,10 +332,10 @@ RELAYER_NEUTRON_CHAIN_HOME_DIR=/data
 RELAYER_NEUTRON_CHAIN_SIGN_KEY_NAME=acc3
 RELAYER_NEUTRON_CHAIN_GAS_PRICES=0.5untrn
 RELAYER_NEUTRON_CHAIN_GAS_LIMIT=10000000
-RELAYER_NEUTRON_CHAIN_GAS_ADJUSTMENT=2.0
+RELAYER_NEUTRON_CHAIN_GAS_ADJUSTMENT=1.3
 RELAYER_NEUTRON_CHAIN_DENOM=untrn
 RELAYER_NEUTRON_CHAIN_MAX_GAS_PRICE=1000
-RELAYER_NEUTRON_CHAIN_GAS_PRICE_MULTIPLIER=1.1
+RELAYER_NEUTRON_CHAIN_GAS_PRICE_MULTIPLIER=3.0
 RELAYER_NEUTRON_CHAIN_CONNECTION_ID={connection_id}
 RELAYER_NEUTRON_CHAIN_DEBUG=true
 RELAYER_NEUTRON_CHAIN_KEYRING_BACKEND=test
@@ -295,17 +377,17 @@ RELAYER_IGNORE_ERRORS_REGEX=(execute wasm contract failed|failed to build tx que
 }
 
 pub fn start_icq_relayer() -> Result<(), Box<dyn std::error::Error>> {
-    match std::process::Command::new("docker")
-        .arg("inspect")
-        .arg("icq-relayer")
-        .output()
-    {
-        Ok(r) => {
-            info!("ICQ relayer already running: {:?}", r);
-            return Ok(());
-        }
-        Err(e) => info!("inspect icq relayer error: {:?}", e),
-    };
+    // match std::process::Command::new("docker")
+    //     .arg("inspect")
+    //     .arg("icq-relayer")
+    //     .output()
+    // {
+    //     Ok(r) => {
+    //         info!("ICQ relayer already running: {:?}", r);
+    //         return Ok(());
+    //     }
+    //     Err(e) => info!("inspect icq relayer error: {:?}", e),
+    // };
     let output = std::process::Command::new("docker")
         .arg("inspect")
         .arg("localneutron-1-val-0-neutron_gaia_junoic")

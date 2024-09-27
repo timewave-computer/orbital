@@ -28,8 +28,6 @@ use neutron_sdk::interchain_queries::types::{
 };
 use serde_json_wasm;
 
-/// defines the incoming transfers limit to make a case of failed callback possible.
-const MAX_ALLOWED_TRANSFER: u64 = 20000;
 const MAX_ALLOWED_MESSAGES: usize = 20;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -40,12 +38,12 @@ pub struct Cw20BalanceResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct GetRecipientTxsResponse {
+pub struct RecipientTxsResponse {
     pub transfers: Vec<Transfer>,
 }
-pub type Recipient = str;
+
 /// contains all transfers mapped by a recipient address observed by the contract.
-pub const RECIPIENT_TXS: Map<&Recipient, Vec<Transfer>> = Map::new("recipient_txs");
+pub const RECIPIENT_TXS: Map<String, Vec<Transfer>> = Map::new("recipient_txs");
 /// contains number of transfers to addresses observed by the contract.
 pub const TRANSFERS: Item<u64> = Item::new("transfers");
 
@@ -91,11 +89,6 @@ pub fn sudo_tx_query_result(
     let transactions_filter = registered_query.registered_query.transactions_filter;
 
     #[allow(clippy::match_single_binding)]
-    // Depending of the query type, check the transaction data to see whether is satisfies
-    // the original query. If you don't write specific checks for a transaction query type,
-    // all submitted results will be treated as valid.
-    //
-    // TODO: come up with solution to determine transactions filter type
     match registered_query.registered_query.query_type {
         _ => {
             // For transfer queries, query data looks like `[{"field:"transfer.recipient", "op":"eq", "value":"some_address"}]`
@@ -130,12 +123,11 @@ pub fn sudo_tx_query_result(
             stored_transfers += deposits.len() as u64;
             TRANSFERS.save(deps.storage, &stored_transfers)?;
 
-            check_deposits_size(&deposits)?;
             let mut stored_deposits: Vec<Transfer> = RECIPIENT_TXS
-                .load(deps.storage, recipient)
+                .load(deps.storage, recipient.to_string())
                 .unwrap_or_default();
             stored_deposits.extend(deposits);
-            RECIPIENT_TXS.save(deps.storage, recipient, &stored_deposits)?;
+            RECIPIENT_TXS.save(deps.storage, recipient.to_string(), &stored_deposits)?;
             Ok(Response::new())
         }
     }
@@ -171,29 +163,6 @@ fn recipient_deposits_from_tx_body(
         }
     }
     Ok(deposits)
-}
-
-// checks whether there are deposits that are greater then MAX_ALLOWED_TRANSFER.
-fn check_deposits_size(deposits: &Vec<Transfer>) -> StdResult<()> {
-    for deposit in deposits {
-        match deposit.amount.parse::<u64>() {
-            Ok(amount) => {
-                if amount > MAX_ALLOWED_TRANSFER {
-                    return Err(StdError::generic_err(format!(
-                        "maximum allowed transfer is {}",
-                        MAX_ALLOWED_TRANSFER
-                    )));
-                };
-            }
-            Err(error) => {
-                return Err(StdError::generic_err(format!(
-                    "failed to cast transfer amount to u64: {}",
-                    error
-                )));
-            }
-        };
-    }
-    Ok(())
 }
 
 /// sudo_kv_query_result is the contract's callback for KV query results. Note that only the query

@@ -1,10 +1,10 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Coin;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    icq::Transfer, orbital_domain::UncheckedOrbitalDomainConfig, state::ClearingAccountConfig,
-};
+use crate::{orbital_domain::UncheckedOrbitalDomainConfig, state::ClearingAccountConfig};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -67,13 +67,14 @@ pub enum QueryMsg {
     Balance { query_id: u64 },
 
     #[returns(GetTransfersAmountResponse)]
-    IcqTransfer {},
+    IcqTransfersAmount {},
 
-    #[returns(Vec<Transfer>)]
+    #[returns(crate::icq::RecipientTxsResponse)]
     IcqRecipientTxs { recipient: String },
 }
 
-#[cw_serde]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub struct GetTransfersAmountResponse {
     pub transfers_number: u64,
 }
