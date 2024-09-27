@@ -7,13 +7,16 @@ use log::info;
 use orbital_core::msg::InstantiateMsg;
 use std::{env, error::Error, time::Duration};
 use utils::{
-    admin_register_domain, query_balance_query_id, query_icq_recipient_txs,
-    query_icq_transfer_amount, query_user_clearing_acc_addr_on_domain, register_icq_balances_query,
-    register_icq_transfers_query, start_icq_relayer, user_register_orbital_core,
-    user_register_to_new_domain, user_withdraw_funds_from_domain,
+    exec::{
+        admin_register_domain, register_icq_balances_query, register_icq_transfers_query,
+        user_register_orbital_core, user_register_to_new_domain, user_withdraw_funds_from_domain,
+    },
+    misc::{generate_icq_relayer_config, start_icq_relayer},
+    query::{
+        query_balance_query_id, query_icq_recipient_txs, query_icq_transfer_amount,
+        query_user_clearing_acc_addr_on_domain,
+    },
 };
-
-mod utils;
 
 pub const POLYTONE_PATH: &str = "local-interchaintest/wasms/polytone";
 pub const LOGS_FILE_PATH: &str = "local-interchaintest/configs/logs.json";
@@ -28,6 +31,7 @@ pub const ACC2_KEY: &str = "acc2";
 pub const ACC2_ADDR: &str = "neutron17lp3n649rxt2jadn455frcj0q6anjnds2s0ve9";
 
 pub const GAS_FLAGS: &str = "--gas=auto --gas-adjustment=3.0";
+mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
@@ -47,11 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let current_dir = env::current_dir()?;
 
     // with test context set up, we can generate the .env file for the icq relayer
-    utils::generate_icq_relayer_config(
-        &test_ctx,
-        current_dir.clone(),
-        JUNO_CHAIN_NAME.to_string(),
-    )?;
+    generate_icq_relayer_config(&test_ctx, current_dir.clone(), JUNO_CHAIN_NAME.to_string())?;
 
     // start the icq relayer. this runs in detached mode so we need
     // to manually kill it before each run for now.
