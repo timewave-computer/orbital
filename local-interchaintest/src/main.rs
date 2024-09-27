@@ -8,9 +8,9 @@ use orbital_core::msg::InstantiateMsg;
 use std::{env, error::Error, time::Duration};
 use utils::{
     admin_register_domain, query_balance_query_id, query_icq_recipient_txs,
-    query_icq_transfer_amount, query_user_clearing_acc_addr_on_domain, query_user_config,
-    register_icq_balances_query, register_icq_transfers_query, start_icq_relayer,
-    user_register_orbital_core, user_register_to_new_domain, user_withdraw_funds_from_domain,
+    query_icq_transfer_amount, query_user_clearing_acc_addr_on_domain, register_icq_balances_query,
+    register_icq_transfers_query, start_icq_relayer, user_register_orbital_core,
+    user_register_to_new_domain, user_withdraw_funds_from_domain,
 };
 
 mod utils;
@@ -149,7 +149,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // query_user_config(&test_ctx, orbital_core.address.to_string(), ACC1_ADDR)?;
 
-    let acc_1_gaia_addr = query_user_clearing_acc_addr_on_domain(
+    let _acc_1_gaia_addr = query_user_clearing_acc_addr_on_domain(
         &test_ctx,
         orbital_core.address.to_string(),
         ACC1_ADDR,
@@ -169,7 +169,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     std::thread::sleep(Duration::from_secs(5));
 
-    let acc_2_gaia_addr = query_user_clearing_acc_addr_on_domain(
+    let _acc_2_gaia_addr = query_user_clearing_acc_addr_on_domain(
         &test_ctx,
         orbital_core.address.to_string(),
         ACC2_ADDR,

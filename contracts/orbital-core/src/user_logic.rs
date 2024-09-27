@@ -3,7 +3,8 @@ pub(crate) mod user {
     use cosmwasm_std::{ensure, Coin, Env, MessageInfo, Response, StdError, Uint64};
     use cw_utils::must_pay;
     use neutron_sdk::{
-        bindings::msg::NeutronMsg, query::min_ibc_fee::query_min_ibc_fee, NeutronResult,
+        bindings::msg::NeutronMsg, interchain_queries::v047::types::COSMOS_SDK_TRANSFER_MSG_URL,
+        query::min_ibc_fee::query_min_ibc_fee, NeutronResult,
     };
 
     use crate::{
@@ -123,7 +124,7 @@ pub(crate) mod user {
             amount: vec![proto_coin],
         };
 
-        let proto_msg = generate_proto_msg(bank_msg, "/cosmos.bank.v1beta1.MsgSend")?;
+        let proto_msg = generate_proto_msg(bank_msg, COSMOS_SDK_TRANSFER_MSG_URL)?;
 
         let withdraw_tx: NeutronMsg = NeutronMsg::submit_tx(
             user_clearing_acc_config.controller_connection_id,

@@ -6,7 +6,6 @@ use cosmos_sdk_proto::{
     prost::Message,
 };
 use cosmwasm_std::{Binary, DepsMut, Env, Response};
-use cw_storage_plus::{Item, Map};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery, types::Height},
     interchain_queries::{
@@ -15,10 +14,8 @@ use neutron_sdk::{
     },
     NeutronResult,
 };
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{StdError, StdResult, Uint128};
+use cosmwasm_std::{StdError, StdResult};
 
 use neutron_sdk::bindings::query::QueryRegisteredQueryResponse;
 use neutron_sdk::interchain_queries::v047::types::{COSMOS_SDK_TRANSFER_MSG_URL, RECIPIENT_FIELD};
@@ -28,32 +25,9 @@ use neutron_sdk::interchain_queries::types::{
 };
 use serde_json_wasm;
 
+use crate::state::{Transfer, RECIPIENT_TXS, TRANSFERS};
+
 const MAX_ALLOWED_MESSAGES: usize = 20;
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct Cw20BalanceResponse {
-    pub balance: Uint128,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct RecipientTxsResponse {
-    pub transfers: Vec<Transfer>,
-}
-
-/// contains all transfers mapped by a recipient address observed by the contract.
-pub const RECIPIENT_TXS: Map<String, Vec<Transfer>> = Map::new("recipient_txs");
-/// contains number of transfers to addresses observed by the contract.
-pub const TRANSFERS: Item<u64> = Item::new("transfers");
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct Transfer {
-    pub recipient: String,
-    pub sender: String,
-    pub denom: String,
-    pub amount: String,
-}
 
 pub fn register_balances_query(
     connection_id: String,
@@ -179,10 +153,6 @@ pub fn sudo_kv_query_result(
         )
         .as_str(),
     );
-
-    // TODO: provide an actual example. Currently to many things are going to change
-    // after @pro0n00gler's PRs to implement this.
-
     Ok(Response::default())
 }
 

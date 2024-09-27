@@ -4,7 +4,10 @@ use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{orbital_domain::UncheckedOrbitalDomainConfig, state::ClearingAccountConfig};
+use crate::{
+    orbital_domain::UncheckedOrbitalDomainConfig,
+    state::{ClearingAccountConfig, Transfer},
+};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -69,7 +72,7 @@ pub enum QueryMsg {
     #[returns(GetTransfersAmountResponse)]
     IcqTransfersAmount {},
 
-    #[returns(crate::icq::RecipientTxsResponse)]
+    #[returns(RecipientTxsResponse)]
     IcqRecipientTxs { recipient: String },
 }
 
@@ -77,6 +80,12 @@ pub enum QueryMsg {
 #[serde(rename_all = "snake_case")]
 pub struct GetTransfersAmountResponse {
     pub transfers_number: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct RecipientTxsResponse {
+    pub transfers: Vec<Transfer>,
 }
 
 #[cw_serde]

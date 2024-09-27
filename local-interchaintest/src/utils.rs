@@ -9,8 +9,7 @@ use localic_std::{
 use localic_utils::{utils::test_context::TestContext, NEUTRON_CHAIN_NAME};
 use log::info;
 use orbital_core::{
-    icq::RecipientTxsResponse,
-    msg::{ExecuteMsg, GetTransfersAmountResponse, QueryMsg},
+    msg::{ExecuteMsg, GetTransfersAmountResponse, QueryMsg, RecipientTxsResponse},
     orbital_domain::UncheckedOrbitalDomainConfig,
     state::{ClearingAccountConfig, UserConfig},
 };
@@ -47,7 +46,7 @@ pub fn query_user_clearing_acc_addr_on_domain(
     Ok(user_clearing_acc)
 }
 
-pub fn query_user_config(
+pub fn _query_user_config(
     test_ctx: &TestContext,
     orbital_core: String,
     user_addr: &str,
