@@ -1,5 +1,6 @@
-use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{StdError, StdResult, Uint64};
+use cosmwasm_std::{Binary, StdError, StdResult, Uint64};
+use neutron_sdk::{bindings::types::ProtobufAny, NeutronResult};
+use prost::Message;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -61,8 +62,6 @@ pub mod fees {
 
         Ok(response)
     }
-
-    // helper method to query the IBC fee
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -94,21 +93,12 @@ pub fn extract_ica_identifier_from_port(port: String) -> StdResult<String> {
     }
 }
 
-#[cw_serde]
-pub struct AccountIdentifier {
-    pub id: String,
-}
+pub fn generate_proto_msg(msg: impl Message, type_url: &str) -> NeutronResult<ProtobufAny> {
+    let buf = msg.encode_to_vec();
 
-impl AccountIdentifier {
-    pub fn try_from_port(port: String) -> StdResult<AccountIdentifier> {
-        Ok(AccountIdentifier {
-            id: extract_ica_identifier_from_port(port)?,
-        })
-    }
-
-    pub fn new(user_id: Uint64, domain: String) -> AccountIdentifier {
-        AccountIdentifier {
-            id: get_ica_identifier(user_id, domain),
-        }
-    }
+    let any_msg = ProtobufAny {
+        type_url: type_url.to_string(),
+        value: Binary::from(buf),
+    };
+    Ok(any_msg)
 }
