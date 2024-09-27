@@ -1,6 +1,7 @@
 use crate::{
     admin_logic::admin,
-    icq::{self},
+    icq::{self, Transfer, RECIPIENT_TXS, TRANSFERS},
+    msg::GetTransfersAmountResponse,
     state::{ClearingAccountConfig, OrbitalDomainConfig, UserConfig, USER_NONCE},
     user_logic::user,
     utils::{extract_ica_identifier_from_port, get_ica_identifier, OpenAckVersion},
@@ -65,15 +66,22 @@ pub fn execute(
         ExecuteMsg::RegisterUserDomain { domain } => {
             user::try_register_new_domain(deps, env, info, domain)
         }
+        // user action to withdraw funds from a selected domain account they own
+        ExecuteMsg::UserWithdrawFunds { domain, coin, dest } => {
+            user::try_withdraw_from_remote_domain(deps, info, domain, coin, dest)
+        }
         ExecuteMsg::RegisterBalancesQuery {
             connection_id,
             update_period,
             addr,
             denoms,
         } => icq::register_balances_query(connection_id, addr, denoms, update_period),
-        ExecuteMsg::UserWithdrawFunds { domain, coin, dest } => {
-            user::try_withdraw_from_remote_domain(deps, info, domain, coin, dest)
-        }
+        ExecuteMsg::RegisterTransfersQuery {
+            connection_id,
+            update_period,
+            recipient,
+            min_height,
+        } => icq::register_transfers_query(connection_id, recipient, update_period, min_height),
     }
 }
 
@@ -87,7 +95,21 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_json_binary(&query_clearing_account(deps, domain, addr)?)
         }
         QueryMsg::Balance { query_id } => to_json_binary(&query_icq_balance(deps, env, query_id)?),
+        QueryMsg::IcqTransfer {} => to_json_binary(&query_transfers_number(deps)?),
+        QueryMsg::IcqRecipientTxs { recipient } => {
+            to_json_binary(&query_recipient_txs(deps, recipient)?)
+        }
     }
+}
+
+fn query_recipient_txs(deps: QueryDeps, recipient: String) -> StdResult<Vec<Transfer>> {
+    let txs = RECIPIENT_TXS.load(deps.storage, &recipient)?;
+    Ok(txs)
+}
+
+fn query_transfers_number(deps: QueryDeps) -> StdResult<GetTransfersAmountResponse> {
+    let transfers_number = TRANSFERS.load(deps.storage).unwrap_or_default();
+    Ok(GetTransfersAmountResponse { transfers_number })
 }
 
 fn query_icq_balance(deps: QueryDeps, env: Env, query_id: u64) -> StdResult<BalanceResponse> {

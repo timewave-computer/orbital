@@ -9,7 +9,10 @@ use cosmwasm_std::{Binary, DepsMut, Env, Response};
 use cw_storage_plus::{Item, Map};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery, types::Height},
-    interchain_queries::{get_registered_query, v045::new_register_balances_query_msg},
+    interchain_queries::{
+        get_registered_query,
+        v045::{new_register_balances_query_msg, new_register_transfers_query_msg},
+    },
     NeutronResult,
 };
 use schemars::JsonSchema;
@@ -212,4 +215,16 @@ pub fn sudo_kv_query_result(
     // after @pro0n00gler's PRs to implement this.
 
     Ok(Response::default())
+}
+
+pub fn register_transfers_query(
+    connection_id: String,
+    recipient: String,
+    update_period: u64,
+    min_height: Option<u64>,
+) -> NeutronResult<Response<NeutronMsg>> {
+    let msg =
+        new_register_transfers_query_msg(connection_id, recipient, update_period, min_height)?;
+
+    Ok(Response::new().add_message(msg))
 }

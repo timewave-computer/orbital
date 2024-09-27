@@ -2,7 +2,9 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Coin;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
-use crate::{orbital_domain::UncheckedOrbitalDomainConfig, state::ClearingAccountConfig};
+use crate::{
+    icq::Transfer, orbital_domain::UncheckedOrbitalDomainConfig, state::ClearingAccountConfig,
+};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -40,6 +42,12 @@ pub enum ExecuteMsg {
         addr: String,
         denoms: Vec<String>,
     },
+    RegisterTransfersQuery {
+        connection_id: String,
+        update_period: u64,
+        recipient: String,
+        min_height: Option<u64>,
+    },
 }
 
 #[cw_ownable_query]
@@ -57,6 +65,17 @@ pub enum QueryMsg {
 
     #[returns(neutron_sdk::interchain_queries::v047::queries::BalanceResponse)]
     Balance { query_id: u64 },
+
+    #[returns(GetTransfersAmountResponse)]
+    IcqTransfer {},
+
+    #[returns(Vec<Transfer>)]
+    IcqRecipientTxs { recipient: String },
+}
+
+#[cw_serde]
+pub struct GetTransfersAmountResponse {
+    pub transfers_number: u64,
 }
 
 #[cw_serde]
