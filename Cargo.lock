@@ -1818,6 +1818,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "orbital-auction"
+version = "0.1.0"
+dependencies = [
+ "cosmos-sdk-proto 0.20.0",
+ "cosmwasm-schema 2.1.3",
+ "cosmwasm-std 2.1.3",
+ "cw-ownable",
+ "cw-storage-plus 2.0.0",
+ "cw-utils 2.0.0",
+ "cw2 2.0.0",
+ "neutron-sdk",
+ "prost 0.12.6",
+ "prost-types 0.12.6",
+ "protobuf",
+ "schemars",
+ "serde",
+ "serde-json-wasm 1.0.1",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "orbital-core"
 version = "0.1.0"
 dependencies = [

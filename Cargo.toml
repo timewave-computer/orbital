@@ -1,6 +1,7 @@
 [workspace]
 members  = [
     "contracts/orbital-core",
+    "contracts/orbital-auction",
     "local-interchaintest",
     "unit-tests/",
 ]
