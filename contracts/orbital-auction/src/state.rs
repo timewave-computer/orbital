@@ -21,6 +21,7 @@ pub const CURRENT_BATCH_CONFIG: Item<AuctionBatch> = Item::new("current_round_co
 // maintaining the priority.
 pub const ORDERBOOK: Deque<UserIntent> = Deque::new("orderbook");
 
+// base definition of an order. will likely change.
 #[cw_serde]
 pub struct UserIntent {
     pub user: String,

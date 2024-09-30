@@ -1,9 +1,9 @@
 use cosmwasm_std::{Addr, StdResult, Uint128};
-use cw_multi_test::Executor;
+use cw_multi_test::{error::AnyResult, AppResponse, Executor};
 use cw_utils::Duration;
 use orbital_auction::{
-    msg::{InstantiateMsg as OrbitalAuctionInstantiateMsg, QueryMsg},
-    state::{AuctionConfig, RouteConfig},
+    msg::{ExecuteMsg, InstantiateMsg as OrbitalAuctionInstantiateMsg, QueryMsg},
+    state::{AuctionConfig, RouteConfig, UserIntent},
 };
 
 use crate::testing_utils::{base_suite_builder::SuiteBuilder, types::CustomApp};
@@ -35,6 +35,17 @@ impl Default for OrbitalAuctionBuilder {
 }
 
 impl Suite {
+    pub fn add_order(&mut self, user_intent: UserIntent) -> AnyResult<AppResponse> {
+        self.app.execute_contract(
+            self.orbital_core.clone(),
+            self.orbital_auction.clone(),
+            &ExecuteMsg::AddOrder(user_intent),
+            &[],
+        )
+    }
+}
+
+impl Suite {
     pub fn query_admin(&mut self) -> StdResult<Addr> {
         self.app
             .wrap()
@@ -45,6 +56,16 @@ impl Suite {
         self.app
             .wrap()
             .query_wasm_smart(self.orbital_auction.clone(), &QueryMsg::AuctionConfig {})
+    }
+
+    pub fn query_orderbook(&mut self) -> StdResult<Vec<UserIntent>> {
+        self.app.wrap().query_wasm_smart(
+            self.orbital_auction.clone(),
+            &QueryMsg::Orderbook {
+                from: None,
+                limit: None,
+            },
+        )
     }
 }
 

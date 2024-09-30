@@ -2,7 +2,7 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
 use cw_utils::Duration;
 
-use crate::state::RouteConfig;
+use crate::state::{RouteConfig, UserIntent};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -21,7 +21,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// adds an order to the auction to be executed on the next round.
     /// only callable by orbital-core which is responsible for escrowing orders.
-    AddOrder {},
+    AddOrder(UserIntent),
     /// finalizes the current auction round and prepares for the next
     FinalizeRound {},
     /// pause the auction, stopping any new orders from being accepted
@@ -40,6 +40,12 @@ pub enum QueryMsg {
 
     #[returns(crate::state::AuctionConfig)]
     AuctionConfig {},
+
+    #[returns(Vec<UserIntent>)]
+    Orderbook {
+        from: Option<u32>,
+        limit: Option<u32>,
+    },
 }
 
 #[cw_serde]

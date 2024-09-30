@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult,
+    ensure, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult,
 };
 use cw2::set_contract_version;
 use neutron_sdk::{
@@ -10,8 +10,9 @@ use neutron_sdk::{
 };
 
 use crate::{
+    error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{AuctionConfig, ADMIN, AUCTION_CONFIG},
+    state::{AuctionConfig, UserIntent, ADMIN, AUCTION_CONFIG, ORDERBOOK},
 };
 
 pub const CONTRACT_NAME: &str = "orbital-auction";
@@ -51,15 +52,59 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    unimplemented!()
+    match msg {
+        ExecuteMsg::AddOrder(user_intent) => enqueue_user_intent(deps, info, user_intent),
+        ExecuteMsg::FinalizeRound {} => unimplemented!(),
+        ExecuteMsg::Pause {} => unimplemented!(),
+        ExecuteMsg::Bid {} => unimplemented!(),
+    }
+}
+
+/// admin-gated action to include a (validated) user intent into the orderbook.
+fn enqueue_user_intent(
+    deps: ExecuteDeps,
+    info: MessageInfo,
+    user_intent: UserIntent,
+) -> NeutronResult<Response<NeutronMsg>> {
+    // only the admin can enqueue new orders on behalf of the users
+    ensure!(
+        info.sender == ADMIN.load(deps.storage)?,
+        ContractError::Unauthorized {}
+    );
+
+    // add the user intent to the end of the orderbook queue
+    ORDERBOOK.push_back(deps.storage, &user_intent)?;
+
+    Ok(Response::default())
 }
 
 #[entry_point]
-pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Admin {} => to_json_binary(&ADMIN.load(deps.storage)?),
         QueryMsg::AuctionConfig {} => to_json_binary(&AUCTION_CONFIG.load(deps.storage)?),
+        QueryMsg::Orderbook { from, limit } => to_json_binary(&query_orderbook(deps, from, limit)?),
     }
+}
+
+fn query_orderbook(
+    deps: QueryDeps,
+    from: Option<u32>,
+    limit: Option<u32>,
+) -> StdResult<Vec<UserIntent>> {
+    // query the first `limit` elements starting from `from` in the ORDERBOOK storage Dequeue item
+    let orderbook_size = ORDERBOOK.len(deps.storage)?;
+    let from = from.unwrap_or(0);
+    let limit = limit.unwrap_or(orderbook_size);
+
+    let resp: Vec<UserIntent> = ORDERBOOK
+        .iter(deps.storage)?
+        .skip(from as usize)
+        .take(limit as usize)
+        .map(|r| r.unwrap()) // TODO: clean this up
+        .collect();
+
+    Ok(resp)
 }
 
 #[entry_point]
