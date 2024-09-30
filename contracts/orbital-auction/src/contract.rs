@@ -1,9 +1,11 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult,
+    coin, ensure, to_json_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply, Response,
+    StdResult,
 };
 use cw2::set_contract_version;
+use cw_utils::must_pay;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
@@ -12,7 +14,7 @@ use neutron_sdk::{
 use crate::{
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{AuctionConfig, UserIntent, ADMIN, AUCTION_CONFIG, ORDERBOOK},
+    state::{AuctionConfig, UserIntent, ADMIN, AUCTION_CONFIG, ORDERBOOK, POSTED_BONDS},
 };
 
 pub const CONTRACT_NAME: &str = "orbital-auction";
@@ -38,7 +40,9 @@ pub fn instantiate(
         auction_duration: msg.auction_duration,
         filling_window_duration: msg.filling_window_duration,
         route_config: msg.route_config,
+        solver_bond: msg.solver_bond,
     };
+
     // save the auction configuration
     AUCTION_CONFIG.save(deps.storage, &auction_config)?;
 
@@ -48,7 +52,7 @@ pub fn instantiate(
 #[entry_point]
 pub fn execute(
     deps: ExecuteDeps,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
@@ -57,7 +61,31 @@ pub fn execute(
         ExecuteMsg::FinalizeRound {} => unimplemented!(),
         ExecuteMsg::Pause {} => unimplemented!(),
         ExecuteMsg::Bid {} => unimplemented!(),
+        ExecuteMsg::PostBond {} => try_post_bond(deps, info),
     }
+}
+
+fn try_post_bond(deps: ExecuteDeps, info: MessageInfo) -> NeutronResult<Response<NeutronMsg>> {
+    let auction_config = AUCTION_CONFIG.load(deps.storage)?;
+
+    println!("funds sent: {:?}", info.funds);
+    // get the amount of tokens sent by the solver
+    let posted_bond_amount = must_pay(&info, &auction_config.solver_bond.denom)
+        .map_err(ContractError::FeePaymentError)?;
+    println!("posted bond amount: {:?}", posted_bond_amount);
+    // depending on if this is the first time the solver is posting a bond,
+    // or if they have already posted a bond before, we return the total
+    let new_bond = match POSTED_BONDS.may_load(deps.storage, info.sender.to_string())? {
+        Some(existing_bond) => coin(
+            existing_bond.amount.checked_add(posted_bond_amount)?.u128(),
+            existing_bond.denom,
+        ),
+        None => coin(posted_bond_amount.u128(), &auction_config.solver_bond.denom),
+    };
+
+    POSTED_BONDS.save(deps.storage, info.sender.to_string(), &new_bond)?;
+
+    Ok(Response::default())
 }
 
 /// admin-gated action to include a (validated) user intent into the orderbook.
@@ -84,7 +112,17 @@ pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Admin {} => to_json_binary(&ADMIN.load(deps.storage)?),
         QueryMsg::AuctionConfig {} => to_json_binary(&AUCTION_CONFIG.load(deps.storage)?),
         QueryMsg::Orderbook { from, limit } => to_json_binary(&query_orderbook(deps, from, limit)?),
+        QueryMsg::PostedBond { solver } => to_json_binary(&query_posted_bond(deps, solver)?),
     }
+}
+
+fn query_posted_bond(deps: QueryDeps, solver: String) -> StdResult<Coin> {
+    let auction_config = AUCTION_CONFIG.load(deps.storage)?;
+    let posted_bond = POSTED_BONDS
+        .may_load(deps.storage, solver)?
+        .unwrap_or(coin(0, auction_config.solver_bond.denom));
+
+    Ok(posted_bond)
 }
 
 fn query_orderbook(

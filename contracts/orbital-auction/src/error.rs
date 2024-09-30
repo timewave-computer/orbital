@@ -1,4 +1,5 @@
 use cosmwasm_std::StdError;
+use cw_utils::PaymentError;
 use neutron_sdk::NeutronError;
 use thiserror::Error;
 
@@ -9,6 +10,9 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
+
+    #[error(transparent)]
+    FeePaymentError(#[from] PaymentError),
 }
 
 impl From<ContractError> for NeutronError {

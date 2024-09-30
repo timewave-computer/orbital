@@ -1,6 +1,6 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, BlockInfo, Timestamp, Uint128, Uint64};
-use cw_storage_plus::{Deque, Item};
+use cosmwasm_std::{Addr, BlockInfo, Coin, Timestamp, Uint128, Uint64};
+use cw_storage_plus::{Deque, Item, Map};
 use cw_utils::Duration;
 
 // authorized orbital-core address
@@ -14,6 +14,9 @@ pub const AUCTION_CONFIG: Item<AuctionConfig> = Item::new("auction_config");
 
 // current batch configuration
 pub const CURRENT_BATCH_CONFIG: Item<AuctionBatch> = Item::new("current_round_config");
+
+// map of solvers registered for participating in the auction
+pub const POSTED_BONDS: Map<String, Coin> = Map::new("posted_bonds");
 
 // orderbook is the queue of orders to be included in the next auction.
 // orders are processed in a FIFO manner. if an order cannot be entirely
@@ -41,6 +44,8 @@ pub struct AuctionConfig {
     // config that describes the route for the auction
     // (src & dest domains, offer & ask denoms)
     pub route_config: RouteConfig,
+    // configured bond amount required to participate in the auction
+    pub solver_bond: Coin,
 }
 
 #[cw_serde]

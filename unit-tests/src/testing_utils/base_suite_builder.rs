@@ -2,7 +2,9 @@ use cosmwasm_std::{coin, coins, Addr, Coin};
 use cw_multi_test::{BasicAppBuilder, Executor, MockApiBech32, SimpleAddressGenerator, WasmKeeper};
 
 use super::{
-    consts::{ALL_DENOMS, CHAIN_PREFIX, DENOM_NTRN, FAUCET, NOTE, OWNER, USER_1},
+    consts::{
+        ALL_DENOMS, CHAIN_PREFIX, DENOM_ATOM, DENOM_NTRN, FAUCET, NOTE, OWNER, SOLVER, USER_1,
+    },
     neutron_adapters::{
         neutron_module::NeutronKeeper,
         neutron_type_contracts::{orbital_auction_contract, orbital_core_contract},
@@ -39,6 +41,7 @@ pub struct SuiteBuilder {
     pub orbital_core_code_id: u64,
     pub orbital_auction_code_id: u64,
     pub user_addr: Addr,
+    pub solver: Addr,
 }
 
 impl Default for SuiteBuilder {
@@ -70,11 +73,26 @@ impl Default for SuiteBuilder {
         let faucet_addr = app.api().addr_make(FAUCET);
         let note_addr = app.api().addr_make(NOTE);
         let user_addr = app.api().addr_make(USER_1);
+        let solver_addr = app.api().addr_make(SOLVER);
 
         app.send_tokens(
             faucet_addr.clone(),
             user_addr.clone(),
             &coins(1_000_000, DENOM_NTRN),
+        )
+        .unwrap();
+
+        app.send_tokens(
+            faucet_addr.clone(),
+            solver_addr.clone(),
+            &[coin(1_000_000, DENOM_NTRN)],
+        )
+        .unwrap();
+
+        app.send_tokens(
+            faucet_addr.clone(),
+            solver_addr.clone(),
+            &[coin(10_000_000, DENOM_ATOM)],
         )
         .unwrap();
 
@@ -86,6 +104,7 @@ impl Default for SuiteBuilder {
             orbital_core_code_id: core_code_id,
             orbital_auction_code_id: auction_code_id,
             user_addr,
+            solver: solver_addr,
         }
     }
 }

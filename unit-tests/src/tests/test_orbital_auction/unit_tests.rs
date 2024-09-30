@@ -1,6 +1,10 @@
-use cosmwasm_std::Uint128;
+use cosmwasm_std::{coin, Uint128};
 use cw_utils::Duration;
 use orbital_auction::state::{RouteConfig, UserIntent};
+
+use crate::testing_utils::consts::{
+    DENOM_ATOM, DENOM_NTRN, DENOM_OSMO, GAIA_DOMAIN, OSMOSIS_DOMAIN,
+};
 
 use super::suite::OrbitalAuctionBuilder;
 
@@ -18,10 +22,10 @@ fn test_init() {
     assert_eq!(
         auction_config.route_config,
         RouteConfig {
-            src_domain: "gaia".to_string(),
-            dest_domain: "juno".to_string(),
-            offer_denom: "uatom".to_string(),
-            ask_denom: "ujuno".to_string(),
+            src_domain: GAIA_DOMAIN.to_string(),
+            dest_domain: OSMOSIS_DOMAIN.to_string(),
+            offer_denom: DENOM_ATOM.to_string(),
+            ask_denom: DENOM_OSMO.to_string(),
         }
     );
 }
@@ -33,14 +37,14 @@ fn test_add_user_intents() {
     let user_intent_1 = UserIntent {
         user: "user1".to_string(),
         amount: Uint128::new(100),
-        offer_domain: "gaia".to_string(),
-        ask_domain: "juno".to_string(),
+        offer_domain: GAIA_DOMAIN.to_string(),
+        ask_domain: OSMOSIS_DOMAIN.to_string(),
     };
     let user_intent_2 = UserIntent {
         user: "user2".to_string(),
         amount: Uint128::new(321),
-        offer_domain: "gaia".to_string(),
-        ask_domain: "juno".to_string(),
+        offer_domain: GAIA_DOMAIN.to_string(),
+        ask_domain: OSMOSIS_DOMAIN.to_string(),
     };
 
     // add the user intents, order matters here
@@ -53,4 +57,42 @@ fn test_add_user_intents() {
     assert_eq!(orderbook[0].amount, Uint128::new(100));
     assert_eq!(orderbook[1].user, "user2");
     assert_eq!(orderbook[1].amount, Uint128::new(321));
+}
+
+#[test]
+#[should_panic(expected = "Must send reserve token 'uatom'")]
+fn test_solver_posting_wrong_bond_denom() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+
+    // solver posts bond with wrong denom
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_NTRN))
+        .unwrap();
+}
+
+#[test]
+fn test_solver_posting_bond_happy() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+
+    // all solvers start with no bond posted
+    let posted_bond = suite.query_posted_bond(solver.as_str()).unwrap();
+    assert_eq!(posted_bond, coin(0, DENOM_ATOM));
+
+    // solver posts bond
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+
+    let posted_bond = suite.query_posted_bond(solver.as_str()).unwrap();
+    assert_eq!(posted_bond, coin(100_000, DENOM_ATOM));
+
+    // for whatever reason solver needs to post more bond
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+
+    let posted_bond = suite.query_posted_bond(solver.as_str()).unwrap();
+    assert_eq!(posted_bond, coin(200_000, DENOM_ATOM));
 }

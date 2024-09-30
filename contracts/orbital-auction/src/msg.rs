@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Uint128;
+use cosmwasm_std::{Coin, Uint128};
 use cw_utils::Duration;
 
 use crate::state::{RouteConfig, UserIntent};
@@ -15,6 +15,10 @@ pub struct InstantiateMsg {
     // auction time configurations expressed in seconds
     pub auction_duration: Duration,
     pub filling_window_duration: Duration,
+
+    // amount of tokens required to be posted as a slashable bond
+    // in order to participate in the auction
+    pub solver_bond: Coin,
 }
 
 #[cw_serde]
@@ -28,6 +32,9 @@ pub enum ExecuteMsg {
     Pause {},
 
     // bidder actions
+    /// post a bond to participate in the auction
+    PostBond {},
+
     /// bid on the current auction
     Bid {},
 }
@@ -46,6 +53,9 @@ pub enum QueryMsg {
         from: Option<u32>,
         limit: Option<u32>,
     },
+
+    #[returns(Coin)]
+    PostedBond { solver: String },
 }
 
 #[cw_serde]
