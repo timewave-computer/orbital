@@ -1,16 +1,16 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{
-    Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
-    StdResult,
-};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdResult};
 use cw2::set_contract_version;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
 };
 
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use crate::{
+    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
+    state::{AuctionConfig, ADMIN, AUCTION_CONFIG},
+};
 
 pub const CONTRACT_NAME: &str = "orbital-auction";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -22,12 +22,24 @@ pub type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 pub fn instantiate(
     deps: ExecuteDeps,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    unimplemented!()
+    // set the sender as admin
+    ADMIN.save(deps.storage, &info.sender)?;
+
+    let auction_config = AuctionConfig {
+        batch_size: msg.batch_size,
+        auction_duration: msg.auction_duration,
+        filling_window_duration: msg.filling_window_duration,
+        route_config: msg.route_config,
+    };
+    // save the auction configuration
+    AUCTION_CONFIG.save(deps.storage, &auction_config)?;
+
+    Ok(Response::default())
 }
 
 #[entry_point]

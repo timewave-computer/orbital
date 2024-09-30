@@ -29,4 +29,3 @@ protobuf        = { workspace = true }
 prost           = { workspace = true }
 prost-types     = { workspace = true }
 serde-json-wasm = { workspace = true }
-cosmos-sdk-proto= { workspace = true }
