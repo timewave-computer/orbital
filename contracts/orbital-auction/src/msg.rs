@@ -35,6 +35,9 @@ pub enum ExecuteMsg {
     /// post a bond to participate in the auction
     PostBond {},
 
+    /// withdraw the posted bond
+    WithdrawBond {},
+
     /// bid on the current auction
     Bid {},
 }

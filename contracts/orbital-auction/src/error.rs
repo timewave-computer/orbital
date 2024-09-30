@@ -13,6 +13,9 @@ pub enum ContractError {
 
     #[error(transparent)]
     FeePaymentError(#[from] PaymentError),
+
+    #[error("No bond is posted by sender")]
+    NoBondPosted {},
 }
 
 impl From<ContractError> for NeutronError {

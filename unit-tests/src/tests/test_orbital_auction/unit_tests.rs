@@ -96,3 +96,53 @@ fn test_solver_posting_bond_happy() {
     let posted_bond = suite.query_posted_bond(solver.as_str()).unwrap();
     assert_eq!(posted_bond, coin(200_000, DENOM_ATOM));
 }
+
+#[test]
+fn test_solver_withdraw_posted_bond() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+
+    // solver posts bond
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+
+    let posted_bond = suite.query_posted_bond(solver.as_str()).unwrap();
+    assert_eq!(posted_bond, coin(100_000, DENOM_ATOM));
+
+    let current_solver_atom_bal = suite
+        .app
+        .wrap()
+        .query_balance(solver.to_string(), DENOM_ATOM)
+        .unwrap();
+    let current_auction_atom_bal = suite
+        .app
+        .wrap()
+        .query_balance(suite.orbital_auction.to_string(), DENOM_ATOM)
+        .unwrap();
+
+    assert_eq!(current_auction_atom_bal.amount.u128(), 100_000);
+
+    // solver is done and withdraws bond
+    suite.withdraw_bond(solver.clone()).unwrap();
+
+    let posted_bond = suite.query_posted_bond(solver.as_str()).unwrap();
+    assert_eq!(posted_bond, coin(0, DENOM_ATOM));
+
+    let new_solver_atom_bal = suite
+        .app
+        .wrap()
+        .query_balance(solver.to_string(), DENOM_ATOM)
+        .unwrap();
+    let new_auction_atom_bal = suite
+        .app
+        .wrap()
+        .query_balance(suite.orbital_auction.to_string(), DENOM_ATOM)
+        .unwrap();
+
+    assert_eq!(new_auction_atom_bal.amount.u128(), 0);
+    assert_eq!(
+        new_solver_atom_bal.amount.u128(),
+        current_solver_atom_bal.amount.u128() + 100_000
+    );
+}

@@ -57,6 +57,15 @@ impl Suite {
             &[bond],
         )
     }
+
+    pub fn withdraw_bond(&mut self, solver: Addr) -> AnyResult<AppResponse> {
+        self.app.execute_contract(
+            solver,
+            self.orbital_auction.clone(),
+            &ExecuteMsg::WithdrawBond {},
+            &[],
+        )
+    }
 }
 
 impl Suite {
