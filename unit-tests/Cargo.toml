@@ -11,6 +11,7 @@ serde_json          = { workspace = true }
 env_logger          = { workspace = true }
 log                 = { workspace = true }
 orbital-core        = { workspace = true }
+orbital-auction     = { workspace = true }
 cosmwasm-std        = { workspace = true }
 cosmwasm-schema     = { workspace = true }
 cw-multi-test       = { workspace = true }
@@ -21,3 +22,4 @@ cw-ownable          = { workspace = true }
 cw-storage-plus     = { workspace = true }
 prost               = { workspace = true }
 cosmos-sdk-proto    = { workspace = true }
+cw-utils            = { workspace = true }

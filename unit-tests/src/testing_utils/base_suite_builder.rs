@@ -4,7 +4,8 @@ use cw_multi_test::{BasicAppBuilder, Executor, MockApiBech32, SimpleAddressGener
 use super::{
     consts::{ALL_DENOMS, CHAIN_PREFIX, DENOM_NTRN, FAUCET, NOTE, OWNER, USER_1},
     neutron_adapters::{
-        neutron_module::NeutronKeeper, neutron_type_contracts::orbital_core_contract,
+        neutron_module::NeutronKeeper,
+        neutron_type_contracts::{orbital_auction_contract, orbital_core_contract},
         stargate_module::StargateModule,
     },
     types::CustomApp,
@@ -36,6 +37,7 @@ pub struct SuiteBuilder {
     pub note: Addr,
     pub app: CustomApp,
     pub orbital_core_code_id: u64,
+    pub orbital_auction_code_id: u64,
     pub user_addr: Addr,
 }
 
@@ -61,7 +63,8 @@ impl Default for SuiteBuilder {
                     .unwrap();
             });
 
-        let code_id = app.store_code(orbital_core_contract());
+        let core_code_id = app.store_code(orbital_core_contract());
+        let auction_code_id = app.store_code(orbital_auction_contract());
 
         let owner_addr = app.api().addr_make(OWNER);
         let faucet_addr = app.api().addr_make(FAUCET);
@@ -80,7 +83,8 @@ impl Default for SuiteBuilder {
             admin: owner_addr,
             note: note_addr,
             app,
-            orbital_core_code_id: code_id,
+            orbital_core_code_id: core_code_id,
+            orbital_auction_code_id: auction_code_id,
             user_addr,
         }
     }

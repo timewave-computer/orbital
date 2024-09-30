@@ -71,3 +71,15 @@ pub fn orbital_core_contract() -> Box<dyn Contract<NeutronMsg, NeutronQuery>> {
 
     Box::new(contract)
 }
+
+pub fn orbital_auction_contract() -> Box<dyn Contract<NeutronMsg, NeutronQuery>> {
+    let contract = ContractWrapper::new(
+        orbital_auction::contract::execute,
+        orbital_auction::contract::instantiate,
+        orbital_auction::contract::query,
+    )
+    .with_reply(orbital_auction::contract::reply)
+    .with_migrate(orbital_auction::contract::migrate);
+
+    Box::new(contract)
+}

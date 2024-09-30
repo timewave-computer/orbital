@@ -35,14 +35,11 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(String)]
-    AuctionState {},
+    #[returns(cosmwasm_std::Addr)]
+    Admin {},
 
-    #[returns(String)]
-    Orderbook {},
-
-    #[returns(String)]
-    CurrentAuction {},
+    #[returns(crate::state::AuctionConfig)]
+    AuctionConfig {},
 }
 
 #[cw_serde]
