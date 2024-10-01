@@ -1,6 +1,8 @@
 use cosmwasm_std::{coin, Uint128};
 use cw_utils::{Duration, Expiration};
-use orbital_auction::state::{BatchStatus, RoundPhaseExpirations, RouteConfig, UserIntent};
+use orbital_auction::state::{
+    AuctionPhase, BatchStatus, RoundPhaseExpirations, RouteConfig, UserIntent,
+};
 
 use crate::testing_utils::consts::{
     DENOM_ATOM, DENOM_NTRN, DENOM_OSMO, GAIA_DOMAIN, OSMOSIS_DOMAIN,
@@ -46,6 +48,7 @@ fn test_init() {
     assert_eq!(
         active_round.phases,
         RoundPhaseExpirations {
+            start_expiration: Expiration::AtTime(current_time),
             auction_expiration: Expiration::AtTime(current_time.plus_seconds(180)),
             filling_expiration: Expiration::AtTime(current_time.plus_seconds(180 + 60)),
             cleanup_expiration: Expiration::AtTime(current_time.plus_seconds(180 + 60 + 60)),
@@ -58,26 +61,26 @@ fn test_round_phase_derivation() {
     let mut suite = OrbitalAuctionBuilder::default().build();
 
     // 0-180 = auction
-    assert_eq!(suite.query_current_phase().unwrap(), "auction");
+    assert!(suite.query_current_phase().unwrap() == AuctionPhase::Bidding);
     suite.advance_time(30);
-    assert_eq!(suite.query_current_phase().unwrap(), "auction");
+    assert!(suite.query_current_phase().unwrap() == AuctionPhase::Bidding);
     suite.advance_time(149);
-    assert_eq!(suite.query_current_phase().unwrap(), "auction");
+    assert!(suite.query_current_phase().unwrap() == AuctionPhase::Bidding);
 
     // 180-240 = filling
     suite.advance_time(1);
-    assert_eq!(suite.query_current_phase().unwrap(), "filling");
+    assert!(suite.query_current_phase().unwrap() == AuctionPhase::Filling);
     suite.advance_time(58);
-    assert_eq!(suite.query_current_phase().unwrap(), "filling");
+    assert!(suite.query_current_phase().unwrap() == AuctionPhase::Filling);
 
     // 240-300 = cleanup
     suite.advance_time(2);
-    assert_eq!(suite.query_current_phase().unwrap(), "cleanup");
+    assert!(suite.query_current_phase().unwrap() == AuctionPhase::Cleanup);
     suite.advance_time(57);
-    assert_eq!(suite.query_current_phase().unwrap(), "cleanup");
+    assert!(suite.query_current_phase().unwrap() == AuctionPhase::Cleanup);
 
     suite.advance_time(3);
-    assert_eq!(suite.query_current_phase().unwrap(), "unknown");
+    assert!(suite.query_current_phase().unwrap() == AuctionPhase::OutOfSync);
 }
 
 #[test]

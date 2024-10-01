@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, BlockInfo, Coin, StdResult, Timestamp, Uint128, Uint64};
+use cosmwasm_std::{Addr, BlockInfo, Coin, StdResult, Uint128, Uint64};
 use cw_storage_plus::{Deque, Item, Map};
 use cw_utils::{Duration, Expiration};
 
@@ -13,7 +13,10 @@ pub const AUCTION_ID: Item<Uint64> = Item::new("auction_id");
 pub const AUCTION_CONFIG: Item<AuctionConfig> = Item::new("auction_config");
 
 // current batch configuration
-pub const ACTIVE_AUCTION_CONFIG: Item<ActiveRoundConfig> = Item::new("current_round_config");
+pub const ACTIVE_AUCTION_CONFIG: Item<AuctionRound> = Item::new("current_round_config");
+
+// archive of past auction rounds
+pub const AUCTION_ARCHIVE: Deque<AuctionRound> = Deque::new("auction_archive");
 
 // map of solvers registered for participating in the auction
 pub const POSTED_BONDS: Map<String, Coin> = Map::new("posted_bonds");
@@ -73,15 +76,15 @@ impl AuctionPhaseConfig {
 }
 
 #[cw_serde]
-pub struct ActiveRoundConfig {
+pub struct AuctionRound {
     pub id: Uint64,
-    pub start_time: Timestamp,
     pub phases: RoundPhaseExpirations,
     pub batch: BatchStatus,
 }
 
 #[cw_serde]
 pub struct RoundPhaseExpirations {
+    pub start_expiration: Expiration,
     pub auction_expiration: Expiration,
     pub filling_expiration: Expiration,
     pub cleanup_expiration: Expiration,
@@ -90,7 +93,7 @@ pub struct RoundPhaseExpirations {
 impl RoundPhaseExpirations {
     /// returns the absolute expiration configuration given the current block time and the
     /// relative auction phase configuration.
-    pub fn from_auction_config(value: AuctionPhaseConfig, block: &BlockInfo) -> StdResult<Self> {
+    pub fn from_auction_config(value: &AuctionPhaseConfig, block: &BlockInfo) -> StdResult<Self> {
         // phases advance in order of auction -> filling -> cleanup.
         // first we derive the durations with respect to t_0 which is block.time
         // (auction duration is already the needed delta).
@@ -99,6 +102,7 @@ impl RoundPhaseExpirations {
 
         // then we calculate the absolute expiration times for each phase
         let phases = RoundPhaseExpirations {
+            start_expiration: Expiration::AtTime(block.time),
             auction_expiration: value.auction_duration.after(block),
             filling_expiration: filling_duration_from_t0.after(block),
             cleanup_expiration: cleanup_duration_from_t0.after(block),
@@ -107,17 +111,27 @@ impl RoundPhaseExpirations {
         Ok(phases)
     }
 
-    pub fn get_current_phase(&self, block: &BlockInfo) -> &str {
+    /// given a block, compares the block timestamp to the phase expirations and returns
+    /// the current phase of the auction.
+    pub fn get_current_phase(&self, block: &BlockInfo) -> AuctionPhase {
         if self.cleanup_expiration.is_expired(block) {
-            "unknown"
+            AuctionPhase::OutOfSync
         } else if self.filling_expiration.is_expired(block) {
-            "cleanup"
+            AuctionPhase::Cleanup
         } else if self.auction_expiration.is_expired(block) {
-            "filling"
+            AuctionPhase::Filling
         } else {
-            "auction"
+            AuctionPhase::Bidding
         }
     }
+}
+
+#[cw_serde]
+pub enum AuctionPhase {
+    Bidding,
+    Filling,
+    Cleanup,
+    OutOfSync,
 }
 
 #[cw_serde]

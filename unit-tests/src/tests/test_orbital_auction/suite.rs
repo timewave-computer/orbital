@@ -3,7 +3,7 @@ use cw_multi_test::{error::AnyResult, AppResponse, Executor};
 use cw_utils::Duration;
 use orbital_auction::{
     msg::{ExecuteMsg, InstantiateMsg as OrbitalAuctionInstantiateMsg, QueryMsg},
-    state::{ActiveRoundConfig, AuctionConfig, RouteConfig, UserIntent},
+    state::{AuctionConfig, AuctionPhase, AuctionRound, RouteConfig, UserIntent},
 };
 
 use crate::testing_utils::{
@@ -87,13 +87,13 @@ impl Suite {
             .query_wasm_smart(self.orbital_auction.clone(), &QueryMsg::AuctionConfig {})
     }
 
-    pub fn query_active_round_config(&mut self) -> StdResult<ActiveRoundConfig> {
+    pub fn query_active_round_config(&mut self) -> StdResult<AuctionRound> {
         self.app
             .wrap()
             .query_wasm_smart(self.orbital_auction.clone(), &QueryMsg::ActiveRound {})
     }
 
-    pub fn query_current_phase(&mut self) -> StdResult<String> {
+    pub fn query_current_phase(&mut self) -> StdResult<AuctionPhase> {
         self.app
             .wrap()
             .query_wasm_smart(self.orbital_auction.clone(), &QueryMsg::AuctionPhase {})

@@ -2,7 +2,7 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, Uint128};
 use cw_utils::Duration;
 
-use crate::state::{RouteConfig, UserIntent};
+use crate::state::{AuctionPhase, RouteConfig, UserIntent};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -65,10 +65,10 @@ pub enum QueryMsg {
     #[returns(Coin)]
     PostedBond { solver: String },
 
-    #[returns(crate::state::ActiveRoundConfig)]
+    #[returns(crate::state::AuctionRound)]
     ActiveRound {},
 
-    #[returns(String)]
+    #[returns(AuctionPhase)]
     AuctionPhase {},
 }
 

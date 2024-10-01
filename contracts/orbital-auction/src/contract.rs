@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    coin, to_json_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply, Response,
+    coin, ensure, to_json_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply, Response,
     StdResult, Uint64,
 };
 use cw2::set_contract_version;
@@ -12,11 +12,13 @@ use neutron_sdk::{
 
 use crate::{
     admin,
+    error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     solver,
     state::{
-        ActiveRoundConfig, AuctionConfig, AuctionPhaseConfig, BatchStatus, RoundPhaseExpirations,
-        UserIntent, ACTIVE_AUCTION_CONFIG, ADMIN, AUCTION_CONFIG, ORDERBOOK, POSTED_BONDS,
+        AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, BatchStatus,
+        RoundPhaseExpirations, UserIntent, ACTIVE_AUCTION_CONFIG, ADMIN, AUCTION_CONFIG, ORDERBOOK,
+        POSTED_BONDS,
     },
 };
 
@@ -35,10 +37,6 @@ pub fn instantiate(
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // set the sender as admin
-    ADMIN.save(deps.storage, &info.sender)?;
-
-    // save the auction configuration
     let auction_config = AuctionConfig {
         batch_size: msg.batch_size,
         auction_phases: AuctionPhaseConfig {
@@ -49,18 +47,22 @@ pub fn instantiate(
         route_config: msg.route_config,
         solver_bond: msg.solver_bond,
     };
-    AUCTION_CONFIG.save(deps.storage, &auction_config)?;
 
-    // start the auction cycle with an empty batch
-    let active_round_config = ActiveRoundConfig {
+    let active_round_config = AuctionRound {
         id: Uint64::zero(),
+        // start the auction cycle with an empty batch
         batch: BatchStatus::Empty {},
-        start_time: env.block.time,
         phases: RoundPhaseExpirations::from_auction_config(
-            auction_config.auction_phases,
+            &auction_config.auction_phases,
             &env.block,
         )?,
     };
+
+    // set the sender as admin
+    ADMIN.save(deps.storage, &info.sender)?;
+
+    // save the auction-related configs
+    AUCTION_CONFIG.save(deps.storage, &auction_config)?;
     ACTIVE_AUCTION_CONFIG.save(deps.storage, &active_round_config)?;
 
     Ok(Response::default())
@@ -69,13 +71,13 @@ pub fn instantiate(
 #[entry_point]
 pub fn execute(
     deps: ExecuteDeps,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
         // permisionless action
-        ExecuteMsg::FinalizeRound {} => unimplemented!(),
+        ExecuteMsg::FinalizeRound {} => try_finalize_round(deps, env),
 
         // solver actions
         ExecuteMsg::Bid {} => unimplemented!(),
@@ -91,6 +93,43 @@ pub fn execute(
     }
 }
 
+/// action to finalize the current round and prepare for the next one.
+fn try_finalize_round(deps: ExecuteDeps, env: Env) -> NeutronResult<Response<NeutronMsg>> {
+    let active_auction = ACTIVE_AUCTION_CONFIG.load(deps.storage)?;
+
+    // first we check if the active auction is not yet started. this can be the case
+    // if (and only if) it's been finalized already and is due to start once it
+    // enters its bidding phase.
+    ensure!(
+        active_auction
+            .phases
+            .start_expiration
+            .is_expired(&env.block),
+        ContractError::AuctionPhaseError {}
+    );
+
+    // depending on the phase we are in, finalization is handled differently:
+    match query_active_auction_phase(deps.as_ref(), env)? {
+        // no-op as there is nothing to finalize in the bidding phase
+        AuctionPhase::Bidding => Err(ContractError::AuctionPhaseError {}.into()),
+        // in the filling phase, if we confirm that the solver had filled the order correctly,
+        // we finalize the round and prepare for the next one.
+        // if the solver failed to fill the order, we wait for the cleanup phase to finalize.
+        // no slashing happens in this phase.
+        AuctionPhase::Filling => unimplemented!(),
+        // in the cleanup phase, we finalize the round and prepare for the next one.
+        // if the solver failed to fill the order, we slash the solver, refund the users,
+        // and prepare for the next round.
+        // if the solver succeeded, we do not slash the solver and prepare for the next round.
+        AuctionPhase::Cleanup => unimplemented!(),
+        // if we are out of sync, that means the round had failed to be finalized during
+        // the filling and cleanup phases. given that this should only happen in case of
+        // any sort of infra failure, this likely involves pausing the auction
+        // and requiring admin intervention.
+        AuctionPhase::OutOfSync => unimplemented!(),
+    }
+}
+
 #[entry_point]
 pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -103,11 +142,11 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-fn query_active_auction_phase(deps: QueryDeps, env: Env) -> StdResult<String> {
+fn query_active_auction_phase(deps: QueryDeps, env: Env) -> StdResult<AuctionPhase> {
     let active_round_config = ACTIVE_AUCTION_CONFIG.load(deps.storage)?;
     let phase = active_round_config.phases.get_current_phase(&env.block);
 
-    Ok(phase.to_string())
+    Ok(phase)
 }
 
 fn query_posted_bond(deps: QueryDeps, solver: String) -> StdResult<Coin> {

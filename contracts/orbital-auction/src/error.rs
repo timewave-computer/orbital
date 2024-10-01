@@ -16,6 +16,9 @@ pub enum ContractError {
 
     #[error("No bond is posted by sender")]
     NoBondPosted {},
+
+    #[error("todo")]
+    AuctionPhaseError {},
 }
 
 impl From<ContractError> for NeutronError {
