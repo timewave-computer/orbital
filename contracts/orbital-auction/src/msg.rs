@@ -62,6 +62,9 @@ pub enum QueryMsg {
 
     #[returns(crate::state::ActiveRoundConfig)]
     ActiveRound {},
+
+    #[returns(String)]
+    AuctionPhase {},
 }
 
 #[cw_serde]

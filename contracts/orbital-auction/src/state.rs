@@ -37,12 +37,8 @@ pub struct UserIntent {
 pub struct AuctionConfig {
     // how many of the offer denom we can fit in a batch
     pub batch_size: Uint128,
-    // duration of the bidding window in seconds
-    pub auction_duration: Duration,
-    // duration of the filling window in seconds
-    pub filling_window_duration: Duration,
-    // duration of the cleanup window in seconds
-    pub cleanup_window_duration: Duration,
+    // config that describes the time durations for each phase of the auction
+    pub auction_phases: AuctionPhaseConfig,
     // config that describes the route for the auction
     // (src & dest domains, offer & ask denoms)
     pub route_config: RouteConfig,
@@ -50,7 +46,24 @@ pub struct AuctionConfig {
     pub solver_bond: Coin,
 }
 
-impl AuctionConfig {
+/// orbital auction operates in discrete-time based rounds.
+/// each round consists of the following phases, in order:
+/// - auction: bidding window where solvers can submit their bids
+/// - filling: window where the auction is finalized and orders are matched
+/// - cleanup: window where the auction is reset and the next round is prepared
+// TODO: validate that all durations are passed in seconds.
+// or just drop Duration altogether and deal in seconds?
+#[cw_serde]
+pub struct AuctionPhaseConfig {
+    // duration of the bidding window in seconds
+    pub auction_duration: Duration,
+    // duration of the filling window in seconds
+    pub filling_window_duration: Duration,
+    // duration of the cleanup window in seconds
+    pub cleanup_window_duration: Duration,
+}
+
+impl AuctionPhaseConfig {
     /// returns the total duration of a round (in seconds),
     /// which is the sum of the auction, filling, and cleaning window durations
     pub fn get_total_round_duration(&self) -> StdResult<Duration> {
@@ -62,8 +75,48 @@ impl AuctionConfig {
 pub struct ActiveRoundConfig {
     pub id: Uint64,
     pub start_time: Timestamp,
-    pub end_time: Expiration,
+    pub phases: RoundPhaseExpirations,
     pub batch: BatchStatus,
+}
+
+#[cw_serde]
+pub struct RoundPhaseExpirations {
+    pub auction_expiration: Expiration,
+    pub filling_expiration: Expiration,
+    pub cleanup_expiration: Expiration,
+}
+
+impl RoundPhaseExpirations {
+    /// returns the absolute expiration configuration given the current block time and the
+    /// relative auction phase configuration.
+    pub fn from_auction_config(value: AuctionPhaseConfig, block: &BlockInfo) -> StdResult<Self> {
+        // phases advance in order of auction -> filling -> cleanup.
+        // first we derive the durations with respect to t_0 which is block.time
+        // (auction duration is already the needed delta).
+        let filling_duration_from_t0 = (value.auction_duration + value.filling_window_duration)?;
+        let cleanup_duration_from_t0 = (filling_duration_from_t0 + value.cleanup_window_duration)?;
+
+        // then we calculate the absolute expiration times for each phase
+        let phases = RoundPhaseExpirations {
+            auction_expiration: value.auction_duration.after(block),
+            filling_expiration: filling_duration_from_t0.after(block),
+            cleanup_expiration: cleanup_duration_from_t0.after(block),
+        };
+
+        Ok(phases)
+    }
+
+    pub fn get_current_phase(&self, block: &BlockInfo) -> &str {
+        if self.cleanup_expiration.is_expired(block) {
+            "unknown"
+        } else if self.filling_expiration.is_expired(block) {
+            "cleanup"
+        } else if self.auction_expiration.is_expired(block) {
+            "filling"
+        } else {
+            "auction"
+        }
+    }
 }
 
 #[cw_serde]

@@ -67,6 +67,11 @@ impl Suite {
             &[],
         )
     }
+
+    pub fn advance_time(&mut self, seconds: u64) {
+        self.app
+            .update_block(|b| b.time = b.time.plus_seconds(seconds));
+    }
 }
 
 impl Suite {
@@ -86,6 +91,12 @@ impl Suite {
         self.app
             .wrap()
             .query_wasm_smart(self.orbital_auction.clone(), &QueryMsg::ActiveRound {})
+    }
+
+    pub fn query_current_phase(&mut self) -> StdResult<String> {
+        self.app
+            .wrap()
+            .query_wasm_smart(self.orbital_auction.clone(), &QueryMsg::AuctionPhase {})
     }
 
     pub fn query_orderbook(&mut self) -> StdResult<Vec<UserIntent>> {

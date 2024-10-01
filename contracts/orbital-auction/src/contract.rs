@@ -15,8 +15,8 @@ use crate::{
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     state::{
-        ActiveRoundConfig, AuctionConfig, BatchStatus, UserIntent, ACTIVE_AUCTION_CONFIG, ADMIN,
-        AUCTION_CONFIG, ORDERBOOK, POSTED_BONDS,
+        ActiveRoundConfig, AuctionConfig, AuctionPhaseConfig, BatchStatus, RoundPhaseExpirations,
+        UserIntent, ACTIVE_AUCTION_CONFIG, ADMIN, AUCTION_CONFIG, ORDERBOOK, POSTED_BONDS,
     },
 };
 
@@ -38,16 +38,17 @@ pub fn instantiate(
     // set the sender as admin
     ADMIN.save(deps.storage, &info.sender)?;
 
+    // save the auction configuration
     let auction_config = AuctionConfig {
         batch_size: msg.batch_size,
-        auction_duration: msg.auction_duration,
-        filling_window_duration: msg.filling_window_duration,
-        cleanup_window_duration: msg.cleanup_window_duration,
+        auction_phases: AuctionPhaseConfig {
+            auction_duration: msg.auction_duration,
+            filling_window_duration: msg.filling_window_duration,
+            cleanup_window_duration: msg.cleanup_window_duration,
+        },
         route_config: msg.route_config,
         solver_bond: msg.solver_bond,
     };
-
-    // save the auction configuration
     AUCTION_CONFIG.save(deps.storage, &auction_config)?;
 
     // start the auction cycle with an empty batch
@@ -55,7 +56,10 @@ pub fn instantiate(
         id: Uint64::zero(),
         batch: BatchStatus::Empty {},
         start_time: env.block.time,
-        end_time: auction_config.get_total_round_duration()?.after(&env.block),
+        phases: RoundPhaseExpirations::from_auction_config(
+            auction_config.auction_phases,
+            &env.block,
+        )?,
     };
     ACTIVE_AUCTION_CONFIG.save(deps.storage, &active_round_config)?;
 
@@ -139,14 +143,22 @@ fn enqueue_user_intent(
 }
 
 #[entry_point]
-pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Admin {} => to_json_binary(&ADMIN.load(deps.storage)?),
         QueryMsg::AuctionConfig {} => to_json_binary(&AUCTION_CONFIG.load(deps.storage)?),
         QueryMsg::Orderbook { from, limit } => to_json_binary(&query_orderbook(deps, from, limit)?),
         QueryMsg::PostedBond { solver } => to_json_binary(&query_posted_bond(deps, solver)?),
         QueryMsg::ActiveRound {} => to_json_binary(&ACTIVE_AUCTION_CONFIG.load(deps.storage)?),
+        QueryMsg::AuctionPhase {} => to_json_binary(&query_active_auction_phase(deps, env)?),
     }
+}
+
+fn query_active_auction_phase(deps: QueryDeps, env: Env) -> StdResult<String> {
+    let active_round_config = ACTIVE_AUCTION_CONFIG.load(deps.storage)?;
+    let phase = active_round_config.phases.get_current_phase(&env.block);
+
+    Ok(phase.to_string())
 }
 
 fn query_posted_bond(deps: QueryDeps, solver: String) -> StdResult<Coin> {
