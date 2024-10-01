@@ -30,6 +30,8 @@ pub enum ExecuteMsg {
     FinalizeRound {},
     /// pause the auction, stopping any new orders from being accepted
     Pause {},
+    /// resume the auction, allowing new orders to be accepted
+    Resume {},
 
     // bidder actions
     /// post a bond to participate in the auction
@@ -40,6 +42,9 @@ pub enum ExecuteMsg {
 
     /// bid on the current auction
     Bid {},
+
+    /// initiate confirmation of filling the order for the auction round
+    Prove {},
 }
 
 #[cw_serde]

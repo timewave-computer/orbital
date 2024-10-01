@@ -1,11 +1,10 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    coin, ensure, to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply,
-    Response, StdResult, Uint64,
+    coin, ensure, to_json_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply, Response,
+    StdResult, Uint64,
 };
 use cw2::set_contract_version;
-use cw_utils::must_pay;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
@@ -14,6 +13,7 @@ use neutron_sdk::{
 use crate::{
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
+    solver,
     state::{
         ActiveRoundConfig, AuctionConfig, AuctionPhaseConfig, BatchStatus, RoundPhaseExpirations,
         UserIntent, ACTIVE_AUCTION_CONFIG, ADMIN, AUCTION_CONFIG, ORDERBOOK, POSTED_BONDS,
@@ -74,54 +74,22 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
+        // user action
         ExecuteMsg::AddOrder(user_intent) => enqueue_user_intent(deps, info, user_intent),
+
+        // permisionless action
         ExecuteMsg::FinalizeRound {} => unimplemented!(),
-        ExecuteMsg::Pause {} => unimplemented!(),
+
+        // solver actions
         ExecuteMsg::Bid {} => unimplemented!(),
-        ExecuteMsg::PostBond {} => try_post_bond(deps, info),
-        ExecuteMsg::WithdrawBond {} => try_withdraw_posted_bond(deps, info),
+        ExecuteMsg::PostBond {} => solver::try_post_bond(deps, info),
+        ExecuteMsg::WithdrawBond {} => solver::try_withdraw_posted_bond(deps, info),
+        ExecuteMsg::Prove {} => unimplemented!(),
+
+        // admin-gated actions
+        ExecuteMsg::Pause {} => unimplemented!(),
+        ExecuteMsg::Resume {} => unimplemented!(),
     }
-}
-
-fn try_withdraw_posted_bond(
-    deps: ExecuteDeps,
-    info: MessageInfo,
-) -> NeutronResult<Response<NeutronMsg>> {
-    // load the existing bond posted by the sender
-    let posted_bond = POSTED_BONDS.load(deps.storage, info.sender.to_string())?;
-
-    // generate a withdraw message
-    let withdraw_msg = BankMsg::Send {
-        to_address: info.sender.to_string(),
-        amount: vec![posted_bond],
-    };
-
-    // remove the sender entry from posted bonds and transfer the funds
-    POSTED_BONDS.remove(deps.storage, info.sender.to_string());
-
-    Ok(Response::default().add_message(withdraw_msg))
-}
-
-fn try_post_bond(deps: ExecuteDeps, info: MessageInfo) -> NeutronResult<Response<NeutronMsg>> {
-    let auction_config = AUCTION_CONFIG.load(deps.storage)?;
-
-    // get the amount of tokens sent by the solver
-    let posted_bond_amount = must_pay(&info, &auction_config.solver_bond.denom)
-        .map_err(ContractError::FeePaymentError)?;
-
-    // depending on if this is the first time the solver is posting a bond,
-    // or if they have already posted a bond before, we return the total
-    let new_bond = match POSTED_BONDS.may_load(deps.storage, info.sender.to_string())? {
-        Some(existing_bond) => coin(
-            existing_bond.amount.checked_add(posted_bond_amount)?.u128(),
-            existing_bond.denom,
-        ),
-        None => coin(posted_bond_amount.u128(), &auction_config.solver_bond.denom),
-    };
-
-    POSTED_BONDS.save(deps.storage, info.sender.to_string(), &new_bond)?;
-
-    Ok(Response::default())
 }
 
 /// admin-gated action to include a (validated) user intent into the orderbook.
