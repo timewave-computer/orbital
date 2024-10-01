@@ -1,5 +1,6 @@
 extern crate core;
 
+pub mod admin;
 pub mod contract;
 pub mod error;
 pub mod msg;

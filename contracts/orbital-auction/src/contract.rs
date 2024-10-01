@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    coin, ensure, to_json_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply, Response,
+    coin, to_json_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply, Response,
     StdResult, Uint64,
 };
 use cw2::set_contract_version;
@@ -11,7 +11,7 @@ use neutron_sdk::{
 };
 
 use crate::{
-    error::ContractError,
+    admin,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     solver,
     state::{
@@ -74,9 +74,6 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
-        // user action
-        ExecuteMsg::AddOrder(user_intent) => enqueue_user_intent(deps, info, user_intent),
-
         // permisionless action
         ExecuteMsg::FinalizeRound {} => unimplemented!(),
 
@@ -86,28 +83,12 @@ pub fn execute(
         ExecuteMsg::WithdrawBond {} => solver::try_withdraw_posted_bond(deps, info),
         ExecuteMsg::Prove {} => unimplemented!(),
 
-        // admin-gated actions
+        // admin-gated actions. should we add a RemoveOrder?
+        // if order is not included in a batch yet, seems like there is no risk to that.
+        ExecuteMsg::AddOrder(user_intent) => admin::enqueue_user_intent(deps, info, user_intent),
         ExecuteMsg::Pause {} => unimplemented!(),
         ExecuteMsg::Resume {} => unimplemented!(),
     }
-}
-
-/// admin-gated action to include a (validated) user intent into the orderbook.
-fn enqueue_user_intent(
-    deps: ExecuteDeps,
-    info: MessageInfo,
-    user_intent: UserIntent,
-) -> NeutronResult<Response<NeutronMsg>> {
-    // only the admin can enqueue new orders on behalf of the users
-    ensure!(
-        info.sender == ADMIN.load(deps.storage)?,
-        ContractError::Unauthorized {}
-    );
-
-    // add the user intent to the end of the orderbook queue
-    ORDERBOOK.push_back(deps.storage, &user_intent)?;
-
-    Ok(Response::default())
 }
 
 #[entry_point]

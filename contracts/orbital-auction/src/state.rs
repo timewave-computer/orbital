@@ -41,6 +41,7 @@ pub struct AuctionConfig {
     pub auction_phases: AuctionPhaseConfig,
     // config that describes the route for the auction
     // (src & dest domains, offer & ask denoms)
+    // TODO: is this relevant?
     pub route_config: RouteConfig,
     // configured bond amount required to participate in the auction
     pub solver_bond: Coin,
