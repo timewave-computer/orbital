@@ -1,6 +1,6 @@
 use cosmwasm_std::{coin, Uint128};
 use cw_utils::Duration;
-use orbital_auction::state::{RouteConfig, UserIntent};
+use orbital_auction::state::{BatchStatus, RouteConfig, UserIntent};
 
 use crate::testing_utils::consts::{
     DENOM_ATOM, DENOM_NTRN, DENOM_OSMO, GAIA_DOMAIN, OSMOSIS_DOMAIN,
@@ -14,6 +14,7 @@ fn test_init() {
 
     let admin = suite.query_admin().unwrap();
     let auction_config = suite.query_auction_config().unwrap();
+    let active_round = suite.query_active_round_config().unwrap();
 
     assert_eq!(admin, suite.orbital_core);
     assert_eq!(auction_config.batch_size.u128(), 10_000_000);
@@ -28,6 +29,8 @@ fn test_init() {
             ask_denom: DENOM_OSMO.to_string(),
         }
     );
+    assert_eq!(active_round.id.u64(), 0);
+    assert_eq!(active_round.batch, BatchStatus::Empty {});
 }
 
 #[test]

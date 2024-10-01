@@ -3,7 +3,7 @@ use cw_multi_test::{error::AnyResult, AppResponse, Executor};
 use cw_utils::Duration;
 use orbital_auction::{
     msg::{ExecuteMsg, InstantiateMsg as OrbitalAuctionInstantiateMsg, QueryMsg},
-    state::{AuctionConfig, RouteConfig, UserIntent},
+    state::{ActiveRoundConfig, AuctionConfig, RouteConfig, UserIntent},
 };
 
 use crate::testing_utils::{
@@ -33,6 +33,7 @@ impl Default for OrbitalAuctionBuilder {
                 batch_size: Uint128::new(10_000_000),
                 auction_duration: Duration::Time(180),
                 filling_window_duration: Duration::Time(60),
+                cleanup_window_duration: Duration::Time(60),
                 solver_bond: coin(100_000, DENOM_ATOM),
             },
         }
@@ -79,6 +80,12 @@ impl Suite {
         self.app
             .wrap()
             .query_wasm_smart(self.orbital_auction.clone(), &QueryMsg::AuctionConfig {})
+    }
+
+    pub fn query_active_round_config(&mut self) -> StdResult<ActiveRoundConfig> {
+        self.app
+            .wrap()
+            .query_wasm_smart(self.orbital_auction.clone(), &QueryMsg::ActiveRound {})
     }
 
     pub fn query_orderbook(&mut self) -> StdResult<Vec<UserIntent>> {

@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, BlockInfo, Coin, Timestamp, Uint128, Uint64};
+use cosmwasm_std::{Addr, BlockInfo, Coin, StdResult, Timestamp, Uint128, Uint64};
 use cw_storage_plus::{Deque, Item, Map};
-use cw_utils::Duration;
+use cw_utils::{Duration, Expiration};
 
 // authorized orbital-core address
 pub const ADMIN: Item<Addr> = Item::new("admin");
@@ -13,7 +13,7 @@ pub const AUCTION_ID: Item<Uint64> = Item::new("auction_id");
 pub const AUCTION_CONFIG: Item<AuctionConfig> = Item::new("auction_config");
 
 // current batch configuration
-pub const CURRENT_BATCH_CONFIG: Item<AuctionBatch> = Item::new("current_round_config");
+pub const ACTIVE_AUCTION_CONFIG: Item<ActiveRoundConfig> = Item::new("current_round_config");
 
 // map of solvers registered for participating in the auction
 pub const POSTED_BONDS: Map<String, Coin> = Map::new("posted_bonds");
@@ -41,6 +41,8 @@ pub struct AuctionConfig {
     pub auction_duration: Duration,
     // duration of the filling window in seconds
     pub filling_window_duration: Duration,
+    // duration of the cleanup window in seconds
+    pub cleanup_window_duration: Duration,
     // config that describes the route for the auction
     // (src & dest domains, offer & ask denoms)
     pub route_config: RouteConfig,
@@ -48,12 +50,29 @@ pub struct AuctionConfig {
     pub solver_bond: Coin,
 }
 
+impl AuctionConfig {
+    /// returns the total duration of a round (in seconds),
+    /// which is the sum of the auction, filling, and cleaning window durations
+    pub fn get_total_round_duration(&self) -> StdResult<Duration> {
+        (self.auction_duration + self.filling_window_duration)? + self.cleanup_window_duration
+    }
+}
+
 #[cw_serde]
-pub struct AuctionBatch {
-    pub user_intents: Vec<UserIntent>,
+pub struct ActiveRoundConfig {
+    pub id: Uint64,
     pub start_time: Timestamp,
-    pub end_time: Timestamp,
-    pub current_bid: Bid,
+    pub end_time: Expiration,
+    pub batch: BatchStatus,
+}
+
+#[cw_serde]
+pub enum BatchStatus {
+    Empty {},
+    Active {
+        user_intents: Vec<UserIntent>,
+        current_bid: Bid,
+    },
 }
 
 #[cw_serde]

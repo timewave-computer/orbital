@@ -15,7 +15,7 @@ pub struct InstantiateMsg {
     // auction time configurations expressed in seconds
     pub auction_duration: Duration,
     pub filling_window_duration: Duration,
-
+    pub cleanup_window_duration: Duration,
     // amount of tokens required to be posted as a slashable bond
     // in order to participate in the auction
     pub solver_bond: Coin,
@@ -59,6 +59,9 @@ pub enum QueryMsg {
 
     #[returns(Coin)]
     PostedBond { solver: String },
+
+    #[returns(crate::state::ActiveRoundConfig)]
+    ActiveRound {},
 }
 
 #[cw_serde]

@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     coin, ensure, to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply,
-    Response, StdResult,
+    Response, StdResult, Uint64,
 };
 use cw2::set_contract_version;
 use cw_utils::must_pay;
@@ -14,7 +14,10 @@ use neutron_sdk::{
 use crate::{
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{AuctionConfig, UserIntent, ADMIN, AUCTION_CONFIG, ORDERBOOK, POSTED_BONDS},
+    state::{
+        ActiveRoundConfig, AuctionConfig, BatchStatus, UserIntent, ACTIVE_AUCTION_CONFIG, ADMIN,
+        AUCTION_CONFIG, ORDERBOOK, POSTED_BONDS,
+    },
 };
 
 pub const CONTRACT_NAME: &str = "orbital-auction";
@@ -26,7 +29,7 @@ pub type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 #[entry_point]
 pub fn instantiate(
     deps: ExecuteDeps,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
@@ -39,12 +42,22 @@ pub fn instantiate(
         batch_size: msg.batch_size,
         auction_duration: msg.auction_duration,
         filling_window_duration: msg.filling_window_duration,
+        cleanup_window_duration: msg.cleanup_window_duration,
         route_config: msg.route_config,
         solver_bond: msg.solver_bond,
     };
 
     // save the auction configuration
     AUCTION_CONFIG.save(deps.storage, &auction_config)?;
+
+    // start the auction cycle with an empty batch
+    let active_round_config = ActiveRoundConfig {
+        id: Uint64::zero(),
+        batch: BatchStatus::Empty {},
+        start_time: env.block.time,
+        end_time: auction_config.get_total_round_duration()?.after(&env.block),
+    };
+    ACTIVE_AUCTION_CONFIG.save(deps.storage, &active_round_config)?;
 
     Ok(Response::default())
 }
@@ -132,6 +145,7 @@ pub fn query(deps: QueryDeps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::AuctionConfig {} => to_json_binary(&AUCTION_CONFIG.load(deps.storage)?),
         QueryMsg::Orderbook { from, limit } => to_json_binary(&query_orderbook(deps, from, limit)?),
         QueryMsg::PostedBond { solver } => to_json_binary(&query_posted_bond(deps, solver)?),
+        QueryMsg::ActiveRound {} => to_json_binary(&ACTIVE_AUCTION_CONFIG.load(deps.storage)?),
     }
 }
 
