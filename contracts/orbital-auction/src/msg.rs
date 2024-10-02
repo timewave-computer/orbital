@@ -27,7 +27,7 @@ pub enum ExecuteMsg {
     /// only callable by orbital-core which is responsible for escrowing orders.
     AddOrder(UserIntent),
     /// finalizes the current auction round and prepares for the next
-    FinalizeRound {},
+    Tick {},
     /// pause the auction, stopping any new orders from being accepted
     Pause {},
     /// resume the auction, allowing new orders to be accepted

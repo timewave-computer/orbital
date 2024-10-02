@@ -17,7 +17,7 @@ pub enum ContractError {
     #[error("No bond is posted by sender")]
     NoBondPosted {},
 
-    #[error("todo")]
+    #[error("auction phase error")]
     AuctionPhaseError {},
 }
 

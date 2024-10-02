@@ -199,3 +199,75 @@ fn test_solver_withdraw_posted_bond() {
         current_solver_atom_bal.amount.u128() + 100_000
     );
 }
+
+#[test]
+#[should_panic(expected = "auction phase error")]
+fn test_finalize_round_before_start_phase() {
+    unimplemented!()
+}
+
+#[test]
+#[should_panic(expected = "auction phase error")]
+fn test_finalize_round_bidding_phase() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+
+    suite.sync().unwrap();
+}
+
+#[test]
+fn test_finalize_round_filling_phase_filled() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+
+    let state = suite.query_current_phase().unwrap();
+    assert_eq!(state, AuctionPhase::Bidding);
+    suite.advance_to_next_phase();
+    let state = suite.query_current_phase().unwrap();
+    assert_eq!(state, AuctionPhase::Filling);
+    
+    let user_intent_1 = UserIntent {
+        user: "user1".to_string(),
+        amount: Uint128::new(100),
+        offer_domain: GAIA_DOMAIN.to_string(),
+        ask_domain: OSMOSIS_DOMAIN.to_string(),
+    };
+    let user_intent_2 = UserIntent {
+        user: "user2".to_string(),
+        amount: Uint128::new(321),
+        offer_domain: GAIA_DOMAIN.to_string(),
+        ask_domain: OSMOSIS_DOMAIN.to_string(),
+    };
+
+    suite.add_order(user_intent_1).unwrap();
+    suite.add_order(user_intent_2).unwrap();
+
+
+    println!("active_round: {:?}", suite.query_active_round_config().unwrap());
+
+    suite.sync().unwrap();
+
+    println!("active_round: {:?}", suite.query_active_round_config().unwrap());
+    
+}
+
+#[test]
+fn test_finalize_round_filling_phase_not_filled() {
+    unimplemented!()
+}
+
+
+#[test]
+fn test_finalize_round_cleanup_phase_filled() {
+    unimplemented!()
+}
+
+#[test]
+fn test_finalize_round_cleanup_phase_not_filled() {
+    unimplemented!()
+}
+
+#[test]
+#[should_panic]
+fn test_finalize_round_out_of_sync_phase() {
+    unimplemented!()
+}
+

@@ -41,6 +41,15 @@ impl Default for OrbitalAuctionBuilder {
 }
 
 impl Suite {
+    pub fn sync(&mut self) -> AnyResult<AppResponse> {
+        self.app.execute_contract(
+            self.orbital_core.clone(),
+            self.orbital_auction.clone(),
+            &ExecuteMsg::Tick {},
+            &[],
+        )
+    }
+
     pub fn add_order(&mut self, user_intent: UserIntent) -> AnyResult<AppResponse> {
         self.app.execute_contract(
             self.orbital_core.clone(),
@@ -71,6 +80,28 @@ impl Suite {
     pub fn advance_time(&mut self, seconds: u64) {
         self.app
             .update_block(|b| b.time = b.time.plus_seconds(seconds));
+    }
+
+    pub fn advance_to_next_phase(&mut self) {
+        let active_round_phases = self.query_active_round_config().unwrap().phases;
+        let current_phase = self.query_current_phase().unwrap();
+
+        let target_expiration = match current_phase {
+            AuctionPhase::Bidding => active_round_phases.auction_expiration,
+            AuctionPhase::Filling => active_round_phases.filling_expiration,
+            AuctionPhase::Cleanup => active_round_phases.cleanup_expiration,
+            AuctionPhase::OutOfSync => {
+                let new_exp = active_round_phases.cleanup_expiration + Duration::Time(1);
+                new_exp.unwrap()
+            }
+        };
+
+        let target_time = match target_expiration {
+            cw_utils::Expiration::AtTime(timestamp) => timestamp,
+            _ => panic!(),
+        };
+        self.app
+            .update_block(|b| b.time = target_time);
     }
 }
 

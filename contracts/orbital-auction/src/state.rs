@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, BlockInfo, Coin, StdResult, Uint128, Uint64};
+use cosmwasm_std::{Addr, BlockInfo, Coin, StdResult, Storage, Uint128, Uint64};
 use cw_storage_plus::{Deque, Item, Map};
 use cw_utils::{Duration, Expiration};
 
@@ -13,7 +13,7 @@ pub const AUCTION_ID: Item<Uint64> = Item::new("auction_id");
 pub const AUCTION_CONFIG: Item<AuctionConfig> = Item::new("auction_config");
 
 // current batch configuration
-pub const ACTIVE_AUCTION_CONFIG: Item<AuctionRound> = Item::new("current_round_config");
+pub const ACTIVE_AUCTION: Item<AuctionRound> = Item::new("current_round_config");
 
 // archive of past auction rounds
 pub const AUCTION_ARCHIVE: Deque<AuctionRound> = Deque::new("auction_archive");
@@ -82,6 +82,28 @@ pub struct AuctionRound {
     pub batch: BatchStatus,
 }
 
+impl AuctionRound {
+    /// advances the current round to the next round:
+    /// - increments the round id
+    /// - shifts the expiration phases to start from the end
+    /// of current round cleanup phase expiration
+    /// - resets the batch to empty
+    pub fn advance(&self, storage: &mut dyn Storage) -> StdResult<Self> {
+        let auction_config = AUCTION_CONFIG.load(storage)?;
+
+        let next_id = self.id + Uint64::one();
+
+        let next_phases = self.phases.shift_phases(&auction_config.auction_phases)?;
+        let next_batch = BatchStatus::Empty {};
+
+        Ok(AuctionRound {
+            id: next_id,
+            phases: next_phases,
+            batch: next_batch,
+        })
+    }
+}
+
 #[cw_serde]
 pub struct RoundPhaseExpirations {
     pub start_expiration: Expiration,
@@ -106,6 +128,32 @@ impl RoundPhaseExpirations {
             auction_expiration: value.auction_duration.after(block),
             filling_expiration: filling_duration_from_t0.after(block),
             cleanup_expiration: cleanup_duration_from_t0.after(block),
+        };
+
+        Ok(phases)
+    }
+
+    pub fn shift_phases(
+        &self,
+        value: &AuctionPhaseConfig
+    ) -> StdResult<Self> {
+        // existing cleanup expiration becomes the new start expiration
+        let start_expiration = self.cleanup_expiration;
+
+        // auction expiration is the start expiration + auction duration
+        let auction_expiration = (start_expiration + value.auction_duration)?;
+
+        // filling expiration is the auction expiration + filling duration
+        let filling_expiration = (auction_expiration + value.filling_window_duration)?;
+
+        // cleanup expiration is the filling expiration + cleanup duration
+        let cleanup_expiration = (filling_expiration + value.cleanup_window_duration)?;
+
+        let phases = RoundPhaseExpirations {
+            start_expiration,
+            auction_expiration,
+            filling_expiration,
+            cleanup_expiration,
         };
 
         Ok(phases)
