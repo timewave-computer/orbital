@@ -40,6 +40,24 @@ impl Default for OrbitalAuctionBuilder {
     }
 }
 
+pub fn user_intent_1() -> UserIntent {
+    UserIntent {
+        user: "user1".to_string(),
+        amount: Uint128::new(100),
+        offer_domain: GAIA_DOMAIN.to_string(),
+        ask_domain: OSMOSIS_DOMAIN.to_string(),
+    }
+}
+
+pub fn user_intent_2() -> UserIntent {
+    UserIntent {
+        user: "user2".to_string(),
+        amount: Uint128::new(321),
+        offer_domain: GAIA_DOMAIN.to_string(),
+        ask_domain: OSMOSIS_DOMAIN.to_string(),
+    }
+}
+
 impl Suite {
     pub fn sync(&mut self) -> AnyResult<AppResponse> {
         self.app.execute_contract(
@@ -100,8 +118,7 @@ impl Suite {
             cw_utils::Expiration::AtTime(timestamp) => timestamp,
             _ => panic!(),
         };
-        self.app
-            .update_block(|b| b.time = target_time);
+        self.app.update_block(|b| b.time = target_time);
     }
 }
 

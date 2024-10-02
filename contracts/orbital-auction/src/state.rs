@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, BlockInfo, Coin, StdResult, Storage, Uint128, Uint64};
+use cosmwasm_std::{Addr, BlockInfo, Coin, StdError, StdResult, Storage, Uint128, Uint64};
 use cw_storage_plus::{Deque, Item, Map};
 use cw_utils::{Duration, Expiration};
 
@@ -79,7 +79,7 @@ impl AuctionPhaseConfig {
 pub struct AuctionRound {
     pub id: Uint64,
     pub phases: RoundPhaseExpirations,
-    pub batch: BatchStatus,
+    pub batch: Batch,
 }
 
 impl AuctionRound {
@@ -94,7 +94,12 @@ impl AuctionRound {
         let next_id = self.id + Uint64::one();
 
         let next_phases = self.phases.shift_phases(&auction_config.auction_phases)?;
-        let next_batch = BatchStatus::Empty {};
+        let next_batch = Batch {
+            batch_capacity: auction_config.batch_size,
+            batch_size: Uint128::zero(),
+            user_intents: vec![],
+            current_bid: None,
+        };
 
         Ok(AuctionRound {
             id: next_id,
@@ -133,10 +138,7 @@ impl RoundPhaseExpirations {
         Ok(phases)
     }
 
-    pub fn shift_phases(
-        &self,
-        value: &AuctionPhaseConfig
-    ) -> StdResult<Self> {
+    pub fn shift_phases(&self, value: &AuctionPhaseConfig) -> StdResult<Self> {
         // existing cleanup expiration becomes the new start expiration
         let start_expiration = self.cleanup_expiration;
 
@@ -183,12 +185,23 @@ pub enum AuctionPhase {
 }
 
 #[cw_serde]
-pub enum BatchStatus {
-    Empty {},
-    Active {
-        user_intents: Vec<UserIntent>,
-        current_bid: Bid,
-    },
+pub struct Batch {
+    pub batch_capacity: Uint128,
+    pub batch_size: Uint128,
+    pub user_intents: Vec<UserIntent>,
+    pub current_bid: Option<Bid>,
+}
+
+impl Batch {
+    pub fn include_order(&mut self, order: UserIntent) -> StdResult<()> {
+        if self.batch_size + order.amount <= self.batch_capacity {
+            self.batch_size += order.amount;
+            self.user_intents.push(order);
+            Ok(())
+        } else {
+            Err(StdError::generic_err("order exceeds batch capacity"))
+        }
+    }
 }
 
 #[cw_serde]

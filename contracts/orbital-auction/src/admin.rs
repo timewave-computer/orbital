@@ -22,5 +22,9 @@ pub fn enqueue_user_intent(
     // add the user intent to the end of the orderbook queue
     ORDERBOOK.push_back(deps.storage, &user_intent)?;
 
+    // TODO: if this order is the only order in the orderbook &
+    // active auction is not yet started (finalized & due to start),
+    // try to push this order into the active auction for faster inclusion.
+
     Ok(Response::default())
 }

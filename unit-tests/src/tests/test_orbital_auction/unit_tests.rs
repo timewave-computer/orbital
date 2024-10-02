@@ -1,11 +1,10 @@
-use cosmwasm_std::{coin, Uint128};
+use cosmwasm_std::{coin, Uint128, Uint64};
 use cw_utils::{Duration, Expiration};
-use orbital_auction::state::{
-    AuctionPhase, BatchStatus, RoundPhaseExpirations, RouteConfig, UserIntent,
-};
+use orbital_auction::state::{AuctionPhase, RoundPhaseExpirations, RouteConfig, UserIntent};
 
-use crate::testing_utils::consts::{
-    DENOM_ATOM, DENOM_NTRN, DENOM_OSMO, GAIA_DOMAIN, OSMOSIS_DOMAIN,
+use crate::{
+    testing_utils::consts::{DENOM_ATOM, DENOM_NTRN, DENOM_OSMO, GAIA_DOMAIN, OSMOSIS_DOMAIN},
+    tests::test_orbital_auction::suite::{user_intent_1, user_intent_2},
 };
 
 use super::suite::OrbitalAuctionBuilder;
@@ -44,7 +43,8 @@ fn test_init() {
         }
     );
     assert_eq!(active_round.id.u64(), 0);
-    assert_eq!(active_round.batch, BatchStatus::Empty {});
+    assert_eq!(active_round.batch.batch_size, Uint128::zero());
+    assert_eq!(active_round.batch.batch_capacity, Uint128::new(10000000));
     assert_eq!(
         active_round.phases,
         RoundPhaseExpirations {
@@ -218,35 +218,24 @@ fn test_finalize_round_bidding_phase() {
 fn test_finalize_round_filling_phase_filled() {
     let mut suite = OrbitalAuctionBuilder::default().build();
 
-    let state = suite.query_current_phase().unwrap();
-    assert_eq!(state, AuctionPhase::Bidding);
+    // add a couple of user intents to the orderbook
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+
+    // advance to filling phase
     suite.advance_to_next_phase();
-    let state = suite.query_current_phase().unwrap();
-    assert_eq!(state, AuctionPhase::Filling);
-    
-    let user_intent_1 = UserIntent {
-        user: "user1".to_string(),
-        amount: Uint128::new(100),
-        offer_domain: GAIA_DOMAIN.to_string(),
-        ask_domain: OSMOSIS_DOMAIN.to_string(),
-    };
-    let user_intent_2 = UserIntent {
-        user: "user2".to_string(),
-        amount: Uint128::new(321),
-        offer_domain: GAIA_DOMAIN.to_string(),
-        ask_domain: OSMOSIS_DOMAIN.to_string(),
-    };
 
-    suite.add_order(user_intent_1).unwrap();
-    suite.add_order(user_intent_2).unwrap();
-
-
-    println!("active_round: {:?}", suite.query_active_round_config().unwrap());
+    let orderbook = suite.query_orderbook().unwrap();
+    assert_eq!(orderbook.len(), 2);
+    let active_round = suite.query_active_round_config().unwrap();
+    assert_eq!(active_round.id, Uint64::zero());
 
     suite.sync().unwrap();
 
-    println!("active_round: {:?}", suite.query_active_round_config().unwrap());
-    
+    let orderbook = suite.query_orderbook().unwrap();
+    assert_eq!(orderbook.len(), 0);
+    let active_round = suite.query_active_round_config().unwrap();
+    assert_eq!(active_round.id, Uint64::new(1));
 }
 
 #[test]
@@ -254,10 +243,30 @@ fn test_finalize_round_filling_phase_not_filled() {
     unimplemented!()
 }
 
-
 #[test]
 fn test_finalize_round_cleanup_phase_filled() {
-    unimplemented!()
+    let mut suite = OrbitalAuctionBuilder::default().build();
+
+    // add a couple of user intents to the orderbook
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    let orderbook = suite.query_orderbook().unwrap();
+    assert_eq!(orderbook.len(), 2);
+    let active_round = suite.query_active_round_config().unwrap();
+    assert_eq!(active_round.id, Uint64::zero());
+
+    suite.sync().unwrap();
+
+    let orderbook = suite.query_orderbook().unwrap();
+    assert_eq!(orderbook.len(), 0);
+    let active_round = suite.query_active_round_config().unwrap();
+    assert_eq!(active_round.id, Uint64::new(1));
 }
 
 #[test]
@@ -270,4 +279,3 @@ fn test_finalize_round_cleanup_phase_not_filled() {
 fn test_finalize_round_out_of_sync_phase() {
     unimplemented!()
 }
-

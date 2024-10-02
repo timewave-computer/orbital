@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    coin, ensure, to_json_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply, Response,
-    StdResult, Uint64,
+    coin, ensure, to_json_binary, Addr, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply,
+    Response, StdResult, Storage, Uint128, Uint64,
 };
 use cw2::set_contract_version;
 use neutron_sdk::{
@@ -16,7 +16,9 @@ use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     solver,
     state::{
-        AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, BatchStatus, RoundPhaseExpirations, UserIntent, ACTIVE_AUCTION, ADMIN, AUCTION_ARCHIVE, AUCTION_CONFIG, ORDERBOOK, POSTED_BONDS
+        AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, Batch,
+        RoundPhaseExpirations, UserIntent, ACTIVE_AUCTION, ADMIN, AUCTION_ARCHIVE, AUCTION_CONFIG,
+        ORDERBOOK, POSTED_BONDS,
     },
 };
 
@@ -49,7 +51,12 @@ pub fn instantiate(
     let active_round = AuctionRound {
         id: Uint64::zero(),
         // start the auction cycle with an empty batch
-        batch: BatchStatus::Empty {},
+        batch: Batch {
+            batch_capacity: msg.batch_size,
+            batch_size: Uint128::zero(),
+            user_intents: vec![],
+            current_bid: None,
+        },
         phases: RoundPhaseExpirations::from_auction_config(
             &auction_config.auction_phases,
             &env.block,
@@ -81,7 +88,6 @@ pub fn execute(
         ExecuteMsg::Bid {} => unimplemented!(),
         ExecuteMsg::PostBond {} => solver::try_post_bond(deps, info),
         ExecuteMsg::WithdrawBond {} => solver::try_withdraw_posted_bond(deps, info),
-        ExecuteMsg::Prove {} => unimplemented!(),
 
         // admin-gated actions. should we add a RemoveOrder?
         // if order is not included in a batch yet, seems like there is no risk to that.
@@ -112,46 +118,75 @@ fn try_finalize_round(deps: ExecuteDeps, env: Env) -> NeutronResult<Response<Neu
         AuctionPhase::Bidding => Err(ContractError::AuctionPhaseError {}.into()),
         AuctionPhase::Filling => {
             let order_filled = query_order_filling_status(deps.as_ref())?;
-            match order_filled {
-                // if order is filled, we finalize the round and prepare for the next one.
-                true => {
-                    // first initialize the next round and replace the active round with it
-                    let next_round = active_auction.advance(deps.storage)?;
-                    ACTIVE_AUCTION.save(deps.storage, &next_round)?;
 
-                    // then archive the current round
-                    AUCTION_ARCHIVE.push_front(deps.storage, &active_auction)?;
+            // if order is filled, we finalize the round and prepare for the next one.
+            if order_filled {
+                start_new_round(deps.storage, active_auction)?;
 
-                    Ok(Response::default())
-                },
+                // TODO: credit the solver
+                Ok(Response::default())
+            } else {
                 // if order is not yet filled, we do nothing.
                 // solver still has time to fill their order and finalize the round.
-                false => Ok(Response::default()),
+                Ok(Response::default())
             }
-        },
+        }
         // in the cleanup phase, we finalize the round and prepare for the next one.
         AuctionPhase::Cleanup => {
             let order_filled = query_order_filling_status(deps.as_ref())?;
-            match order_filled {
-                // if the solver succeeded, we do not slash the solver and prepare for the next round.
-                true => {
 
-                    Ok(Response::default())
-                },
+            // if the solver succeeded, we do not slash the solver and prepare for the next round.
+            if order_filled {
+                start_new_round(deps.storage, active_auction)?;
+                // TODO: credit the solver
+                Ok(Response::default())
+            } else {
                 // if the solver failed to fill the order, we slash the solver, refund the users,
                 // and prepare for the next round.
-                false => {
 
-                    Ok(Response::default())
-                },
+                // first we slash the solver. TODO: remove unwrap and handle case with no bids
+                let winning_bid = active_auction.batch.current_bid.clone().unwrap();
+                slash_solver(deps.storage, winning_bid.solver)?;
+
+                // then start the new round
+                start_new_round(deps.storage, active_auction)?;
+
+                // TODO: refund users
+                Ok(Response::default())
             }
-        },
+        }
         // if we are out of sync, that means the round had failed to be finalized during
         // the filling and cleanup phases. given that this should only happen in case of
         // any sort of infra failure, this likely involves pausing the auction
         // and requiring admin intervention.
         AuctionPhase::OutOfSync => unimplemented!(),
     }
+}
+
+/// queries the auction config to find the configured bond for this auction
+/// and slashes the solver's bond accordingly.
+fn slash_solver(storage: &mut dyn Storage, solver: Addr) -> StdResult<()> {
+    let auction_config = AUCTION_CONFIG.load(storage)?;
+    let mut posted_bond = POSTED_BONDS.load(storage, solver.to_string())?;
+    posted_bond.amount = posted_bond
+        .amount
+        .checked_sub(auction_config.solver_bond.amount)?;
+
+    POSTED_BONDS.save(storage, solver.to_string(), &posted_bond)?;
+
+    Ok(())
+}
+
+/// archives the current round and prepares the next active round
+fn start_new_round(storage: &mut dyn Storage, active_auction: AuctionRound) -> StdResult<()> {
+    // first initialize the next round and replace the active round with it
+    let next_round = active_auction.advance(storage)?;
+    ACTIVE_AUCTION.save(storage, &next_round)?;
+
+    // then archive the current round
+    AUCTION_ARCHIVE.push_front(storage, &active_auction)?;
+
+    Ok(())
 }
 
 /// query orbital-core contract to check if solver had deposited the funds

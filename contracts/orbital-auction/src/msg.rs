@@ -42,9 +42,6 @@ pub enum ExecuteMsg {
 
     /// bid on the current auction
     Bid {},
-
-    /// initiate confirmation of filling the order for the auction round
-    Prove {},
 }
 
 #[cw_serde]
