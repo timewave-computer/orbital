@@ -16,9 +16,9 @@ use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     solver,
     state::{
-        AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, Batch,
-        RoundPhaseExpirations, UserIntent, ACTIVE_AUCTION, ADMIN, AUCTION_ARCHIVE, AUCTION_CONFIG,
-        ORDERBOOK, POSTED_BONDS,
+        AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, Batch, Bid,
+        RoundPhaseExpirations, UserIntent, ACTIVE_AUCTION, AUCTION_ARCHIVE, AUCTION_CONFIG,
+        ORBITAL_CORE, ORDERBOOK, POSTED_BONDS,
     },
 };
 
@@ -63,8 +63,8 @@ pub fn instantiate(
         )?,
     };
 
-    // set the sender as admin
-    ADMIN.save(deps.storage, &info.sender)?;
+    // set the sender as orbital-core
+    ORBITAL_CORE.save(deps.storage, &info.sender)?;
 
     // save the auction-related configs
     AUCTION_CONFIG.save(deps.storage, &auction_config)?;
@@ -82,10 +82,17 @@ pub fn execute(
 ) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
         // permisionless action
-        ExecuteMsg::Tick {} => try_finalize_round(deps, env),
+        ExecuteMsg::Tick { mock_fill_status } => try_finalize_round(deps, env, mock_fill_status),
 
         // solver actions
-        ExecuteMsg::Bid {} => unimplemented!(),
+        ExecuteMsg::Bid { amount } => solver::try_bid(
+            deps,
+            Bid {
+                solver: info.sender,
+                amount,
+                bid_block: env.block,
+            },
+        ),
         ExecuteMsg::PostBond {} => solver::try_post_bond(deps, info),
         ExecuteMsg::WithdrawBond {} => solver::try_withdraw_posted_bond(deps, info),
 
@@ -98,7 +105,12 @@ pub fn execute(
 }
 
 /// action to finalize the current round and prepare for the next one.
-fn try_finalize_round(deps: ExecuteDeps, env: Env) -> NeutronResult<Response<NeutronMsg>> {
+// `mock_fill_status` here is temp for unit testing
+fn try_finalize_round(
+    deps: ExecuteDeps,
+    env: Env,
+    mock_fill_status: bool,
+) -> NeutronResult<Response<NeutronMsg>> {
     let active_auction = ACTIVE_AUCTION.load(deps.storage)?;
 
     // first we check if the active auction is not yet started. this can be the case
@@ -112,18 +124,19 @@ fn try_finalize_round(deps: ExecuteDeps, env: Env) -> NeutronResult<Response<Neu
         ContractError::AuctionPhaseError {}
     );
 
+    // TODO: handle cases where no bids are placed. applies from Filling phase onwards.
+
     // depending on the phase we are in, finalization is handled differently:
     match query_active_auction(deps.as_ref(), env)? {
         // no-op as there is nothing to finalize in the bidding phase
         AuctionPhase::Bidding => Err(ContractError::AuctionPhaseError {}.into()),
         AuctionPhase::Filling => {
-            let order_filled = query_order_filling_status(deps.as_ref())?;
+            let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
 
             // if order is filled, we finalize the round and prepare for the next one.
             if order_filled {
                 start_new_round(deps.storage, active_auction)?;
-
-                // TODO: credit the solver
+                // TODO: credit the users & solver
                 Ok(Response::default())
             } else {
                 // if order is not yet filled, we do nothing.
@@ -133,12 +146,12 @@ fn try_finalize_round(deps: ExecuteDeps, env: Env) -> NeutronResult<Response<Neu
         }
         // in the cleanup phase, we finalize the round and prepare for the next one.
         AuctionPhase::Cleanup => {
-            let order_filled = query_order_filling_status(deps.as_ref())?;
+            let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
 
             // if the solver succeeded, we do not slash the solver and prepare for the next round.
             if order_filled {
                 start_new_round(deps.storage, active_auction)?;
-                // TODO: credit the solver
+                // TODO: credit the users & solver
                 Ok(Response::default())
             } else {
                 // if the solver failed to fill the order, we slash the solver, refund the users,
@@ -191,17 +204,17 @@ fn start_new_round(storage: &mut dyn Storage, active_auction: AuctionRound) -> S
 
 /// query orbital-core contract to check if solver had deposited the funds
 /// into the clearing account
-fn query_order_filling_status(deps: QueryDeps) -> NeutronResult<bool> {
-    let _orbital_core = ADMIN.load(deps.storage)?;
+fn query_order_filling_status(deps: QueryDeps, mock_fill_status: bool) -> NeutronResult<bool> {
+    let _orbital_core = ORBITAL_CORE.load(deps.storage)?;
 
-    // TODO: query orbital-core. mocking with `true` for now.
-    Ok(true)
+    // TODO: query orbital-core
+    Ok(mock_fill_status)
 }
 
 #[entry_point]
 pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Admin {} => to_json_binary(&ADMIN.load(deps.storage)?),
+        QueryMsg::Admin {} => to_json_binary(&ORBITAL_CORE.load(deps.storage)?),
         QueryMsg::AuctionConfig {} => to_json_binary(&AUCTION_CONFIG.load(deps.storage)?),
         QueryMsg::Orderbook { from, limit } => to_json_binary(&query_orderbook(deps, from, limit)?),
         QueryMsg::PostedBond { solver } => to_json_binary(&query_posted_bond(deps, solver)?),

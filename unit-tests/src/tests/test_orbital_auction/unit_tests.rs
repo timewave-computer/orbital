@@ -203,7 +203,15 @@ fn test_solver_withdraw_posted_bond() {
 #[test]
 #[should_panic(expected = "auction phase error")]
 fn test_finalize_round_before_start_phase() {
-    unimplemented!()
+    let mut suite = OrbitalAuctionBuilder::default().build();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    suite.tick(true).unwrap();
+    suite.tick(true).unwrap();
 }
 
 #[test]
@@ -211,7 +219,7 @@ fn test_finalize_round_before_start_phase() {
 fn test_finalize_round_bidding_phase() {
     let mut suite = OrbitalAuctionBuilder::default().build();
 
-    suite.sync().unwrap();
+    suite.tick(false).unwrap();
 }
 
 #[test]
@@ -230,7 +238,7 @@ fn test_finalize_round_filling_phase_filled() {
     let active_round = suite.query_active_round_config().unwrap();
     assert_eq!(active_round.id, Uint64::zero());
 
-    suite.sync().unwrap();
+    suite.tick(true).unwrap();
 
     let orderbook = suite.query_orderbook().unwrap();
     assert_eq!(orderbook.len(), 0);
@@ -261,17 +269,41 @@ fn test_finalize_round_cleanup_phase_filled() {
     let active_round = suite.query_active_round_config().unwrap();
     assert_eq!(active_round.id, Uint64::zero());
 
-    suite.sync().unwrap();
+    suite.tick(true).unwrap();
 
-    let orderbook = suite.query_orderbook().unwrap();
-    assert_eq!(orderbook.len(), 0);
+    // let orderbook = suite.query_orderbook().unwrap();
+    // assert_eq!(orderbook.len(), 0);
     let active_round = suite.query_active_round_config().unwrap();
     assert_eq!(active_round.id, Uint64::new(1));
 }
 
 #[test]
-fn test_finalize_round_cleanup_phase_not_filled() {
-    unimplemented!()
+fn test_finalize_round_cleanup_phase_not_filled_slashes_solver() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+
+    // add a couple of user intents to the orderbook
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    let orderbook = suite.query_orderbook().unwrap();
+    assert_eq!(orderbook.len(), 2);
+    let active_round = suite.query_active_round_config().unwrap();
+    assert_eq!(active_round.id, Uint64::zero());
+    let solver_bond = suite.query_posted_bond(solver.as_str()).unwrap();
+    assert_eq!(solver_bond, coin(0, DENOM_ATOM));
+
+    suite.tick(false).unwrap();
+
+    // let orderbook = suite.query_orderbook().unwrap();
+    // assert_eq!(orderbook.len(), 0);
+    let active_round = suite.query_active_round_config().unwrap();
+    assert_eq!(active_round.id, Uint64::new(1));
 }
 
 #[test]

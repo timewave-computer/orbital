@@ -59,11 +59,13 @@ pub fn user_intent_2() -> UserIntent {
 }
 
 impl Suite {
-    pub fn sync(&mut self) -> AnyResult<AppResponse> {
+    pub fn tick(&mut self, filled: bool) -> AnyResult<AppResponse> {
         self.app.execute_contract(
             self.orbital_core.clone(),
             self.orbital_auction.clone(),
-            &ExecuteMsg::Tick {},
+            &ExecuteMsg::Tick {
+                mock_fill_status: filled,
+            },
             &[],
         )
     }

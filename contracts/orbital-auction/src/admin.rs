@@ -4,7 +4,7 @@ use neutron_sdk::{bindings::msg::NeutronMsg, NeutronResult};
 use crate::{
     contract::ExecuteDeps,
     error::ContractError,
-    state::{UserIntent, ADMIN, ORDERBOOK},
+    state::{UserIntent, ORBITAL_CORE, ORDERBOOK},
 };
 
 /// admin-gated action to include a (validated) user intent into the orderbook.
@@ -15,7 +15,7 @@ pub fn enqueue_user_intent(
 ) -> NeutronResult<Response<NeutronMsg>> {
     // only the admin can enqueue new orders on behalf of the users
     ensure!(
-        info.sender == ADMIN.load(deps.storage)?,
+        info.sender == ORBITAL_CORE.load(deps.storage)?,
         ContractError::Unauthorized {}
     );
 

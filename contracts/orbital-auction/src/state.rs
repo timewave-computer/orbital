@@ -4,7 +4,7 @@ use cw_storage_plus::{Deque, Item, Map};
 use cw_utils::{Duration, Expiration};
 
 // authorized orbital-core address
-pub const ADMIN: Item<Addr> = Item::new("admin");
+pub const ORBITAL_CORE: Item<Addr> = Item::new("orbital_core");
 
 // identifier for current auction. advances on successful round.
 pub const AUCTION_ID: Item<Uint64> = Item::new("auction_id");

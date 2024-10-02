@@ -1,12 +1,47 @@
-use cosmwasm_std::{coin, BankMsg, MessageInfo, Response};
+use cosmwasm_std::{coin, ensure, BankMsg, MessageInfo, Response, Uint128};
 use cw_utils::must_pay;
 use neutron_sdk::{bindings::msg::NeutronMsg, NeutronResult};
 
 use crate::{
     contract::ExecuteDeps,
     error::ContractError,
-    state::{AUCTION_CONFIG, POSTED_BONDS},
+    state::{AuctionPhase, Bid, ACTIVE_AUCTION, AUCTION_CONFIG, POSTED_BONDS},
 };
+
+/// attempts to place a bid on the active auction round
+pub fn try_bid(deps: ExecuteDeps, bid: Bid) -> NeutronResult<Response<NeutronMsg>> {
+    // load the existing bond posted by the sender
+    let posted_bond = POSTED_BONDS.load(deps.storage, bid.solver.to_string())?;
+    let auction_config = AUCTION_CONFIG.load(deps.storage)?;
+    let mut active_auction = ACTIVE_AUCTION.load(deps.storage)?;
+
+    // ensure that solver had posted a bond high enough to bid on the auction
+    ensure!(
+        posted_bond.amount >= auction_config.solver_bond.amount,
+        ContractError::BondTooLow {}
+    );
+
+    // bids are only accepted during the bidding phase
+    ensure!(
+        active_auction.phases.get_current_phase(&bid.bid_block) == AuctionPhase::Bidding,
+        ContractError::AuctionPhaseError {}
+    );
+
+    active_auction.batch.current_bid = match active_auction.batch.current_bid {
+        Some(current_bid) => {
+            // first we assert that the bid is higher than the current one (and non-zero)
+            ensure!(
+                bid.amount > current_bid.amount && bid.amount > Uint128::zero(),
+                ContractError::BidTooLow {}
+            );
+            Some(bid)
+        }
+        None => Some(bid),
+    };
+    ACTIVE_AUCTION.save(deps.storage, &active_auction)?;
+
+    Ok(Response::default())
+}
 
 pub fn try_withdraw_posted_bond(
     deps: ExecuteDeps,

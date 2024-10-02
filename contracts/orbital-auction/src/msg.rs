@@ -27,7 +27,7 @@ pub enum ExecuteMsg {
     /// only callable by orbital-core which is responsible for escrowing orders.
     AddOrder(UserIntent),
     /// finalizes the current auction round and prepares for the next
-    Tick {},
+    Tick { mock_fill_status: bool },
     /// pause the auction, stopping any new orders from being accepted
     Pause {},
     /// resume the auction, allowing new orders to be accepted
@@ -41,7 +41,7 @@ pub enum ExecuteMsg {
     WithdrawBond {},
 
     /// bid on the current auction
-    Bid {},
+    Bid { amount: Uint128 },
 }
 
 #[cw_serde]
