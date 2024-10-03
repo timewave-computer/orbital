@@ -124,13 +124,19 @@ fn try_finalize_round(
         ContractError::AuctionPhaseError {}
     );
 
-    // TODO: handle cases where no bids are placed. applies from Filling phase onwards.
+
 
     // depending on the phase we are in, finalization is handled differently:
     match query_active_auction(deps.as_ref(), env)? {
         // no-op as there is nothing to finalize in the bidding phase
         AuctionPhase::Bidding => Err(ContractError::AuctionPhaseError {}.into()),
         AuctionPhase::Filling => {
+            // if no bids are placed, we finalize the round and prepare for the next one
+            if let None = active_auction.batch.current_bid {
+                start_new_round(deps.storage, active_auction)?;
+                return Ok(Response::default())
+            }
+            
             let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
 
             // if order is filled, we finalize the round and prepare for the next one.
@@ -146,6 +152,12 @@ fn try_finalize_round(
         }
         // in the cleanup phase, we finalize the round and prepare for the next one.
         AuctionPhase::Cleanup => {
+            // if no bids are placed, we finalize the round and prepare for the next one
+            if let None = active_auction.batch.current_bid {
+                start_new_round(deps.storage, active_auction)?;
+                return Ok(Response::default())
+            }
+            
             let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
 
             // if the solver succeeded, we do not slash the solver and prepare for the next round.
@@ -156,8 +168,6 @@ fn try_finalize_round(
             } else {
                 // if the solver failed to fill the order, we slash the solver, refund the users,
                 // and prepare for the next round.
-
-                // first we slash the solver. TODO: remove unwrap and handle case with no bids
                 let winning_bid = active_auction.batch.current_bid.clone().unwrap();
                 slash_solver(deps.storage, winning_bid.solver)?;
 

@@ -5,6 +5,7 @@ use orbital_auction::{
     msg::{ExecuteMsg, InstantiateMsg as OrbitalAuctionInstantiateMsg, QueryMsg},
     state::{AuctionConfig, AuctionPhase, AuctionRound, RouteConfig, UserIntent},
 };
+use cw_utils::Expiration::AtTime;
 
 use crate::testing_utils::{
     base_suite_builder::SuiteBuilder,
@@ -59,6 +60,16 @@ pub fn user_intent_2() -> UserIntent {
 }
 
 impl Suite {
+    pub fn bid(&mut self, solver: Addr, amount: u128) -> AnyResult<AppResponse> {
+        println!("solver placing a bid of {amount}");
+        self.app.execute_contract(
+            solver,
+            self.orbital_auction.clone(),
+            &ExecuteMsg::Bid { amount: amount.into() },
+            &[],
+        )
+    }
+
     pub fn tick(&mut self, filled: bool) -> AnyResult<AppResponse> {
         self.app.execute_contract(
             self.orbital_core.clone(),
@@ -104,23 +115,46 @@ impl Suite {
 
     pub fn advance_to_next_phase(&mut self) {
         let active_round_phases = self.query_active_round_config().unwrap().phases;
-        let current_phase = self.query_current_phase().unwrap();
 
-        let target_expiration = match current_phase {
-            AuctionPhase::Bidding => active_round_phases.auction_expiration,
-            AuctionPhase::Filling => active_round_phases.filling_expiration,
-            AuctionPhase::Cleanup => active_round_phases.cleanup_expiration,
-            AuctionPhase::OutOfSync => {
-                let new_exp = active_round_phases.cleanup_expiration + Duration::Time(1);
-                new_exp.unwrap()
+        let current_block = self.app.block_info();
+        if !active_round_phases.start_expiration.is_expired(&current_block) {
+            if let AtTime(t) = active_round_phases.start_expiration {
+                println!("_____BIDDING_PHASE______");
+                self.app.update_block(|b| b.time = t)
             }
-        };
+        } else if !active_round_phases.auction_expiration.is_expired(&current_block) {
+            if let AtTime(t) = active_round_phases.auction_expiration {
+                println!("_____FILLING_PHASE______");
+                self.app.update_block(|b| b.time = t)
+            }
+        } else if !active_round_phases.filling_expiration.is_expired(&current_block) {
+            if let AtTime(t) = active_round_phases.filling_expiration {
+                println!("_____CLEANUP_PHASE______");
+                self.app.update_block(|b| b.time = t)
+            }
+        } else if !active_round_phases.cleanup_expiration.is_expired(&current_block) {
+            if let AtTime(t) = active_round_phases.cleanup_expiration {
+                println!("____END_OF_CLEANUP_PHASE____");
+                self.app.update_block(|b| b.time = t)
+            }
+        }
+        // let current_phase = self.query_current_phase().unwrap();
 
-        let target_time = match target_expiration {
-            cw_utils::Expiration::AtTime(timestamp) => timestamp,
-            _ => panic!(),
-        };
-        self.app.update_block(|b| b.time = target_time);
+        // let target_expiration = match current_phase {
+        //     AuctionPhase::Bidding => active_round_phases.auction_expiration,
+        //     AuctionPhase::Filling => active_round_phases.filling_expiration,
+        //     AuctionPhase::Cleanup => active_round_phases.cleanup_expiration,
+        //     AuctionPhase::OutOfSync => {
+        //         let new_exp = active_round_phases.cleanup_expiration + Duration::Time(1);
+        //         new_exp.unwrap()
+        //     }
+        // };
+
+        // let target_time = match target_expiration {
+        //     cw_utils::Expiration::AtTime(timestamp) => timestamp,
+        //     _ => panic!(),
+        // };
+        // self.app.update_block(|b| b.time = target_time);
     }
 }
 

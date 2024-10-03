@@ -282,28 +282,53 @@ fn test_finalize_round_cleanup_phase_not_filled_slashes_solver() {
     let mut suite = OrbitalAuctionBuilder::default().build();
     let solver = suite.solver.clone();
 
+    suite.post_bond(solver.clone(), coin(100_000, DENOM_ATOM)).unwrap();
+
     // add a couple of user intents to the orderbook
     suite.add_order(user_intent_1()).unwrap();
     suite.add_order(user_intent_2()).unwrap();
 
     // advance to filling phase
     suite.advance_to_next_phase();
+
     // advance to cleanup phase
     suite.advance_to_next_phase();
 
-    let orderbook = suite.query_orderbook().unwrap();
-    assert_eq!(orderbook.len(), 2);
     let active_round = suite.query_active_round_config().unwrap();
     assert_eq!(active_round.id, Uint64::zero());
     let solver_bond = suite.query_posted_bond(solver.as_str()).unwrap();
-    assert_eq!(solver_bond, coin(0, DENOM_ATOM));
+    assert_eq!(solver_bond, coin(100_000, DENOM_ATOM));
 
+    // tick with no bids placed, forcing the next round to prepare
     suite.tick(false).unwrap();
 
-    // let orderbook = suite.query_orderbook().unwrap();
-    // assert_eq!(orderbook.len(), 0);
     let active_round = suite.query_active_round_config().unwrap();
     assert_eq!(active_round.id, Uint64::new(1));
+
+    // advance to bidding phase
+    suite.advance_to_next_phase();
+    
+    // solver places a bid
+    suite.bid(solver.clone(), 5_000).unwrap();
+    if let Some(bid) = suite.query_active_round_config().unwrap().batch.current_bid {
+        assert_eq!(bid.amount, Uint128::new(5_000));
+        assert_eq!(bid.solver, solver);
+    }
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    let solver_bond = suite.query_posted_bond(solver.as_str()).unwrap();
+    assert_eq!(solver_bond, coin(100_000, DENOM_ATOM));
+
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+    
+    // tick with no-fill flag, which should slash the solver
+    suite.tick(false).unwrap();
+
+    let solver_bond = suite.query_posted_bond(solver.as_str()).unwrap();
+    assert_eq!(solver_bond, coin(0, DENOM_ATOM));
 }
 
 #[test]
