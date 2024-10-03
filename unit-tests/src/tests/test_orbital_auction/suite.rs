@@ -59,6 +59,15 @@ pub fn user_intent_2() -> UserIntent {
     }
 }
 
+pub fn big_user_intent() -> UserIntent {
+    UserIntent {
+        user: "whale".to_string(),
+        amount: Uint128::new(1_500_000_000),
+        offer_domain: GAIA_DOMAIN.to_string(),
+        ask_domain: OSMOSIS_DOMAIN.to_string(),
+    }
+}
+
 impl Suite {
     pub fn bid(&mut self, solver: Addr, amount: u128) -> AnyResult<AppResponse> {
         println!("solver placing a bid of {amount}");

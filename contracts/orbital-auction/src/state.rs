@@ -67,14 +67,6 @@ pub struct AuctionPhaseConfig {
     pub cleanup_window_duration: Duration,
 }
 
-impl AuctionPhaseConfig {
-    /// returns the total duration of a round (in seconds),
-    /// which is the sum of the auction, filling, and cleaning window durations
-    pub fn get_total_round_duration(&self) -> StdResult<Duration> {
-        (self.auction_duration + self.filling_window_duration)? + self.cleanup_window_duration
-    }
-}
-
 #[cw_serde]
 pub struct AuctionRound {
     pub id: Uint64,

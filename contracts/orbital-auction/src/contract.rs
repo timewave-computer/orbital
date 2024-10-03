@@ -98,7 +98,9 @@ pub fn execute(
 
         // admin-gated actions. should we add a RemoveOrder?
         // if order is not included in a batch yet, seems like there is no risk to that.
-        ExecuteMsg::AddOrder(user_intent) => admin::enqueue_user_intent(deps, info, user_intent),
+        ExecuteMsg::AddOrder(user_intent) => {
+            admin::enqueue_user_intent(deps, info, env, user_intent)
+        }
         ExecuteMsg::Pause {} => unimplemented!(),
         ExecuteMsg::Resume {} => unimplemented!(),
     }

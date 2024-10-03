@@ -1,10 +1,14 @@
 use cosmwasm_std::{coin, Uint128, Uint64};
+use cw_multi_test::Executor;
 use cw_utils::{Duration, Expiration};
-use orbital_auction::state::{AuctionPhase, RoundPhaseExpirations, RouteConfig, UserIntent};
+use orbital_auction::{
+    msg::ExecuteMsg,
+    state::{AuctionPhase, RoundPhaseExpirations, RouteConfig, UserIntent},
+};
 
 use crate::{
     testing_utils::consts::{DENOM_ATOM, DENOM_NTRN, DENOM_OSMO, GAIA_DOMAIN, OSMOSIS_DOMAIN},
-    tests::test_orbital_auction::suite::{user_intent_1, user_intent_2},
+    tests::test_orbital_auction::suite::{big_user_intent, user_intent_1, user_intent_2},
 };
 
 use super::suite::OrbitalAuctionBuilder;
@@ -553,4 +557,96 @@ fn test_solver_withdraw_posted_bond_while_winning_bidder() {
     assert_eq!(current_bid.solver, solver);
 
     suite.withdraw_bond(solver.clone()).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Unauthorized")]
+fn test_enqueue_user_intent_non_admin() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+
+    suite
+        .app
+        .execute_contract(
+            suite.solver.clone(),
+            suite.orbital_auction.clone(),
+            &ExecuteMsg::AddOrder(user_intent_1()),
+            &[],
+        )
+        .unwrap();
+}
+
+#[test]
+fn test_enqueue_user_intent_pre_start_straight_to_batch() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+
+    suite.add_order(user_intent_1()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    // tick with no bids placed, forcing the next round to prepare
+    suite.tick(false).unwrap();
+
+    let batched_intents = suite
+        .query_active_round_config()
+        .unwrap()
+        .batch
+        .user_intents;
+    assert!(batched_intents.len() == 1);
+    let orderbook = suite.query_orderbook().unwrap();
+    assert!(orderbook.is_empty());
+
+    // from pre-start phase, we attempt to add a new intent to a non-full batch
+    suite.add_order(user_intent_2()).unwrap();
+
+    // assert it went straight to the batch and bypassed the orderbook
+    let batched_intents = suite
+        .query_active_round_config()
+        .unwrap()
+        .batch
+        .user_intents;
+    assert!(batched_intents.len() == 2);
+    let orderbook = suite.query_orderbook().unwrap();
+    assert!(orderbook.is_empty());
+}
+
+#[test]
+fn test_enqueue_user_intent_pre_start_big_order() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+
+    suite.add_order(user_intent_1()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    // tick with no bids placed, forcing the next round to prepare
+    suite.tick(false).unwrap();
+
+    let batched_intents = suite
+        .query_active_round_config()
+        .unwrap()
+        .batch
+        .user_intents;
+    assert!(batched_intents.len() == 1);
+    let orderbook = suite.query_orderbook().unwrap();
+    assert!(orderbook.is_empty());
+
+    // from pre-start phase, we attempt to add a huge intent to a non-full batch
+    suite.add_order(big_user_intent()).unwrap();
+
+    // assert it went straight to the batch and bypassed the orderbook
+    let batched_intents = suite
+        .query_active_round_config()
+        .unwrap()
+        .batch
+        .user_intents;
+    assert_eq!(batched_intents.len(), 1);
+    let orderbook = suite.query_orderbook().unwrap();
+    assert!(orderbook.len() == 1);
 }
