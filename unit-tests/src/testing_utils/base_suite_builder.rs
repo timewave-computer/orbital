@@ -3,7 +3,8 @@ use cw_multi_test::{BasicAppBuilder, Executor, MockApiBech32, SimpleAddressGener
 
 use super::{
     consts::{
-        ALL_DENOMS, CHAIN_PREFIX, DENOM_ATOM, DENOM_NTRN, FAUCET, NOTE, OWNER, SOLVER, USER_1,
+        ALL_DENOMS, CHAIN_PREFIX, DENOM_ATOM, DENOM_NTRN, FAUCET, NOTE, OWNER, SOLVER, SOLVER_2,
+        USER_1,
     },
     neutron_adapters::{
         neutron_module::NeutronKeeper,
@@ -42,6 +43,7 @@ pub struct SuiteBuilder {
     pub orbital_auction_code_id: u64,
     pub user_addr: Addr,
     pub solver: Addr,
+    pub solver_2: Addr,
 }
 
 impl Default for SuiteBuilder {
@@ -74,6 +76,7 @@ impl Default for SuiteBuilder {
         let note_addr = app.api().addr_make(NOTE);
         let user_addr = app.api().addr_make(USER_1);
         let solver_addr = app.api().addr_make(SOLVER);
+        let solver_2_addr = app.api().addr_make(SOLVER_2);
 
         app.send_tokens(
             faucet_addr.clone(),
@@ -96,6 +99,20 @@ impl Default for SuiteBuilder {
         )
         .unwrap();
 
+        app.send_tokens(
+            faucet_addr.clone(),
+            solver_2_addr.clone(),
+            &[coin(1_000_000, DENOM_NTRN)],
+        )
+        .unwrap();
+
+        app.send_tokens(
+            faucet_addr.clone(),
+            solver_2_addr.clone(),
+            &[coin(10_000_000, DENOM_ATOM)],
+        )
+        .unwrap();
+
         Self {
             faucet: faucet_addr,
             admin: owner_addr,
@@ -105,6 +122,7 @@ impl Default for SuiteBuilder {
             orbital_auction_code_id: auction_code_id,
             user_addr,
             solver: solver_addr,
+            solver_2: solver_2_addr,
         }
     }
 }

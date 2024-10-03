@@ -193,6 +193,14 @@ pub struct Batch {
 }
 
 impl Batch {
+    pub fn can_fit_order(&self, order: &UserIntent) -> bool {
+        self.batch_size + order.amount <= self.batch_capacity
+    }
+
+    pub fn remaining_capacity(&self) -> Uint128 {
+        self.batch_capacity - self.batch_size
+    }
+
     pub fn include_order(&mut self, order: UserIntent) -> StdResult<()> {
         if self.batch_size + order.amount <= self.batch_capacity {
             self.batch_size += order.amount;

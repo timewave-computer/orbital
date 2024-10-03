@@ -20,6 +20,9 @@ pub enum ContractError {
     #[error("Insufficient bond posted")]
     BondTooLow {},
 
+    #[error("Cannot withdraw bond while being the highest active bidder")]
+    BondWithdrawalError {},
+
     #[error("Current bid is higher")]
     BidTooLow {},
 

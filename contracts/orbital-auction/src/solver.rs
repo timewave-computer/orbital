@@ -47,6 +47,20 @@ pub fn try_withdraw_posted_bond(
     deps: ExecuteDeps,
     info: MessageInfo,
 ) -> NeutronResult<Response<NeutronMsg>> {
+    // ensure that the sender is not currently the highest bidder
+    ensure!(
+        ACTIVE_AUCTION
+            .may_load(deps.storage)?
+            .map_or(true, |auction| {
+                auction
+                    .batch
+                    .current_bid
+                    .as_ref()
+                    .map_or(true, |bid| bid.solver != info.sender)
+            }),
+        ContractError::BondWithdrawalError {}
+    );
+
     // load the existing bond posted by the sender
     let posted_bond = POSTED_BONDS.load(deps.storage, info.sender.to_string())?;
 

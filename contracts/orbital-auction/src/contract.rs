@@ -124,24 +124,24 @@ fn try_finalize_round(
         ContractError::AuctionPhaseError {}
     );
 
-
-
     // depending on the phase we are in, finalization is handled differently:
     match query_active_auction(deps.as_ref(), env)? {
         // no-op as there is nothing to finalize in the bidding phase
         AuctionPhase::Bidding => Err(ContractError::AuctionPhaseError {}.into()),
         AuctionPhase::Filling => {
             // if no bids are placed, we finalize the round and prepare for the next one
-            if let None = active_auction.batch.current_bid {
+            if active_auction.batch.current_bid.is_none() {
                 start_new_round(deps.storage, active_auction)?;
-                return Ok(Response::default())
+                process_orderbook(deps.storage)?;
+                return Ok(Response::default());
             }
-            
+
             let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
 
             // if order is filled, we finalize the round and prepare for the next one.
             if order_filled {
                 start_new_round(deps.storage, active_auction)?;
+                process_orderbook(deps.storage)?;
                 // TODO: credit the users & solver
                 Ok(Response::default())
             } else {
@@ -153,16 +153,18 @@ fn try_finalize_round(
         // in the cleanup phase, we finalize the round and prepare for the next one.
         AuctionPhase::Cleanup => {
             // if no bids are placed, we finalize the round and prepare for the next one
-            if let None = active_auction.batch.current_bid {
+            if active_auction.batch.current_bid.is_none() {
                 start_new_round(deps.storage, active_auction)?;
-                return Ok(Response::default())
+                process_orderbook(deps.storage)?;
+                return Ok(Response::default());
             }
-            
+
             let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
 
             // if the solver succeeded, we do not slash the solver and prepare for the next round.
             if order_filled {
                 start_new_round(deps.storage, active_auction)?;
+                process_orderbook(deps.storage)?;
                 // TODO: credit the users & solver
                 Ok(Response::default())
             } else {
@@ -173,6 +175,7 @@ fn try_finalize_round(
 
                 // then start the new round
                 start_new_round(deps.storage, active_auction)?;
+                process_orderbook(deps.storage)?;
 
                 // TODO: refund users
                 Ok(Response::default())
@@ -184,6 +187,36 @@ fn try_finalize_round(
         // and requiring admin intervention.
         AuctionPhase::OutOfSync => unimplemented!(),
     }
+}
+
+/// moves the user intents from the orderbook queue to the active auction batch
+fn process_orderbook(storage: &mut dyn Storage) -> StdResult<()> {
+    let mut active_auction = ACTIVE_AUCTION.load(storage)?;
+    let mut batch_capacity = active_auction.batch.remaining_capacity();
+
+    // we iterate over the head of the orderbook while the batch is not full
+    while !ORDERBOOK.is_empty(storage)? && batch_capacity > Uint128::zero() {
+        // grab the head of the orderbook
+        if let Some(intent) = ORDERBOOK.pop_front(storage)? {
+            if intent.amount <= batch_capacity {
+                // if it fits, we add it to the batch and update the capacity
+                println!("Moved head of orderbook into the batch: {:?}", intent);
+                active_auction.batch.user_intents.push(intent.clone());
+                batch_capacity = batch_capacity.checked_sub(intent.amount)?;
+            } else {
+                // if it doesn't fit, we push it back to the orderbook and break the loop
+                println!("Head of orderbook doesn't fit in the batch!");
+                ORDERBOOK.push_front(storage, &intent)?;
+                break;
+            }
+        } else {
+            println!("Fully processed the orderbook!");
+        }
+    }
+
+    ACTIVE_AUCTION.save(storage, &active_auction)?;
+
+    Ok(())
 }
 
 /// queries the auction config to find the configured bond for this auction

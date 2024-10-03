@@ -247,8 +247,40 @@ fn test_finalize_round_filling_phase_filled() {
 }
 
 #[test]
-fn test_finalize_round_filling_phase_not_filled() {
-    unimplemented!()
+fn test_finalize_round_filling_phase_not_filled_noop() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+
+    // add a couple of user intents to the orderbook
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    let orderbook = suite.query_orderbook().unwrap();
+    assert_eq!(orderbook.len(), 2);
+    let active_round = suite.query_active_round_config().unwrap();
+    assert_eq!(active_round.id, Uint64::zero());
+
+    suite.tick(false).unwrap();
+
+    // advance to bidding phase
+    suite.advance_to_next_phase();
+
+    suite.bid(solver.clone(), 5_000).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    // ticking without fulfilling the bid in the filling phase is a no-op
+    suite.tick(false).unwrap();
 }
 
 #[test]
@@ -282,7 +314,9 @@ fn test_finalize_round_cleanup_phase_not_filled_slashes_solver() {
     let mut suite = OrbitalAuctionBuilder::default().build();
     let solver = suite.solver.clone();
 
-    suite.post_bond(solver.clone(), coin(100_000, DENOM_ATOM)).unwrap();
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
 
     // add a couple of user intents to the orderbook
     suite.add_order(user_intent_1()).unwrap();
@@ -307,7 +341,7 @@ fn test_finalize_round_cleanup_phase_not_filled_slashes_solver() {
 
     // advance to bidding phase
     suite.advance_to_next_phase();
-    
+
     // solver places a bid
     suite.bid(solver.clone(), 5_000).unwrap();
     if let Some(bid) = suite.query_active_round_config().unwrap().batch.current_bid {
@@ -323,7 +357,7 @@ fn test_finalize_round_cleanup_phase_not_filled_slashes_solver() {
 
     // advance to cleanup phase
     suite.advance_to_next_phase();
-    
+
     // tick with no-fill flag, which should slash the solver
     suite.tick(false).unwrap();
 
@@ -335,4 +369,188 @@ fn test_finalize_round_cleanup_phase_not_filled_slashes_solver() {
 #[should_panic]
 fn test_finalize_round_out_of_sync_phase() {
     unimplemented!()
+}
+
+#[test]
+#[should_panic(expected = "Insufficient bond posted")]
+fn test_solver_bid_with_insufficient_bond_amount() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+
+    suite
+        .post_bond(solver.clone(), coin(10_000, DENOM_ATOM))
+        .unwrap();
+
+    // add a couple of user intents to the orderbook
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    // tick with no bids placed, forcing the next round to prepare
+    suite.tick(false).unwrap();
+
+    // advance to bidding phase
+    suite.advance_to_next_phase();
+
+    // solver places a bid
+    suite.bid(solver.clone(), 5_000).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "auction phase error")]
+fn test_solver_bid_during_non_bidding_phase() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+
+    // add a couple of user intents to the orderbook
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    // solver places a bid
+    suite.bid(solver.clone(), 5_000).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Current bid is higher")]
+fn test_solver_bid_with_lower_than_current_bid_amount() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+    let solver_2 = suite.solver_2.clone();
+
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+    suite
+        .post_bond(solver_2.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+
+    // add a couple of user intents to the orderbook
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    // tick with no bids placed, forcing the next round to prepare
+    suite.tick(false).unwrap();
+
+    // advance to bidding phase
+    suite.advance_to_next_phase();
+
+    suite.bid(solver.clone(), 5_000).unwrap();
+    suite.bid(solver_2.clone(), 4_000).unwrap();
+}
+
+#[test]
+fn test_solver_bid_happy() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+    let solver_2 = suite.solver_2.clone();
+
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+    suite
+        .post_bond(solver_2.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+
+    // add a couple of user intents to the orderbook
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    // tick with no bids placed, forcing the next round to prepare
+    suite.tick(false).unwrap();
+
+    // advance to bidding phase
+    suite.advance_to_next_phase();
+
+    let current_bid = suite.query_active_round_config().unwrap().batch.current_bid;
+    assert_eq!(current_bid, None);
+
+    suite.bid(solver.clone(), 5_000).unwrap();
+
+    let current_bid = suite
+        .query_active_round_config()
+        .unwrap()
+        .batch
+        .current_bid
+        .unwrap();
+    assert_eq!(current_bid.amount.u128(), 5_000);
+    assert_eq!(current_bid.solver, solver);
+
+    // solver 2 overbids
+    suite.bid(solver_2.clone(), 10_000).unwrap();
+
+    let current_bid = suite
+        .query_active_round_config()
+        .unwrap()
+        .batch
+        .current_bid
+        .unwrap();
+    assert_eq!(current_bid.amount.u128(), 10_000);
+    assert_eq!(current_bid.solver, solver_2);
+}
+
+#[test]
+#[should_panic(expected = "Cannot withdraw bond while being the highest active bidder")]
+fn test_solver_withdraw_posted_bond_while_winning_bidder() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+    let solver = suite.solver.clone();
+
+    suite
+        .post_bond(solver.clone(), coin(100_000, DENOM_ATOM))
+        .unwrap();
+
+    // add a couple of user intents to the orderbook
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    // tick with no bids placed, forcing the next round to prepare
+    suite.tick(false).unwrap();
+
+    // advance to bidding phase
+    suite.advance_to_next_phase();
+
+    let current_bid = suite.query_active_round_config().unwrap().batch.current_bid;
+    assert_eq!(current_bid, None);
+
+    suite.bid(solver.clone(), 5_000).unwrap();
+
+    let current_bid = suite
+        .query_active_round_config()
+        .unwrap()
+        .batch
+        .current_bid
+        .unwrap();
+    assert_eq!(current_bid.amount.u128(), 5_000);
+    assert_eq!(current_bid.solver, solver);
+
+    suite.withdraw_bond(solver.clone()).unwrap();
 }
