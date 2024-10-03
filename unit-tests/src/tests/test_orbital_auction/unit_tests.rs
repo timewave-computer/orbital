@@ -650,3 +650,42 @@ fn test_enqueue_user_intent_pre_start_big_order() {
     let orderbook = suite.query_orderbook().unwrap();
     assert!(orderbook.len() == 1);
 }
+
+#[test]
+fn test_processing_orderbook_splits_oversized_intent_orders() {
+    let mut suite = OrbitalAuctionBuilder::default().build();
+
+    // load three intents where the latest one is too big to fit in the batch
+    suite.add_order(user_intent_1()).unwrap();
+    suite.add_order(user_intent_2()).unwrap();
+    suite.add_order(big_user_intent()).unwrap();
+
+    // advance to filling phase
+    suite.advance_to_next_phase();
+
+    // advance to cleanup phase
+    suite.advance_to_next_phase();
+
+    let orderbook = suite.query_orderbook().unwrap();
+    assert_eq!(orderbook.len(), 3);
+
+    // we tick and force the new round to prepare
+    suite.tick(false).unwrap();
+
+    // the batch should contain three intents:
+    // - user_intent_1
+    // - user_intent_2
+    // - part of the big_user_intent
+    let active_batch = suite.query_active_round_config().unwrap().batch;
+
+    // batch should be full
+    assert_eq!(active_batch.batch_capacity, active_batch.batch_size);
+    assert_eq!(active_batch.user_intents.len(), 3);
+
+    let orderbook = suite.query_orderbook().unwrap();
+    assert_eq!(orderbook.len(), 1);
+    assert_eq!(
+        orderbook[0].amount.u128(),
+        1_500_000_000 - (10_000_000 - 100 - 321)
+    );
+}

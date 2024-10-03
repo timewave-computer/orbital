@@ -194,21 +194,23 @@ fn try_finalize_round(
 /// moves the user intents from the orderbook queue to the active auction batch
 fn process_orderbook(storage: &mut dyn Storage) -> StdResult<()> {
     let mut active_auction = ACTIVE_AUCTION.load(storage)?;
-    let mut batch_capacity = active_auction.batch.remaining_capacity();
 
     // we iterate over the head of the orderbook while the batch is not full
-    while !ORDERBOOK.is_empty(storage)? && batch_capacity > Uint128::zero() {
+    while !ORDERBOOK.is_empty(storage)?
+        && active_auction.batch.remaining_capacity() > Uint128::zero()
+    {
         // grab the head of the orderbook
         if let Some(intent) = ORDERBOOK.pop_front(storage)? {
-            if intent.amount <= batch_capacity {
+            if intent.amount <= active_auction.batch.remaining_capacity() {
                 // if it fits, we add it to the batch and update the capacity
-                println!("Moved head of orderbook into the batch: {:?}", intent);
-                active_auction.batch.user_intents.push(intent.clone());
-                batch_capacity = batch_capacity.checked_sub(intent.amount)?;
+                active_auction.batch.include_order(intent.clone())?;
             } else {
-                // if it doesn't fit, we push it back to the orderbook and break the loop
-                println!("Head of orderbook doesn't fit in the batch!");
-                ORDERBOOK.push_front(storage, &intent)?;
+                // if it doesn't fit, we check if we could include at least a part of it
+                // and then push the rest back to the orderbook
+                let (fitting, rest) =
+                    intent.split_order(active_auction.batch.remaining_capacity())?;
+                active_auction.batch.include_order(fitting.clone())?;
+                ORDERBOOK.push_front(storage, &rest)?;
                 break;
             }
         } else {

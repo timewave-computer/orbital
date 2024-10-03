@@ -36,6 +36,29 @@ pub struct UserIntent {
     pub ask_domain: String,
 }
 
+impl UserIntent {
+    /// splits the order into two orders, one with the given amount and the remainder.
+    /// returns an error if the amount exceeds the order amount. if it doesn't, returns
+    /// a tuple in the form of (new_order, remainder).
+    pub fn split_order(&self, amount: Uint128) -> StdResult<(UserIntent, UserIntent)> {
+        let new_order = UserIntent {
+            user: self.user.clone(),
+            amount,
+            offer_domain: self.offer_domain.clone(),
+            ask_domain: self.ask_domain.clone(),
+        };
+
+        let remainder = UserIntent {
+            user: self.user.clone(),
+            amount: self.amount.checked_sub(amount)?,
+            offer_domain: self.offer_domain.clone(),
+            ask_domain: self.ask_domain.clone(),
+        };
+
+        Ok((new_order, remainder))
+    }
+}
+
 #[cw_serde]
 pub struct AuctionConfig {
     // how many of the offer denom we can fit in a batch
