@@ -1,12 +1,12 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{
-    ensure, Api, Binary, Coin, MessageInfo, QueryRequest, StdError, StdResult, Uint64,
-};
-use neutron_sdk::bindings::{msg::NeutronMsg, query::NeutronQuery};
+use cosmwasm_std::{ensure, Api, Coin, MessageInfo, StdError, StdResult, Uint64};
+use neutron_sdk::bindings::msg::NeutronMsg;
 
 use crate::{
-    contract::ExecuteDeps, error::ContractError, state::OrbitalDomainConfig,
-    utils::assert_fee_payment,
+    contract::ExecuteDeps,
+    error::ContractError,
+    state::OrbitalDomainConfig,
+    utils::fees::{assert_fee_payment, query_ica_registration_fee},
 };
 
 #[cw_serde]
@@ -70,25 +70,7 @@ impl OrbitalDomainConfig {
     ) -> Result<NeutronMsg, ContractError> {
         match self {
             OrbitalDomainConfig::InterchainAccount { connection_id, .. } => {
-                // TODO: remove this explicit allow
-                #[allow(deprecated)]
-                let stargate_query_msg: QueryRequest<NeutronQuery> = QueryRequest::Stargate {
-                    path: "/neutron.interchaintxs.v1.Query/Params".to_string(),
-                    data: Binary::default(),
-                };
-
-                #[cw_serde]
-                struct Params {
-                    pub msg_submit_tx_max_messages: Uint64,
-                    pub register_fee: Vec<Coin>,
-                }
-
-                #[cw_serde]
-                struct QueryParamsResponse {
-                    pub params: Option<Params>,
-                }
-
-                let response: QueryParamsResponse = deps.querier.query(&stargate_query_msg)?;
+                let response = query_ica_registration_fee(deps)?;
 
                 // if fee_coins is empty, set value to None; otherwise - set it to Some(fee_coins)
                 let registration_fees = if let Some(val) = response.params {

@@ -1,6 +1,8 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint64};
 use cw_storage_plus::{Item, Map};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 /// keeping track of registered user IDs which get incremented
 /// with each new registration. it's needed to generate unique
@@ -18,7 +20,27 @@ pub const ORBITAL_DOMAINS: Map<String, OrbitalDomainConfig> = Map::new("domains"
 /// `utils::get_ica_identifier`. value is an optional address where:
 /// - None: clearing account is being registered and awaiting callback
 /// - Some: clearing account has been registered and is ready for use
-pub const CLEARING_ACCOUNTS: Map<String, Option<String>> = Map::new("clearing_accounts");
+pub const CLEARING_ACCOUNTS: Map<String, Option<ClearingAccountConfig>> =
+    Map::new("clearing_accounts");
+
+/// contains all transfers mapped by a recipient address observed by the contract.
+pub const RECIPIENT_TXS: Map<String, Vec<Transfer>> = Map::new("recipient_txs");
+/// contains number of transfers to addresses observed by the contract.
+pub const TRANSFERS: Item<u64> = Item::new("transfers");
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct Transfer {
+    pub recipient: String,
+    pub sender: String,
+    pub denom: String,
+    pub amount: String,
+}
+
+#[cw_serde]
+pub struct ClearingAccountConfig {
+    pub addr: String,
+    pub controller_connection_id: String,
+}
 
 #[cw_serde]
 pub struct UserConfig {

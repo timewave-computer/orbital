@@ -24,6 +24,9 @@ pub enum ContractError {
     #[error("User not registered")]
     UserNotRegistered {},
 
+    #[error("User not registered to domain: {0}")]
+    UserNotRegisteredToDomain(String),
+
     #[error("Unknown domain: {0}")]
     UnknownDomain(String),
 

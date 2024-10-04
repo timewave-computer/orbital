@@ -7,12 +7,16 @@ use log::info;
 use orbital_core::msg::InstantiateMsg;
 use std::{env, error::Error, time::Duration};
 use utils::{
-    admin_register_domain, query_balance_query_id, query_user_clearing_acc_addr_on_domain,
-    query_user_config, register_icq_balances_query, start_icq_relayer, user_register_orbital_core,
-    user_register_to_new_domain,
+    exec::{
+        admin_register_domain, register_icq_balances_query, register_icq_transfers_query,
+        user_register_orbital_core, user_register_to_new_domain, user_withdraw_funds_from_domain,
+    },
+    misc::{generate_icq_relayer_config, start_icq_relayer},
+    query::{
+        query_balance_query_id, query_icq_recipient_txs, query_icq_transfer_amount,
+        query_user_clearing_acc_addr_on_domain,
+    },
 };
-
-mod utils;
 
 pub const POLYTONE_PATH: &str = "local-interchaintest/wasms/polytone";
 pub const LOGS_FILE_PATH: &str = "local-interchaintest/configs/logs.json";
@@ -27,6 +31,7 @@ pub const ACC2_KEY: &str = "acc2";
 pub const ACC2_ADDR: &str = "neutron17lp3n649rxt2jadn455frcj0q6anjnds2s0ve9";
 
 pub const GAS_FLAGS: &str = "--gas=auto --gas-adjustment=3.0";
+mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
@@ -46,11 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let current_dir = env::current_dir()?;
 
     // with test context set up, we can generate the .env file for the icq relayer
-    utils::generate_icq_relayer_config(
-        &test_ctx,
-        current_dir.clone(),
-        JUNO_CHAIN_NAME.to_string(),
-    )?;
+    generate_icq_relayer_config(&test_ctx, current_dir.clone(), JUNO_CHAIN_NAME.to_string())?;
 
     // start the icq relayer. this runs in detached mode so we need
     // to manually kill it before each run for now.
@@ -60,7 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let orbital_core_local_path = format!("{}/artifacts/orbital_core.wasm", current_dir.display());
 
     info!("sleeping to allow icq relayer to start...");
-    std::thread::sleep(Duration::from_secs(30));
+    std::thread::sleep(Duration::from_secs(10));
 
     uploader
         .with_chain_name(NEUTRON_CHAIN_NAME)
@@ -113,6 +114,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     user_register_orbital_core(&test_ctx, ACC1_KEY, orbital_core.address.to_string())?;
     user_register_orbital_core(&test_ctx, ACC2_KEY, orbital_core.address.to_string())?;
 
+    std::thread::sleep(Duration::from_secs(3));
+
     // then we register them to gaia domain
     user_register_to_new_domain(
         &test_ctx,
@@ -144,14 +147,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     std::thread::sleep(Duration::from_secs(5));
 
-    query_user_config(&test_ctx, orbital_core.address.to_string(), ACC1_ADDR)?;
+    // query_user_config(&test_ctx, orbital_core.address.to_string(), ACC1_ADDR)?;
 
-    query_user_clearing_acc_addr_on_domain(
+    let _acc_1_gaia_addr = query_user_clearing_acc_addr_on_domain(
         &test_ctx,
         orbital_core.address.to_string(),
         ACC1_ADDR,
         GAIA_CHAIN_NAME.to_string(),
-    )?;
+    )?
+    .unwrap()
+    .addr;
 
     let acc_1_juno_addr = query_user_clearing_acc_addr_on_domain(
         &test_ctx,
@@ -159,7 +164,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         ACC1_ADDR,
         JUNO_CHAIN_NAME.to_string(),
     )?
-    .unwrap();
+    .unwrap()
+    .addr;
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    let _acc_2_gaia_addr = query_user_clearing_acc_addr_on_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC2_ADDR,
+        GAIA_CHAIN_NAME.to_string(),
+    )?
+    .unwrap()
+    .addr;
+    let acc_2_juno_addr = query_user_clearing_acc_addr_on_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC2_ADDR,
+        JUNO_CHAIN_NAME.to_string(),
+    )?
+    .unwrap()
+    .addr;
+
+    std::thread::sleep(Duration::from_secs(5));
 
     let icq_registration_response = register_icq_balances_query(
         &test_ctx,
@@ -192,40 +219,133 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let fee_coin = coin(50_000, "ujuno");
 
-    let cmd = format!(
-        "tx bank send {ACC0_KEY} {acc_1_juno_addr} {transfer_coins_str} --fees={fee_coin} --output=json"
-    );
     test_ctx
         .get_request_builder()
         .get_request_builder(JUNO_CHAIN_NAME)
-        .tx(&cmd, true)?;
+        .tx(&format!(
+            "tx bank send {ACC0_KEY} {acc_1_juno_addr} {transfer_coins_str} --fees={fee_coin} --output=json"
+        ), true)?;
 
+    info!("sleeping for 5...");
     std::thread::sleep(Duration::from_secs(5));
 
-    info!("querying icq result for query id 1...");
     let balance_query_response =
         query_balance_query_id(&test_ctx, orbital_core.address.to_string(), 1)?;
-
-    info!("balance query response: {:?}", balance_query_response);
-
     let post_transfer_balance = get_balance(
         test_ctx
             .get_request_builder()
             .get_request_builder(JUNO_CHAIN_NAME),
         acc_1_juno_addr.as_str(),
     );
-    info!("post_transfer_balance: {:?}", post_transfer_balance);
+    info!("ICQ balance query response  : {:?}", balance_query_response);
+    info!("native bal query response   : {:?}", post_transfer_balance);
 
     info!("sleeping for 5...");
     std::thread::sleep(Duration::from_secs(5));
+
     info!("transfering more juno");
     test_ctx
         .get_request_builder()
         .get_request_builder(JUNO_CHAIN_NAME)
-        .tx(&cmd, true)?;
+        .tx(&format!(
+            "tx bank send {ACC0_KEY} {acc_1_juno_addr} {transfer_coins_str} --fees={fee_coin} --output=json"
+        ), true)?;
 
-    info!("sleeping for 60sec...");
-    std::thread::sleep(Duration::from_secs(60));
+    info!("sleeping for 5...");
+    std::thread::sleep(Duration::from_secs(5));
+
+    let user_2_juno_bal = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_2_juno_addr.as_str(),
+    );
+    info!("user 2 juno acc balance   : {:?}", user_2_juno_bal);
+
+    user_withdraw_funds_from_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC1_KEY,
+        JUNO_CHAIN_NAME.to_string(),
+        acc_2_juno_addr.to_string(),
+        1_000_000,
+        "ujuno",
+    )?;
+
+    info!("sleeping for 5...");
+    std::thread::sleep(Duration::from_secs(5));
+
+    let balance_query_response =
+        query_balance_query_id(&test_ctx, orbital_core.address.to_string(), 1)?;
+    let post_transfer_balance = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_1_juno_addr.as_str(),
+    );
+    let user_2_juno_bal = get_balance(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(JUNO_CHAIN_NAME),
+        acc_2_juno_addr.as_str(),
+    );
+    info!(
+        "user1 ICQ balance query response  : {:?}",
+        balance_query_response
+    );
+    info!(
+        "user1 native bal query response   : {:?}",
+        post_transfer_balance
+    );
+
+    info!("user 2 juno acc balance   : {:?}", user_2_juno_bal);
+
+    info!("sleeping for 5...");
+    std::thread::sleep(Duration::from_secs(5));
+
+    info!("registering ICQ transfer queries on juno");
+    register_icq_transfers_query(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        JUNO_CHAIN_NAME.to_string(),
+        acc_2_juno_addr.to_string(),
+    )?;
+    std::thread::sleep(Duration::from_secs(5));
+    register_icq_transfers_query(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        JUNO_CHAIN_NAME.to_string(),
+        acc_1_juno_addr.to_string(),
+    )?;
+    std::thread::sleep(Duration::from_secs(15));
+
+    info!("user_2 withdrawing juno to user_1");
+
+    user_withdraw_funds_from_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC2_KEY,
+        JUNO_CHAIN_NAME.to_string(),
+        acc_1_juno_addr.to_string(),
+        1_000_000,
+        "ujuno",
+    )?;
+    std::thread::sleep(Duration::from_secs(15));
+
+    query_icq_recipient_txs(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        acc_1_juno_addr.to_string(),
+    )?;
+    std::thread::sleep(Duration::from_secs(5));
+
+    query_icq_recipient_txs(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        acc_2_juno_addr.to_string(),
+    )?;
+
+    query_icq_transfer_amount(&test_ctx, orbital_core.address.to_string())?;
 
     Ok(())
 }
