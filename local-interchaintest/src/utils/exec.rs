@@ -54,7 +54,7 @@ pub fn register_icq_balances_query(
         ACC0_KEY,
         &serde_json::to_string(&register_icq_msg)
             .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
-            NEUTRON_IBC_GAS_FLAG,
+        NEUTRON_IBC_GAS_FLAG,
     )
 }
 
@@ -85,7 +85,7 @@ pub fn register_icq_transfers_query(
         ACC0_KEY,
         &serde_json::to_string(&register_icq_msg)
             .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
-            NEUTRON_IBC_GAS_FLAG,
+        NEUTRON_IBC_GAS_FLAG,
     )
 }
 
@@ -114,7 +114,7 @@ pub fn user_withdraw_funds_from_domain(
         user_key,
         &serde_json::to_string(&withdraw_funds_msg)
             .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
-            NEUTRON_IBC_GAS_FLAG,
+        NEUTRON_IBC_GAS_FLAG,
     )
 }
 
