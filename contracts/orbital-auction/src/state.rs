@@ -90,6 +90,29 @@ pub struct AuctionPhaseConfig {
     pub cleanup_window_duration: Duration,
 }
 
+impl AuctionPhaseConfig {
+    /// validates that the auction phase configuration is all based on time (seconds).
+    pub fn validate(&self) -> StdResult<()> {
+        if let Duration::Height(_) = self.auction_duration {
+            return Err(StdError::generic_err(
+                "auction duration must be a time duration",
+            ));
+        }
+        if let Duration::Height(_) = self.filling_window_duration {
+            return Err(StdError::generic_err(
+                "filling duration must be a time duration",
+            ));
+        }
+        if let Duration::Height(_) = self.cleanup_window_duration {
+            return Err(StdError::generic_err(
+                "cleanup duration must be a time duration",
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 #[cw_serde]
 pub struct AuctionRound {
     pub id: Uint64,

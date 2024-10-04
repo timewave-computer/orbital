@@ -4,7 +4,9 @@ use cw_utils::Duration;
 use cw_utils::Expiration::AtTime;
 use orbital_auction::{
     msg::{ExecuteMsg, InstantiateMsg as OrbitalAuctionInstantiateMsg, QueryMsg},
-    state::{AuctionConfig, AuctionPhase, AuctionRound, RouteConfig, UserIntent},
+    state::{
+        AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, RouteConfig, UserIntent,
+    },
 };
 
 use crate::testing_utils::{
@@ -32,9 +34,11 @@ impl Default for OrbitalAuctionBuilder {
                     ask_denom: DENOM_OSMO.to_string(),
                 },
                 batch_size: Uint128::new(10_000_000),
-                auction_duration: Duration::Time(180),
-                filling_window_duration: Duration::Time(60),
-                cleanup_window_duration: Duration::Time(60),
+                auction_phase_config: AuctionPhaseConfig {
+                    auction_duration: Duration::Time(180),
+                    filling_window_duration: Duration::Time(60),
+                    cleanup_window_duration: Duration::Time(60),
+                },
                 solver_bond: coin(100_000, DENOM_ATOM),
             },
         }

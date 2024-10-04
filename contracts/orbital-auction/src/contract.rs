@@ -16,9 +16,8 @@ use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     solver,
     state::{
-        AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, Batch, Bid,
-        RoundPhaseExpirations, UserIntent, ACTIVE_AUCTION, AUCTION_ARCHIVE, AUCTION_CONFIG,
-        ORBITAL_CORE, ORDERBOOK, POSTED_BONDS,
+        AuctionConfig, AuctionPhase, AuctionRound, Batch, Bid, RoundPhaseExpirations, UserIntent,
+        ACTIVE_AUCTION, AUCTION_ARCHIVE, AUCTION_CONFIG, ORBITAL_CORE, ORDERBOOK, POSTED_BONDS,
     },
 };
 
@@ -37,13 +36,11 @@ pub fn instantiate(
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+    msg.auction_phase_config.validate()?;
+
     let auction_config = AuctionConfig {
         batch_size: msg.batch_size,
-        auction_phases: AuctionPhaseConfig {
-            auction_duration: msg.auction_duration,
-            filling_window_duration: msg.filling_window_duration,
-            cleanup_window_duration: msg.cleanup_window_duration,
-        },
+        auction_phases: msg.auction_phase_config,
         route_config: msg.route_config,
         solver_bond: msg.solver_bond,
     };
@@ -127,62 +124,11 @@ fn try_finalize_round(
     );
 
     // depending on the phase we are in, finalization is handled differently:
-    match query_active_auction(deps.as_ref(), env)? {
+    match query_active_auction_phase(deps.as_ref(), env)? {
         // no-op as there is nothing to finalize in the bidding phase
         AuctionPhase::Bidding => Err(ContractError::AuctionPhaseError {}.into()),
-        AuctionPhase::Filling => {
-            // if no bids are placed, we finalize the round and prepare for the next one
-            if active_auction.batch.current_bid.is_none() {
-                start_new_round(deps.storage, active_auction)?;
-                process_orderbook(deps.storage)?;
-                return Ok(Response::default());
-            }
-
-            let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
-
-            // if order is filled, we finalize the round and prepare for the next one.
-            if order_filled {
-                start_new_round(deps.storage, active_auction)?;
-                process_orderbook(deps.storage)?;
-                // TODO: credit the users & solver
-                Ok(Response::default())
-            } else {
-                // if order is not yet filled, we do nothing.
-                // solver still has time to fill their order and finalize the round.
-                Ok(Response::default())
-            }
-        }
-        // in the cleanup phase, we finalize the round and prepare for the next one.
-        AuctionPhase::Cleanup => {
-            // if no bids are placed, we finalize the round and prepare for the next one
-            if active_auction.batch.current_bid.is_none() {
-                start_new_round(deps.storage, active_auction)?;
-                process_orderbook(deps.storage)?;
-                return Ok(Response::default());
-            }
-
-            let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
-
-            // if the solver succeeded, we do not slash the solver and prepare for the next round.
-            if order_filled {
-                start_new_round(deps.storage, active_auction)?;
-                process_orderbook(deps.storage)?;
-                // TODO: credit the users & solver
-                Ok(Response::default())
-            } else {
-                // if the solver failed to fill the order, we slash the solver, refund the users,
-                // and prepare for the next round.
-                let winning_bid = active_auction.batch.current_bid.clone().unwrap();
-                slash_solver(deps.storage, winning_bid.solver)?;
-
-                // then start the new round
-                start_new_round(deps.storage, active_auction)?;
-                process_orderbook(deps.storage)?;
-
-                // TODO: refund users
-                Ok(Response::default())
-            }
-        }
+        AuctionPhase::Filling => tick_filling_phase(deps, active_auction, mock_fill_status),
+        AuctionPhase::Cleanup => tick_cleanup_phase(deps, active_auction, mock_fill_status),
         // if we are out of sync, that means the round had failed to be finalized during
         // the filling and cleanup phases. given that this should only happen in case of
         // any sort of infra failure, this likely involves pausing the auction
@@ -191,30 +137,91 @@ fn try_finalize_round(
     }
 }
 
+/// attempts to advance the auction state from the filling phase
+fn tick_filling_phase(
+    deps: ExecuteDeps,
+    active_auction: AuctionRound,
+    mock_fill_status: bool,
+) -> NeutronResult<Response<NeutronMsg>> {
+    // if we are in the filling phase and no bids had been placed,
+    // we finalize the round and prepare for the next one
+    if active_auction.batch.current_bid.is_none() {
+        start_new_round(deps.storage, active_auction)?;
+        process_orderbook(deps.storage)?;
+        return Ok(Response::default());
+    }
+
+    let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
+
+    // if order is filled, we finalize the round and prepare for the next one.
+    if order_filled {
+        start_new_round(deps.storage, active_auction)?;
+        process_orderbook(deps.storage)?;
+        // TODO: credit the users & solver
+        Ok(Response::default())
+    } else {
+        // if order is not yet filled, we do nothing.
+        // solver still has time to fill their order and finalize the round.
+        Ok(Response::default())
+    }
+}
+
+// in the cleanup phase, we finalize the round and prepare for the next one.
+fn tick_cleanup_phase(
+    deps: ExecuteDeps,
+    active_auction: AuctionRound,
+    mock_fill_status: bool,
+) -> NeutronResult<Response<NeutronMsg>> {
+    // if no bids are placed, we finalize the round and prepare for the next one
+    if active_auction.batch.current_bid.is_none() {
+        start_new_round(deps.storage, active_auction)?;
+        process_orderbook(deps.storage)?;
+        return Ok(Response::default());
+    }
+
+    let order_filled = query_order_filling_status(deps.as_ref(), mock_fill_status)?;
+
+    // if the solver succeeded, we do not slash the solver and prepare for the next round.
+    if order_filled {
+        start_new_round(deps.storage, active_auction)?;
+        process_orderbook(deps.storage)?;
+        // TODO: credit the users & solver
+        Ok(Response::default())
+    } else {
+        // if the solver failed to fill the order, we slash the solver, refund the users,
+        // and prepare for the next round.
+        let winning_bid = active_auction.batch.current_bid.clone().unwrap();
+        slash_solver(deps.storage, winning_bid.solver)?;
+
+        // then start the new round
+        start_new_round(deps.storage, active_auction)?;
+        process_orderbook(deps.storage)?;
+
+        // TODO: refund users
+        Ok(Response::default())
+    }
+}
+
 /// moves the user intents from the orderbook queue to the active auction batch
 fn process_orderbook(storage: &mut dyn Storage) -> StdResult<()> {
     let mut active_auction = ACTIVE_AUCTION.load(storage)?;
 
-    // we iterate over the head of the orderbook while the batch is not full
     while !ORDERBOOK.is_empty(storage)?
         && active_auction.batch.remaining_capacity() > Uint128::zero()
     {
-        // grab the head of the orderbook
         if let Some(intent) = ORDERBOOK.pop_front(storage)? {
-            if intent.amount <= active_auction.batch.remaining_capacity() {
+            let capacity = active_auction.batch.remaining_capacity();
+            if intent.amount <= capacity {
                 // if it fits, we add it to the batch and update the capacity
-                active_auction.batch.include_order(intent.clone())?;
+                active_auction.batch.include_order(intent)?;
             } else {
                 // if it doesn't fit, we check if we could include at least a part of it
                 // and then push the rest back to the orderbook
-                let (fitting, rest) =
-                    intent.split_order(active_auction.batch.remaining_capacity())?;
-                active_auction.batch.include_order(fitting.clone())?;
-                ORDERBOOK.push_front(storage, &rest)?;
+                let (fitting, leftover) = intent.split_order(capacity)?;
+                active_auction.batch.include_order(fitting)?;
+                ORDERBOOK.push_front(storage, &leftover)?;
                 break;
             }
-        } else {
-            println!("Fully processed the orderbook!");
         }
     }
 
@@ -266,11 +273,11 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Orderbook { from, limit } => to_json_binary(&query_orderbook(deps, from, limit)?),
         QueryMsg::PostedBond { solver } => to_json_binary(&query_posted_bond(deps, solver)?),
         QueryMsg::ActiveRound {} => to_json_binary(&ACTIVE_AUCTION.load(deps.storage)?),
-        QueryMsg::AuctionPhase {} => to_json_binary(&query_active_auction(deps, env)?),
+        QueryMsg::AuctionPhase {} => to_json_binary(&query_active_auction_phase(deps, env)?),
     }
 }
 
-fn query_active_auction(deps: QueryDeps, env: Env) -> StdResult<AuctionPhase> {
+fn query_active_auction_phase(deps: QueryDeps, env: Env) -> StdResult<AuctionPhase> {
     let active_round_config = ACTIVE_AUCTION.load(deps.storage)?;
     let phase = active_round_config.phases.get_current_phase(&env.block);
 

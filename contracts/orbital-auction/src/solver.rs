@@ -50,14 +50,10 @@ pub fn try_withdraw_posted_bond(
     // ensure that the sender is not currently the highest bidder
     ensure!(
         ACTIVE_AUCTION
-            .may_load(deps.storage)?
-            .map_or(true, |auction| {
-                auction
-                    .batch
-                    .current_bid
-                    .as_ref()
-                    .map_or(true, |bid| bid.solver != info.sender)
-            }),
+            .load(deps.storage)?
+            .batch
+            .current_bid
+            .map_or(true, |bid| bid.solver != info.sender),
         ContractError::BondWithdrawalError {}
     );
 

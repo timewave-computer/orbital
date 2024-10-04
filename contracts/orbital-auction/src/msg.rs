@@ -1,8 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, Uint128};
-use cw_utils::Duration;
 
-use crate::state::{AuctionPhase, RouteConfig, UserIntent};
+use crate::state::{AuctionPhase, AuctionPhaseConfig, RouteConfig, UserIntent};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -12,10 +11,8 @@ pub struct InstantiateMsg {
     pub route_config: RouteConfig,
     // auction batch size (offer denom amount)
     pub batch_size: Uint128,
-    // auction time configurations expressed in seconds
-    pub auction_duration: Duration,
-    pub filling_window_duration: Duration,
-    pub cleanup_window_duration: Duration,
+    // auction phase configuration
+    pub auction_phase_config: AuctionPhaseConfig,
     // amount of tokens required to be posted as a slashable bond
     // in order to participate in the auction
     pub solver_bond: Coin,
