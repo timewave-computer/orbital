@@ -6,7 +6,7 @@ use localic_utils::{utils::test_context::TestContext, NEUTRON_CHAIN_NAME};
 use log::info;
 use orbital_core::{msg::ExecuteMsg, orbital_domain::UncheckedOrbitalDomainConfig};
 
-use crate::ACC0_KEY;
+use crate::{utils::misc::NEUTRON_IBC_GAS_FLAG, ACC0_KEY};
 
 pub fn user_register_orbital_core(
     test_ctx: &TestContext,
@@ -54,7 +54,7 @@ pub fn register_icq_balances_query(
         ACC0_KEY,
         &serde_json::to_string(&register_icq_msg)
             .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
-        "--amount 10000000untrn --gas 50000000",
+            NEUTRON_IBC_GAS_FLAG,
     )
 }
 
@@ -85,7 +85,7 @@ pub fn register_icq_transfers_query(
         ACC0_KEY,
         &serde_json::to_string(&register_icq_msg)
             .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
-        "--amount 10000000untrn --gas 50000000",
+            NEUTRON_IBC_GAS_FLAG,
     )
 }
 
@@ -114,7 +114,7 @@ pub fn user_withdraw_funds_from_domain(
         user_key,
         &serde_json::to_string(&withdraw_funds_msg)
             .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
-        "--amount 10000000untrn --gas 50000000",
+            NEUTRON_IBC_GAS_FLAG,
     )
 }
 

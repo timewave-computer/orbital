@@ -3,6 +3,8 @@ use std::{fs::File, io::Write, path::PathBuf};
 use localic_utils::{utils::test_context::TestContext, NEUTRON_CHAIN_NAME};
 use log::info;
 
+pub const NEUTRON_IBC_GAS_FLAG: &str = "--amount 10000000untrn --gas 50000000";
+
 pub fn generate_icq_relayer_config(
     test_ctx: &TestContext,
     current_path: PathBuf,
