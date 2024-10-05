@@ -1,7 +1,7 @@
 pub(crate) mod admin {
     use cosmwasm_std::{
-        ensure, instantiate2_address, to_json_binary, Addr, BlockInfo, Checksum, CodeInfoResponse,
-        CosmosMsg, Env, MessageInfo, Response, StdError, StdResult, SubMsg, Uint64, WasmMsg,
+        ensure, instantiate2_address, to_json_binary, Addr, BlockInfo, CodeInfoResponse, CosmosMsg,
+        Env, MessageInfo, Response, StdError, StdResult, Uint64, WasmMsg,
     };
     use cw_ownable::{assert_owner, update_ownership, Action};
     use neutron_sdk::{bindings::msg::NeutronMsg, NeutronResult};
@@ -18,31 +18,21 @@ pub(crate) mod admin {
         utils::ClearingIcaIdentifier,
     };
 
-    fn get_code_checksum(deps: &ExecuteDeps, code_id: u64) -> StdResult<Checksum> {
-        let CodeInfoResponse { checksum, .. } = deps.querier.query_wasm_code_info(code_id)?;
-        Ok(checksum)
-    }
-
-    pub fn try_instantiate_auction(
+    pub fn try_get_instantiate_auction_msg(
         deps: ExecuteDeps,
         env: Env,
         ica_identifier: String,
         auction_id: u64,
-    ) -> StdResult<Response<NeutronMsg>> {
+    ) -> StdResult<CosmosMsg<NeutronMsg>> {
         let mut associated_orbital_auction = ORBITAL_AUCTIONS.load(deps.storage, auction_id)?;
         let code_id = ORBITAL_AUCTION_CODE_ID.load(deps.storage)?;
 
-        let code_checksum = get_code_checksum(&deps, code_id.u64())?;
-        let canonical_self_address = deps.api.addr_canonicalize(env.contract.address.as_str())?;
-
         let salt = ica_identifier.as_bytes();
-        let auction_addr =
-            instantiate2_address(code_checksum.as_slice(), &canonical_self_address, salt)
-                .map_err(|_| StdError::generic_err("failed to get instantiate2 addr"))?;
-        let core_contract = deps.api.addr_humanize(&auction_addr)?.to_string();
-        associated_orbital_auction.auction_addr = Some(core_contract);
 
-        let instantiate_call: CosmosMsg = WasmMsg::Instantiate2 {
+        let core_contract = compute_auction_address(&deps, code_id.u64(), &env, salt)?;
+        associated_orbital_auction.auction_addr = Some(core_contract.to_string());
+
+        let instantiate_call: CosmosMsg<NeutronMsg> = WasmMsg::Instantiate2 {
             admin: Some(env.contract.address.to_string()),
             code_id: code_id.u64(),
             label: ica_identifier.to_string(),
@@ -54,14 +44,22 @@ pub(crate) mod admin {
 
         ORBITAL_AUCTIONS.save(deps.storage, auction_id, &associated_orbital_auction)?;
 
-        match SubMsg::new(instantiate_call).change_custom() {
-            Some(msg) => Ok(Response::default()
-                .add_attribute("sudo_open_ack_handler", "instantiating_auction_contract")
-                .add_submessage(msg)),
-            None => Err(StdError::generic_err(
-                "failed to construct custom instantiate2 msg",
-            )),
-        }
+        Ok(instantiate_call)
+    }
+
+    fn compute_auction_address(
+        deps: &ExecuteDeps,
+        code_id: u64,
+        env: &Env,
+        salt: &[u8],
+    ) -> StdResult<Addr> {
+        let CodeInfoResponse { checksum, .. } = deps.querier.query_wasm_code_info(code_id)?;
+
+        let canonical_self_address = deps.api.addr_canonicalize(env.contract.address.as_str())?;
+
+        instantiate2_address(checksum.as_slice(), &canonical_self_address, salt)
+            .map_err(|_| StdError::generic_err("Failed to get instantiate2 addr"))
+            .and_then(|addr| deps.api.addr_humanize(&addr))
     }
 
     pub fn try_register_new_auction(
@@ -73,7 +71,7 @@ pub(crate) mod admin {
         assert_owner(deps.storage, &info.sender).map_err(ContractError::Ownership)?;
 
         let auction_id = ORBITAL_AUCTION_NONCE.load(deps.storage)?;
-        // TODO 1: create clearing accounts for src & dest domains
+
         let src_domain_ica_identifier = ClearingIcaIdentifier::Auction {
             auction_id: auction_id.u64(),
             domain: instantiate_msg.src_domain.to_string(),
@@ -113,6 +111,10 @@ pub(crate) mod admin {
             },
         )?;
 
+        // here we fire the clearing account registration messages.
+        // on callback, they will register into the stored `OrbitalAuctionConfig`.
+        // once both are registered, the sudo callback handler will instantiate
+        // the auction contract.
         Ok(Response::default()
             .add_message(instantiate_src_clearing_acc_msg)
             .add_message(instantiate_dest_clearing_acc_msg))

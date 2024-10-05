@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Uint64};
+use cosmwasm_std::{Addr, StdError, StdResult, Uint64};
 use cw_storage_plus::{Item, Map};
 use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
 use schemars::JsonSchema;
@@ -53,6 +53,24 @@ pub struct OrbitalAuctionConfig {
 impl OrbitalAuctionConfig {
     pub fn prepared_clearing_accounts(&self) -> bool {
         self.src_clearing_acc_addr.is_some() && self.dest_clearing_acc_addr.is_some()
+    }
+
+    pub fn register_clearing_account(
+        &mut self,
+        domain: String,
+        clearing_account: &ClearingAccountConfig,
+    ) -> StdResult<()> {
+        if self.src_domain == domain {
+            self.src_clearing_acc_addr = Some(clearing_account.addr.to_string());
+            Ok(())
+        } else if self.dest_domain == domain {
+            self.dest_clearing_acc_addr = Some(clearing_account.addr.to_string());
+            Ok(())
+        } else {
+            Err(StdError::generic_err(
+                "failed to register clearing account - unknown domain",
+            ))
+        }
     }
 }
 

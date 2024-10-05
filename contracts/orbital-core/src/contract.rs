@@ -229,45 +229,70 @@ fn sudo_open_ack(
     _counterparty_channel_id: String,
     counterparty_version: String,
 ) -> StdResult<Response<NeutronMsg>> {
-    // parse the response
+    // parse the counterparty version and clearing ica identifier
     let parsed_version: OpenAckVersion =
         serde_json_wasm::from_str(counterparty_version.as_str())
             .map_err(|_| StdError::generic_err("Can't parse counterparty_version"))?;
-
-    // extract the ICA identifier from the port
-    let parsed_ica_identifier = ClearingIcaIdentifier::from_str_identifier(&port_id)?;
-
-    let string_ica_identifier = parsed_ica_identifier.to_str_identifier();
-
     let clearing_account_config = ClearingAccountConfig {
         addr: parsed_version.address,
         controller_connection_id: parsed_version.controller_connection_id,
     };
+    // `port_id` argument above is composed of a custom structure.
+    // we parse that structure to get the clearing ica identifier.
+    let parsed_ica_identifier = ClearingIcaIdentifier::from_str_identifier(&port_id)?;
+    let string_ica_identifier = parsed_ica_identifier.to_str_identifier();
 
-    // Update the storage record associated with the interchain account.
+    // update the storage record associated with the interchain account
     CLEARING_ACCOUNTS.save(
         deps.storage,
         string_ica_identifier.to_string(),
         &Some(clearing_account_config.clone()),
     )?;
 
-    // if the clearing account is associated with an auction, we need to handle some hooks
-    if let ClearingIcaIdentifier::Auction { auction_id, domain } = parsed_ica_identifier.clone() {
-        let mut associated_orbital_auction = ORBITAL_AUCTIONS.load(deps.storage, auction_id)?;
+    match parsed_ica_identifier {
+        // in case this callback is triggered by a user action, we only need to
+        // save the clearing account which is done above. we return.
+        ClearingIcaIdentifier::User { user_id, domain } => Ok(Response::default()
+            .add_attribute("action", "handle_open_ack")
+            .add_attribute("clearing_ica_type", "user")
+            .add_attribute("user_id", user_id.to_string())
+            .add_attribute("domain", domain)),
+        // in case this callback is triggered by auction creation, we perform extra
+        //  actions to update the auction config. having clearing accounts ready on
+        // both src & dest domains is a prerequisite for instantiating auctions.
+        ClearingIcaIdentifier::Auction { auction_id, domain } => {
+            let associated_orbital_auction = ORBITAL_AUCTIONS.update(
+                deps.storage,
+                auction_id,
+                |auction| -> StdResult<OrbitalAuctionConfig> {
+                    match auction {
+                        Some(mut auction_config) => {
+                            auction_config.register_clearing_account(
+                                domain.to_string(),
+                                &clearing_account_config,
+                            )?;
+                            Ok(auction_config)
+                        }
+                        None => Err(StdError::not_found("auction not found")),
+                    }
+                },
+            )?;
+            let mut resp = Response::new()
+                .add_attribute("action", "handle_open_ack")
+                .add_attribute("clearing_ica_type", "auction")
+                .add_attribute("auction_id", auction_id.to_string())
+                .add_attribute("domain", domain);
 
-        // update the associated address in the auction config
-        if domain == associated_orbital_auction.src_domain {
-            associated_orbital_auction.src_clearing_acc_addr = Some(clearing_account_config.addr);
-        } else if domain == associated_orbital_auction.dest_domain {
-            associated_orbital_auction.dest_clearing_acc_addr = Some(clearing_account_config.addr);
-        }
-        ORBITAL_AUCTIONS.save(deps.storage, auction_id, &associated_orbital_auction)?;
-
-        // if both clearing accounts are prepared, we can instantiate the auction
-        if associated_orbital_auction.prepared_clearing_accounts() {
-            admin::try_instantiate_auction(deps, env, string_ica_identifier, auction_id)?;
+            // if both clearing accounts are prepared, we can instantiate the auction
+            if associated_orbital_auction.prepared_clearing_accounts() {
+                resp = resp.add_message(admin::try_get_instantiate_auction_msg(
+                    deps,
+                    env,
+                    string_ica_identifier,
+                    auction_id,
+                )?);
+            }
+            Ok(resp)
         }
     }
-
-    Ok(Response::default())
 }
