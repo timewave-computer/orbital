@@ -1,9 +1,10 @@
+use cosmwasm_std::Uint64;
 use localic_std::{errors::LocalError, modules::cosmwasm::contract_query};
 use localic_utils::{utils::test_context::TestContext, NEUTRON_CHAIN_NAME};
 use log::info;
 use orbital_core::{
     msg::{GetTransfersAmountResponse, QueryMsg, RecipientTxsResponse},
-    state::{ClearingAccountConfig, UserConfig},
+    state::{ClearingAccountConfig, OrbitalAuctionConfig, UserConfig},
 };
 
 pub fn query_user_clearing_acc_addr_on_domain(
@@ -36,6 +37,36 @@ pub fn query_user_clearing_acc_addr_on_domain(
     Ok(user_clearing_acc)
 }
 
+pub fn query_auction_clearing_acc_addr_on_domain(
+    test_ctx: &TestContext,
+    orbital_core: String,
+    auction_id: u64,
+    domain: String,
+) -> Result<Option<ClearingAccountConfig>, LocalError> {
+    let clearing_acc_response = contract_query(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core,
+        &serde_json::to_string(&QueryMsg::AuctionClearingAccountAddress {
+            id: Uint64::new(auction_id),
+            domain: domain.to_string(),
+        })
+        .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
+    )["data"]
+        .clone();
+    let auction_clearing_acc: Option<ClearingAccountConfig> =
+        serde_json::from_value(clearing_acc_response)
+            .map_err(|e| LocalError::Custom { msg: e.to_string() })?;
+
+    info!(
+        "auction {auction_id} clearing account on {domain}: {:?}",
+        auction_clearing_acc
+    );
+
+    Ok(auction_clearing_acc)
+}
+
 pub fn _query_user_config(
     test_ctx: &TestContext,
     orbital_core: String,
@@ -58,6 +89,30 @@ pub fn _query_user_config(
     info!("user {user_addr} config: {:?}", user_config);
 
     Ok(user_config)
+}
+
+pub fn query_orbital_auction_by_id(
+    test_ctx: &TestContext,
+    orbital_core: String,
+    auction_id: u64,
+) -> Result<OrbitalAuctionConfig, LocalError> {
+    let query_response = contract_query(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core,
+        &serde_json::to_string(&QueryMsg::Auction {
+            id: Uint64::new(auction_id),
+        })
+        .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
+    )["data"]
+        .clone();
+
+    let auction_config: OrbitalAuctionConfig = serde_json::from_value(query_response).unwrap();
+
+    info!("auction #{auction_id} config: {:?}", auction_config);
+
+    Ok(auction_config)
 }
 
 pub fn query_balance_query_id(

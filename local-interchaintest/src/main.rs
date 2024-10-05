@@ -1,19 +1,22 @@
-use cosmwasm_std::{coin, coins};
+use cosmwasm_std::{coin, coins, Uint64};
 use localic_std::modules::{bank::get_balance, cosmwasm::contract_instantiate};
 use localic_utils::{
-    ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_NAME, JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
+    ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_DENOM, GAIA_CHAIN_NAME, JUNO_CHAIN_DENOM,
+    JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
 };
 use log::info;
-use orbital_core::msg::InstantiateMsg;
+
 use std::{env, error::Error, time::Duration};
 use utils::{
     exec::{
         admin_register_domain, register_icq_balances_query, register_icq_transfers_query,
-        user_register_orbital_core, user_register_to_new_domain, user_withdraw_funds_from_domain,
+        register_new_auction, user_register_orbital_core, user_register_to_new_domain,
+        user_withdraw_funds_from_domain,
     },
     misc::{generate_icq_relayer_config, start_icq_relayer},
     query::{
-        query_balance_query_id, query_icq_recipient_txs, query_icq_transfer_amount,
+        query_auction_clearing_acc_addr_on_domain, query_balance_query_id, query_icq_recipient_txs,
+        query_icq_transfer_amount, query_orbital_auction_by_id,
         query_user_clearing_acc_addr_on_domain,
     },
 };
@@ -59,6 +62,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut uploader = test_ctx.build_tx_upload_contracts();
     let orbital_core_local_path = format!("{}/artifacts/orbital_core.wasm", current_dir.display());
+    let orbital_auction_local_path =
+        format!("{}/artifacts/orbital_auction.wasm", current_dir.display());
 
     info!("sleeping to allow icq relayer to start...");
     std::thread::sleep(Duration::from_secs(10));
@@ -66,6 +71,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     uploader
         .with_chain_name(NEUTRON_CHAIN_NAME)
         .send_single_contract(&orbital_core_local_path)?;
+
+    uploader
+        .with_chain_name(NEUTRON_CHAIN_NAME)
+        .send_single_contract(&orbital_auction_local_path)?;
 
     let orbital_core_code_id = test_ctx
         .get_contract()
@@ -76,11 +85,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     info!("orbital core code id: {orbital_core_code_id}");
 
-    let orbital_instantiate_msg = InstantiateMsg {
+    let orbital_auction_code_id = test_ctx
+        .get_contract()
+        .contract("orbital_auction")
+        .get_cw()
+        .code_id
+        .unwrap();
+
+    info!("orbital auction code id: {orbital_auction_code_id}");
+
+    let orbital_instantiate_msg = orbital_core::msg::InstantiateMsg {
         owner: test_ctx
             .get_chain(NEUTRON_CHAIN_NAME)
             .admin_addr
             .to_string(),
+        auction_code_id: Uint64::new(orbital_auction_code_id),
     };
 
     // instantiate orbital-core from the ACC0_KEY (=admin in localic-utils)
@@ -346,6 +365,61 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     query_icq_transfer_amount(&test_ctx, orbital_core.address.to_string())?;
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    let auction_registration_response = register_new_auction(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC0_KEY,
+        (GAIA_CHAIN_NAME, GAIA_CHAIN_DENOM),
+        (JUNO_CHAIN_NAME, JUNO_CHAIN_DENOM),
+    )?;
+
+    info!(
+        "auction registration response: {:?}",
+        auction_registration_response
+    );
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    let auction = query_orbital_auction_by_id(&test_ctx, orbital_core.address.to_string(), 0)?;
+
+    println!("auction created: {:?}", auction);
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    let auction = query_orbital_auction_by_id(&test_ctx, orbital_core.address.to_string(), 0)?;
+
+    println!("auction created: {:?}", auction);
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    let auction = query_orbital_auction_by_id(&test_ctx, orbital_core.address.to_string(), 0)?;
+
+    println!("auction created: {:?}", auction);
+
+    let clearing_acc_auction_1_gaia = query_auction_clearing_acc_addr_on_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        0,
+        GAIA_CHAIN_NAME.to_string(),
+    )?;
+    let clearing_acc_auction_1_juno = query_auction_clearing_acc_addr_on_domain(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        0,
+        JUNO_CHAIN_NAME.to_string(),
+    )?;
+
+    info!(
+        "clearing acc auction 1 gaia: {:?}",
+        clearing_acc_auction_1_gaia
+    );
+    info!(
+        "clearing acc auction 1 juno: {:?}",
+        clearing_acc_auction_1_juno
+    );
 
     Ok(())
 }

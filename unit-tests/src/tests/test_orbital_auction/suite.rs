@@ -3,11 +3,10 @@ use cw_multi_test::{error::AnyResult, AppResponse, Executor};
 use cw_utils::Duration;
 use cw_utils::Expiration::AtTime;
 use orbital_auction::{
-    msg::{ExecuteMsg, InstantiateMsg as OrbitalAuctionInstantiateMsg, QueryMsg},
-    state::{
-        AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, RouteConfig, UserIntent,
-    },
+    msg::{ExecuteMsg, QueryMsg},
+    state::{AuctionConfig, AuctionPhase, AuctionRound, UserIntent},
 };
+use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
 
 use crate::testing_utils::{
     base_suite_builder::SuiteBuilder,
@@ -27,18 +26,17 @@ impl Default for OrbitalAuctionBuilder {
         Self {
             builder,
             instantiate_msg: OrbitalAuctionInstantiateMsg {
-                route_config: RouteConfig {
-                    src_domain: GAIA_DOMAIN.to_string(),
-                    dest_domain: OSMOSIS_DOMAIN.to_string(),
-                    offer_denom: DENOM_ATOM.to_string(),
-                    ask_denom: DENOM_OSMO.to_string(),
-                },
+                src_domain: GAIA_DOMAIN.to_string(),
+                dest_domain: OSMOSIS_DOMAIN.to_string(),
+                offer_denom: DENOM_ATOM.to_string(),
+                ask_denom: DENOM_OSMO.to_string(),
+
                 batch_size: Uint128::new(10_000_000),
-                auction_phase_config: AuctionPhaseConfig {
-                    auction_duration: Duration::Time(180),
-                    filling_window_duration: Duration::Time(60),
-                    cleanup_window_duration: Duration::Time(60),
-                },
+
+                auction_duration: Duration::Time(180),
+                filling_window_duration: Duration::Time(60),
+                cleanup_window_duration: Duration::Time(60),
+
                 solver_bond: coin(100_000, DENOM_ATOM),
             },
         }

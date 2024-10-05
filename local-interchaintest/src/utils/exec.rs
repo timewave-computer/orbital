@@ -1,9 +1,14 @@
-use cosmwasm_std::{coin, Uint64};
+use cosmwasm_std::{coin, Uint128, Uint64};
+use cw_utils::Duration;
 use localic_std::{
     errors::LocalError, modules::cosmwasm::contract_execute, types::TransactionResponse,
 };
-use localic_utils::{utils::test_context::TestContext, NEUTRON_CHAIN_NAME};
+use localic_utils::{
+    utils::test_context::TestContext, GAIA_CHAIN_DENOM, GAIA_CHAIN_NAME, JUNO_CHAIN_DENOM,
+    JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
+};
 use log::info;
+use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
 use orbital_core::{msg::ExecuteMsg, orbital_domain::UncheckedOrbitalDomainConfig};
 
 use crate::{utils::misc::NEUTRON_IBC_GAS_FLAG, ACC0_KEY};
@@ -55,6 +60,41 @@ pub fn register_icq_balances_query(
         &serde_json::to_string(&register_icq_msg)
             .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
         NEUTRON_IBC_GAS_FLAG,
+    )
+}
+
+pub fn register_new_auction(
+    test_ctx: &TestContext,
+    orbital_core: String,
+    acc_key: &str,
+    (src_domain, src_denom): (&str, &str),
+    (dest_domain, dest_denom): (&str, &str),
+) -> Result<TransactionResponse, LocalError> {
+    info!(
+        "registering new auction for ({src_domain}, {src_denom}) => ({dest_domain}, {dest_denom})"
+    );
+
+    let register_auction_msg = ExecuteMsg::RegisterNewAuction(OrbitalAuctionInstantiateMsg {
+        src_domain: GAIA_CHAIN_NAME.to_string(),
+        dest_domain: JUNO_CHAIN_NAME.to_string(),
+        offer_denom: GAIA_CHAIN_DENOM.to_string(),
+        ask_denom: JUNO_CHAIN_DENOM.to_string(),
+        batch_size: Uint128::new(1000),
+        auction_duration: Duration::Time(30),
+        filling_window_duration: Duration::Time(30),
+        cleanup_window_duration: Duration::Time(30),
+        solver_bond: coin(100, GAIA_CHAIN_DENOM),
+    });
+
+    contract_execute(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core,
+        acc_key,
+        &serde_json::to_string(&register_auction_msg)
+            .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
+        "--amount 20000000untrn --gas 50000000",
     )
 }
 

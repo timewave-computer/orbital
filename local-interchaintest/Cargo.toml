@@ -12,6 +12,8 @@ hex             = { workspace = true }
 serde_json      = { workspace = true }
 env_logger      = { workspace = true }
 log             = { workspace = true }
-orbital-core    = { workspace = true }
 cosmwasm-std    = { workspace = true }
 neutron-sdk     = { workspace = true }
+orbital-core    = { workspace = true }
+orbital-common  = { workspace = true }
+cw-utils        = { workspace = true }

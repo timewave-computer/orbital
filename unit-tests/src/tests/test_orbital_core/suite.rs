@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Coin, StdResult};
+use cosmwasm_std::{Addr, Coin, StdResult, Uint64};
 use cw_multi_test::{error::AnyResult, AppResponse, Executor};
 use orbital_core::{
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
@@ -21,10 +21,13 @@ impl Default for OrbitalCoreBuilder {
         let builder = SuiteBuilder::default();
 
         let owner = builder.admin.to_string();
-
+        let auction_code_id = Uint64::new(builder.orbital_auction_code_id);
         Self {
             builder,
-            instantiate_msg: InstantiateMsg { owner },
+            instantiate_msg: InstantiateMsg {
+                owner,
+                auction_code_id,
+            },
         }
     }
 }
