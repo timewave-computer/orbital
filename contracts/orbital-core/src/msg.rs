@@ -1,17 +1,16 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Coin;
+use cosmwasm_std::{Coin, Uint64};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
+use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    orbital_domain::UncheckedOrbitalDomainConfig,
-    state::{ClearingAccountConfig, Transfer},
-};
+use crate::{orbital_domain::UncheckedOrbitalDomainConfig, state::Transfer};
 
 #[cw_serde]
 pub struct InstantiateMsg {
     pub owner: String,
+    pub auction_code_id: Uint64,
 }
 
 #[cw_ownable_execute]
@@ -24,6 +23,8 @@ pub enum ExecuteMsg {
         // type of account to be used
         account_type: UncheckedOrbitalDomainConfig,
     },
+    /// enable new auction
+    RegisterNewAuction(OrbitalAuctionInstantiateMsg),
     /// register user to orbital
     RegisterUser {},
     /// register user to a specific domain
@@ -63,8 +64,11 @@ pub enum QueryMsg {
     #[returns(crate::state::UserConfig)]
     UserConfig { addr: String },
 
-    #[returns(Option<ClearingAccountConfig>)]
+    #[returns(Option<crate::state::ClearingAccountConfig>)]
     ClearingAccountAddress { addr: String, domain: String },
+
+    #[returns(Option<crate::state::ClearingAccountConfig>)]
+    AuctionClearingAccountAddress { id: Uint64, domain: String },
 
     #[returns(neutron_sdk::interchain_queries::v047::queries::BalanceResponse)]
     Balance { query_id: u64 },
@@ -74,6 +78,9 @@ pub enum QueryMsg {
 
     #[returns(RecipientTxsResponse)]
     IcqRecipientTxs { recipient: String },
+
+    #[returns(crate::state::OrbitalAuctionConfig)]
+    Auction { id: Uint64 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

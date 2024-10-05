@@ -1,22 +1,22 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, Uint128};
 
-use crate::state::{AuctionPhase, AuctionPhaseConfig, RouteConfig, UserIntent};
+use crate::state::{AuctionPhase, UserIntent};
 
-#[cw_serde]
-pub struct InstantiateMsg {
-    // config that describes the route:
-    // - src & destination domains
-    // - offer & ask denoms
-    pub route_config: RouteConfig,
-    // auction batch size (offer denom amount)
-    pub batch_size: Uint128,
-    // auction phase configuration
-    pub auction_phase_config: AuctionPhaseConfig,
-    // amount of tokens required to be posted as a slashable bond
-    // in order to participate in the auction
-    pub solver_bond: Coin,
-}
+// #[cw_serde]
+// pub struct OrbitalAuctionInstantiateMsg {
+//     // pub src_domain: String,
+//     // pub dest_domain: String,
+//     // pub offer_denom: String,
+//     // pub ask_denom: String,
+//     // auction batch size (offer denom amount)
+//     pub batch_size: Uint128,
+//     // auction phase configuration
+//     pub auction_phase_config: AuctionPhaseConfig,
+//     // amount of tokens required to be posted as a slashable bond
+//     // in order to participate in the auction
+//     pub solver_bond: Coin,
+// }
 
 #[cw_serde]
 pub enum ExecuteMsg {

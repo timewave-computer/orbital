@@ -15,7 +15,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use cosmwasm_std::{StdError, StdResult};
+use cosmwasm_std::StdError;
 
 use neutron_sdk::bindings::query::QueryRegisteredQueryResponse;
 use neutron_sdk::interchain_queries::v047::types::{COSMOS_SDK_TRANSFER_MSG_URL, RECIPIENT_FIELD};
@@ -48,7 +48,7 @@ pub fn sudo_tx_query_result(
     query_id: u64,
     _height: Height,
     data: Binary,
-) -> StdResult<Response<NeutronMsg>> {
+) -> NeutronResult<Response<NeutronMsg>> {
     // Decode the transaction data
     let tx: TxRaw = TxRaw::decode(data.as_slice())
         .map_err(|_| StdError::generic_err("sudo_tx_query_result failed to decode tx_raw"))?;
@@ -88,9 +88,9 @@ pub fn sudo_tx_query_result(
             // If we didn't find a Send message with the correct recipient, return an error, and
             // this query result will be rejected by Neutron: no data will be saved to state.
             if deposits.is_empty() {
-                return Err(StdError::generic_err(
-                    "failed to find a matching transaction message",
-                ));
+                return Err(
+                    StdError::generic_err("failed to find a matching transaction message").into(),
+                );
             }
 
             let mut stored_transfers: u64 = TRANSFERS.load(deps.storage).unwrap_or_default();
@@ -145,7 +145,7 @@ pub fn sudo_kv_query_result(
     deps: DepsMut<NeutronQuery>,
     _env: Env,
     query_id: u64,
-) -> StdResult<Response<NeutronMsg>> {
+) -> NeutronResult<Response<NeutronMsg>> {
     deps.api.debug(
         format!(
             "WASMDEBUG: sudo_kv_query_result received; query_id: {:?}",

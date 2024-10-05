@@ -64,7 +64,7 @@ impl UncheckedOrbitalDomainConfig {
 impl OrbitalDomainConfig {
     pub fn get_registration_message(
         &self,
-        deps: ExecuteDeps,
+        deps: &ExecuteDeps,
         info: &MessageInfo,
         ica_identifier: String,
     ) -> Result<NeutronMsg, ContractError> {
@@ -97,7 +97,7 @@ impl OrbitalDomainConfig {
                     registration_fees,
                 ))
             }
-            _ => unimplemented!(),
+            _ => Err(StdError::generic_err("unimplemented!()").into()),
         }
     }
 }

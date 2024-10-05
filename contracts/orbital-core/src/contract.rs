@@ -3,17 +3,18 @@ use crate::{
     icq::{self},
     msg::{GetTransfersAmountResponse, RecipientTxsResponse},
     state::{
-        ClearingAccountConfig, OrbitalDomainConfig, UserConfig, RECIPIENT_TXS, TRANSFERS,
+        ClearingAccountConfig, OrbitalAuctionConfig, OrbitalDomainConfig, UserConfig,
+        ORBITAL_AUCTIONS, ORBITAL_AUCTION_CODE_ID, ORBITAL_AUCTION_NONCE, RECIPIENT_TXS, TRANSFERS,
         USER_NONCE,
     },
     user_logic::user,
-    utils::{extract_ica_identifier_from_port, get_ica_identifier, OpenAckVersion},
+    utils::{ClearingIcaIdentifier, OpenAckVersion},
 };
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     state::{CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS},
 };
-#[cfg(not(feature = "library"))]
+
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
@@ -25,7 +26,7 @@ use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     interchain_queries::v047::queries::{query_balance, BalanceResponse},
     sudo::msg::SudoMsg,
-    NeutronResult,
+    NeutronError, NeutronResult,
 };
 
 pub const CONTRACT_NAME: &str = "orbital-core";
@@ -34,7 +35,7 @@ pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub type QueryDeps<'a> = Deps<'a, NeutronQuery>;
 pub type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: ExecuteDeps,
     _env: Env,
@@ -45,10 +46,13 @@ pub fn instantiate(
     initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
 
     USER_NONCE.save(deps.storage, &Uint64::zero())?;
+    ORBITAL_AUCTION_CODE_ID.save(deps.storage, &msg.auction_code_id)?;
+    ORBITAL_AUCTION_NONCE.save(deps.storage, &Uint64::zero())?;
+
     Ok(Response::new())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: ExecuteDeps,
     env: Env,
@@ -63,6 +67,9 @@ pub fn execute(
             domain,
             account_type,
         } => admin::try_register_new_domain(deps, info, domain, account_type),
+        ExecuteMsg::RegisterNewAuction(instantiate_msg) => {
+            admin::try_register_new_auction(deps, info, instantiate_msg)
+        }
         // user action to create a new user account which enables registration to domains
         ExecuteMsg::RegisterUser {} => user::try_register(deps, env, info),
         // user action to register a new domain which creates their clearing account
@@ -88,7 +95,7 @@ pub fn execute(
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::OrbitalDomain { domain } => to_json_binary(&query_orbital_domain(deps, domain)?),
@@ -102,7 +109,17 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::IcqRecipientTxs { recipient } => {
             to_json_binary(&query_recipient_txs(deps, recipient)?)
         }
+        QueryMsg::Auction { id } => to_json_binary(&query_auction_by_id(deps, id)?),
+        QueryMsg::AuctionClearingAccountAddress { id, domain } => {
+            to_json_binary(&query_auction_clearing_account(deps, id, domain)?)
+        }
     }
+}
+
+fn query_auction_by_id(deps: QueryDeps, auction_id: Uint64) -> StdResult<OrbitalAuctionConfig> {
+    let auction = ORBITAL_AUCTIONS.load(deps.storage, auction_id.u64())?;
+
+    Ok(auction)
 }
 
 fn query_recipient_txs(deps: QueryDeps, recipient: String) -> StdResult<RecipientTxsResponse> {
@@ -128,8 +145,25 @@ fn query_clearing_account(
     addr: String,
 ) -> StdResult<Option<ClearingAccountConfig>> {
     let user_config = USER_CONFIGS.load(deps.storage, addr)?;
-    let ica_id = get_ica_identifier(user_config.id, domain);
-    CLEARING_ACCOUNTS.load(deps.storage, ica_id)
+    let user_clearing_account = ClearingIcaIdentifier::User {
+        user_id: user_config.id.u64(),
+        domain,
+    };
+
+    CLEARING_ACCOUNTS.load(deps.storage, user_clearing_account.to_str_identifier())
+}
+
+fn query_auction_clearing_account(
+    deps: QueryDeps,
+    auction_id: Uint64,
+    domain: String,
+) -> StdResult<Option<ClearingAccountConfig>> {
+    let auction_clearing_account = ClearingIcaIdentifier::Auction {
+        auction_id: auction_id.u64(),
+        domain,
+    };
+
+    CLEARING_ACCOUNTS.load(deps.storage, auction_clearing_account.to_str_identifier())
 }
 
 fn query_ownership(deps: QueryDeps) -> StdResult<cw_ownable::Ownership<Addr>> {
@@ -144,19 +178,19 @@ fn query_user_config(deps: QueryDeps, user: String) -> StdResult<UserConfig> {
     USER_CONFIGS.load(deps.storage, user)
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(_deps: ExecuteDeps, _env: Env, _msg: Reply) -> StdResult<Response<NeutronMsg>> {
-    unimplemented!()
+    Err(StdError::generic_err("unimplemented!()"))
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> StdResult<Response<NeutronMsg>> {
-    unimplemented!()
+    Err(StdError::generic_err("unimplemented!()"))
 }
 
 // neutron uses the `sudo` entry point in their ICA/ICQ related logic
-#[entry_point]
-pub fn sudo(deps: ExecuteDeps, env: Env, msg: SudoMsg) -> StdResult<Response<NeutronMsg>> {
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn sudo(deps: ExecuteDeps, env: Env, msg: SudoMsg) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
         // For handling successful registering of ICA
         SudoMsg::OpenAck {
@@ -171,7 +205,8 @@ pub fn sudo(deps: ExecuteDeps, env: Env, msg: SudoMsg) -> StdResult<Response<Neu
             channel_id,
             counterparty_channel_id,
             counterparty_version,
-        ),
+        )
+        .map_err(NeutronError::Std),
         // For handling tx query result
         SudoMsg::TxQueryResult {
             query_id,
@@ -188,7 +223,7 @@ pub fn sudo(deps: ExecuteDeps, env: Env, msg: SudoMsg) -> StdResult<Response<Neu
 // handler
 fn sudo_open_ack(
     deps: ExecuteDeps,
-    _env: Env,
+    env: Env,
     port_id: String,
     _channel_id: String,
     _counterparty_channel_id: String,
@@ -200,7 +235,9 @@ fn sudo_open_ack(
             .map_err(|_| StdError::generic_err("Can't parse counterparty_version"))?;
 
     // extract the ICA identifier from the port
-    let ica_identifier = extract_ica_identifier_from_port(port_id)?;
+    let parsed_ica_identifier = ClearingIcaIdentifier::from_str_identifier(&port_id)?;
+
+    let string_ica_identifier = parsed_ica_identifier.to_str_identifier();
 
     let clearing_account_config = ClearingAccountConfig {
         addr: parsed_version.address,
@@ -208,7 +245,29 @@ fn sudo_open_ack(
     };
 
     // Update the storage record associated with the interchain account.
-    CLEARING_ACCOUNTS.save(deps.storage, ica_identifier, &Some(clearing_account_config))?;
+    CLEARING_ACCOUNTS.save(
+        deps.storage,
+        string_ica_identifier.to_string(),
+        &Some(clearing_account_config.clone()),
+    )?;
+
+    // if the clearing account is associated with an auction, we need to handle some hooks
+    if let ClearingIcaIdentifier::Auction { auction_id, domain } = parsed_ica_identifier.clone() {
+        let mut associated_orbital_auction = ORBITAL_AUCTIONS.load(deps.storage, auction_id)?;
+
+        // update the associated address in the auction config
+        if domain == associated_orbital_auction.src_domain {
+            associated_orbital_auction.src_clearing_acc_addr = Some(clearing_account_config.addr);
+        } else if domain == associated_orbital_auction.dest_domain {
+            associated_orbital_auction.dest_clearing_acc_addr = Some(clearing_account_config.addr);
+        }
+        ORBITAL_AUCTIONS.save(deps.storage, auction_id, &associated_orbital_auction)?;
+
+        // if both clearing accounts are prepared, we can instantiate the auction
+        if associated_orbital_auction.prepared_clearing_accounts() {
+            admin::try_instantiate_auction(deps, env, string_ica_identifier, auction_id)?;
+        }
+    }
 
     Ok(Response::default())
 }

@@ -9,15 +9,17 @@ use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
 };
+use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
 
 use crate::{
     admin,
     error::ContractError,
-    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
+    msg::{ExecuteMsg, MigrateMsg, QueryMsg},
     solver,
     state::{
-        AuctionConfig, AuctionPhase, AuctionRound, Batch, Bid, RoundPhaseExpirations, UserIntent,
-        ACTIVE_AUCTION, AUCTION_ARCHIVE, AUCTION_CONFIG, ORBITAL_CORE, ORDERBOOK, POSTED_BONDS,
+        AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, Batch, Bid,
+        RoundPhaseExpirations, RouteConfig, UserIntent, ACTIVE_AUCTION, AUCTION_ARCHIVE,
+        AUCTION_CONFIG, ORBITAL_CORE, ORDERBOOK, POSTED_BONDS,
     },
 };
 
@@ -27,21 +29,31 @@ pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub type QueryDeps<'a> = Deps<'a, NeutronQuery>;
 pub type ExecuteDeps<'a> = DepsMut<'a, NeutronQuery>;
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: ExecuteDeps,
     env: Env,
     info: MessageInfo,
-    msg: InstantiateMsg,
+    msg: OrbitalAuctionInstantiateMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    msg.auction_phase_config.validate()?;
+    let auction_phase_config = AuctionPhaseConfig {
+        auction_duration: msg.auction_duration,
+        filling_window_duration: msg.filling_window_duration,
+        cleanup_window_duration: msg.cleanup_window_duration,
+    };
+    auction_phase_config.validate()?;
 
     let auction_config = AuctionConfig {
         batch_size: msg.batch_size,
-        auction_phases: msg.auction_phase_config,
-        route_config: msg.route_config,
+        auction_phases: auction_phase_config,
+        route_config: RouteConfig {
+            src_domain: msg.src_domain,
+            dest_domain: msg.dest_domain,
+            offer_denom: msg.offer_denom,
+            ask_denom: msg.ask_denom,
+        },
         solver_bond: msg.solver_bond,
     };
 
@@ -70,7 +82,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: ExecuteDeps,
     env: Env,
@@ -98,8 +110,8 @@ pub fn execute(
         ExecuteMsg::AddOrder(user_intent) => {
             admin::enqueue_user_intent(deps, info, env, user_intent)
         }
-        ExecuteMsg::Pause {} => unimplemented!(),
-        ExecuteMsg::Resume {} => unimplemented!(),
+        ExecuteMsg::Pause {} => Ok(Response::default()),
+        ExecuteMsg::Resume {} => Ok(Response::default()),
     }
 }
 
@@ -133,7 +145,7 @@ fn try_finalize_round(
         // the filling and cleanup phases. given that this should only happen in case of
         // any sort of infra failure, this likely involves pausing the auction
         // and requiring admin intervention.
-        AuctionPhase::OutOfSync => unimplemented!(),
+        AuctionPhase::OutOfSync => Ok(Response::default()),
     }
 }
 
@@ -265,7 +277,7 @@ fn query_order_filling_status(deps: QueryDeps, mock_fill_status: bool) -> Neutro
     Ok(mock_fill_status)
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Admin {} => to_json_binary(&ORBITAL_CORE.load(deps.storage)?),
@@ -313,12 +325,12 @@ fn query_orderbook(
     Ok(resp)
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(_deps: ExecuteDeps, _env: Env, _msg: Reply) -> StdResult<Response<NeutronMsg>> {
-    unimplemented!()
+    Ok(Response::default())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(_deps: ExecuteDeps, _env: Env, _msg: MigrateMsg) -> StdResult<Response<NeutronMsg>> {
-    unimplemented!()
+    Ok(Response::default())
 }

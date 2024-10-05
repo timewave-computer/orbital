@@ -11,7 +11,7 @@ pub(crate) mod user {
         contract::ExecuteDeps,
         error::ContractError,
         state::{UserConfig, CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS, USER_NONCE},
-        utils::{fees::flatten_ibc_fees_amt, generate_proto_msg, get_ica_identifier},
+        utils::{fees::flatten_ibc_fees_amt, generate_proto_msg, ClearingIcaIdentifier},
     };
 
     pub fn try_register_new_domain(
@@ -36,19 +36,30 @@ pub(crate) mod user {
         let mut user_config = USER_CONFIGS.load(deps.storage, info.sender.to_string())?;
 
         // get the ica identifier
-        let ica_identifier = get_ica_identifier(user_config.id, domain.to_string());
+        let user_ica_identifier = ClearingIcaIdentifier::User {
+            user_id: user_config.id.u64(),
+            domain: domain.to_string(),
+        };
+
+        let ica_identifier_str = user_ica_identifier.to_str_identifier();
+
+        println!("ica identifier: {ica_identifier_str}");
 
         // update the registered domains for the caller
         user_config.registered_domains.push(domain.to_string());
 
         // store `None` as the clearing account until the callback is received
         // from the registration message, which will fill the clearing account
-        CLEARING_ACCOUNTS.save(deps.storage, ica_identifier.to_string(), &None)?;
+        CLEARING_ACCOUNTS.save(deps.storage, ica_identifier_str.to_string(), &None)?;
         //save the updated user config
         USER_CONFIGS.save(deps.storage, info.sender.to_string(), &user_config)?;
 
         Ok(Response::new()
-            .add_message(domain_config.get_registration_message(deps, &info, ica_identifier)?)
+            .add_message(domain_config.get_registration_message(
+                &deps,
+                &info,
+                ica_identifier_str,
+            )?)
             .add_attribute("method", "register_user_domain"))
     }
 
@@ -107,7 +118,12 @@ pub(crate) mod user {
         );
 
         // derive the port associated with user's clearing account
-        let ica_identifier = get_ica_identifier(user_config.id, domain.to_string());
+        let user_ica_identifier = ClearingIcaIdentifier::User {
+            user_id: user_config.id.u64(),
+            domain: domain.to_string(),
+        };
+
+        let ica_identifier = user_ica_identifier.to_str_identifier();
 
         let user_clearing_acc_config = CLEARING_ACCOUNTS
             .load(deps.storage, ica_identifier.to_string())?

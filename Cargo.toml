@@ -4,6 +4,7 @@ members  = [
     "contracts/orbital-auction",
     "local-interchaintest",
     "unit-tests/",
+    "packages/*",
 ]
 resolver = "2"
 
@@ -44,6 +45,7 @@ anyhow              = "1.0.86"
 cw-multi-test       = { version = "2.1.1", features = [ "stargate", "cosmwasm_1_1", "cosmwasm_1_2", "cosmwasm_1_3", "cosmwasm_1_4" ] }
 orbital-core        = { path = "contracts/orbital-core" }
 orbital-auction     = { path = "contracts/orbital-auction" }
+orbital-common      = { path = "packages/orbital-common" }
 serde-json-wasm     = "1.0.0"
 hex                 = "0.4.3"
 localic-std         = { git = "https://github.com/strangelove-ventures/interchaintest", branch = "main" }

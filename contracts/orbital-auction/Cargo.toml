@@ -18,6 +18,7 @@ cw-ownable      = { workspace = true }
 cosmwasm-schema = { workspace = true }
 cosmwasm-std    = { workspace = true }
 cw-storage-plus = { workspace = true }
+orbital-common  = { workspace = true }
 cw-utils        = { workspace = true }
 cw2             = { workspace = true }
 serde           = { workspace = true }

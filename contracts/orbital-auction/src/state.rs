@@ -4,28 +4,25 @@ use cw_storage_plus::{Deque, Item, Map};
 use cw_utils::{Duration, Expiration};
 
 // authorized orbital-core address
-pub const ORBITAL_CORE: Item<Addr> = Item::new("orbital_core");
-
-// identifier for current auction. advances on successful round.
-pub const AUCTION_ID: Item<Uint64> = Item::new("auction_id");
+pub(crate) const ORBITAL_CORE: Item<Addr> = Item::new("orbital_core");
 
 // global auction configuration that applies for every round
-pub const AUCTION_CONFIG: Item<AuctionConfig> = Item::new("auction_config");
+pub(crate) const AUCTION_CONFIG: Item<AuctionConfig> = Item::new("auction_config");
 
 // current batch configuration
-pub const ACTIVE_AUCTION: Item<AuctionRound> = Item::new("current_round_config");
+pub(crate) const ACTIVE_AUCTION: Item<AuctionRound> = Item::new("current_round_config");
 
 // archive of past auction rounds
-pub const AUCTION_ARCHIVE: Deque<AuctionRound> = Deque::new("auction_archive");
+pub(crate) const AUCTION_ARCHIVE: Deque<AuctionRound> = Deque::new("auction_archive");
 
 // map of solvers registered for participating in the auction
-pub const POSTED_BONDS: Map<String, Coin> = Map::new("posted_bonds");
+pub(crate) const POSTED_BONDS: Map<String, Coin> = Map::new("posted_bonds");
 
 // orderbook is the queue of orders to be included in the next auction.
 // orders are processed in a FIFO manner. if an order cannot be entirely
 // included in the auction, order is split and the remainder is re-enqueued,
 // maintaining the priority.
-pub const ORDERBOOK: Deque<UserIntent> = Deque::new("orderbook");
+pub(crate) const ORDERBOOK: Deque<UserIntent> = Deque::new("orderbook");
 
 // base definition of an order. will likely change.
 #[cw_serde]

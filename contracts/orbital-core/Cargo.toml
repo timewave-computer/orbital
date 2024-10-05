@@ -20,6 +20,7 @@ cosmwasm-std    = { workspace = true }
 cw-storage-plus = { workspace = true }
 cw-utils        = { workspace = true }
 cw2             = { workspace = true }
+orbital-common  = { workspace = true }
 serde           = { workspace = true }
 thiserror       = { workspace = true }
 neutron-sdk     = { workspace = true }

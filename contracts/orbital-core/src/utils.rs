@@ -1,4 +1,5 @@
-use cosmwasm_std::{Binary, StdError, StdResult, Uint64};
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::{ensure, Binary, StdError, StdResult};
 use neutron_sdk::{bindings::types::ProtobufAny, NeutronResult};
 use prost::Message;
 use schemars::JsonSchema;
@@ -50,7 +51,7 @@ pub mod fees {
     }
 
     /// helper method to query the registration fee for the ICA
-    pub fn query_ica_registration_fee(deps: ExecuteDeps) -> StdResult<QueryParamsResponse> {
+    pub fn query_ica_registration_fee(deps: &ExecuteDeps) -> StdResult<QueryParamsResponse> {
         // TODO: remove this explicit allow
         #[allow(deprecated)]
         let stargate_query_msg: QueryRequest<NeutronQuery> = QueryRequest::Stargate {
@@ -75,21 +76,56 @@ pub(crate) struct OpenAckVersion {
     pub tx_type: String,
 }
 
-/// returns the ICA identifier for this specific (user, domain) combination.
-/// it can be any string.
-pub fn get_ica_identifier(user_id: Uint64, domain: String) -> String {
-    let id = user_id.to_string();
-    format!("{domain}{id}")
+#[cw_serde]
+pub enum ClearingIcaIdentifier {
+    User { user_id: u64, domain: String },
+    Auction { auction_id: u64, domain: String },
 }
 
-/// inverse of neutron_sdk::interchain_txs::helpers::get_port_id,
-/// which turns string of format "icacontroller-{contract_address}.{interchain_account_id}".
-/// returns the interchain_account_id substring.
-pub fn extract_ica_identifier_from_port(port: String) -> StdResult<String> {
-    let parts: Vec<&str> = port.split('.').collect();
-    match parts.len() {
-        2 => Ok(parts[1].to_string()),
-        _ => Err(StdError::generic_err("invalid port id {port}".to_string())),
+impl ClearingIcaIdentifier {
+    pub fn to_str_identifier(&self) -> String {
+        match self {
+            ClearingIcaIdentifier::User { user_id, domain } => {
+                format!("user_{}_{}", user_id, domain)
+            }
+            ClearingIcaIdentifier::Auction { auction_id, domain } => {
+                format!("auction_{}_{}", auction_id, domain)
+            }
+        }
+    }
+
+    /// parses `port_id` returned in sudo endpoint into ClearingIcaIdentifier
+    pub fn from_str_identifier(s: &str) -> StdResult<Self> {
+        // e.g. input: icacontroller-neutron1780emnrt7v9uqx5txhpxc0z8zfawq0czjmtd4q2maz83cckwjlfsqfjd2s.auction_0_juno
+        // splitting over a '.' will return ["icacontroller-neutron1780emnrt7v9uqx5txhpxc0z8zfawq0czjmtd4q2maz83cckwjlfsqfjd2s", "auction_0_juno"]
+        let parts: Vec<&str> = s.split('.').collect();
+        let port = match parts.len() {
+            2 => Ok(parts[1].to_string()),
+            _ => Err(StdError::generic_err("invalid port id {port}".to_string())),
+        }?;
+        // e.g. input:  "auction_0_juno"
+        // splitting over a '_' will return ["auction", "0", "juno"]
+        let parts: Vec<&str> = port.split('_').collect();
+        ensure!(
+            parts.len() == 3,
+            StdError::generic_err("error parsing ica identifier")
+        );
+
+        let id: u64 = parts[1]
+            .parse()
+            .map_err(|_| StdError::generic_err("invalid id"))?;
+        let domain = parts[2].to_string();
+        match parts[0] {
+            "user" => Ok(ClearingIcaIdentifier::User {
+                user_id: id,
+                domain,
+            }),
+            "auction" => Ok(ClearingIcaIdentifier::Auction {
+                auction_id: id,
+                domain,
+            }),
+            _ => Err(StdError::generic_err("Invalid identifier type")),
+        }
     }
 }
 
