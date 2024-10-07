@@ -3,8 +3,9 @@ use cw_multi_test::Executor;
 use cw_utils::{Duration, Expiration};
 use orbital_auction::{
     msg::ExecuteMsg,
-    state::{AuctionPhase, RoundPhaseExpirations, RouteConfig, UserIntent},
+    state::{AuctionPhase, RoundPhaseExpirations},
 };
+use orbital_common::{intent::UserIntent, msg_types::RouteConfig};
 
 use crate::{
     testing_utils::consts::{DENOM_ATOM, DENOM_NTRN, DENOM_OSMO, GAIA_DOMAIN, OSMOSIS_DOMAIN},

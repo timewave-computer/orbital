@@ -10,6 +10,7 @@ use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery, types::Height},
     interchain_queries::{
         get_registered_query,
+        types::QueryPayload,
         v045::{new_register_balances_query_msg, new_register_transfers_query_msg},
     },
     NeutronResult,
@@ -166,4 +167,38 @@ pub fn register_transfers_query(
         new_register_transfers_query_msg(connection_id, recipient, update_period, min_height)?;
 
     Ok(Response::new().add_message(msg))
+}
+
+pub fn register_remote_domain_escrow_tx_query(
+    recipient: &str,
+    sender: &str,
+    connection_id: &str,
+    update_period: u64,
+    amt: String,
+) -> NeutronResult<NeutronMsg> {
+    // we query for a tx with target sender & recipient, and min amount to assert the deposit
+    let query_data = vec![
+        TransactionFilterItem {
+            field: RECIPIENT_FIELD.to_string(),
+            op: TransactionFilterOp::Eq,
+            value: TransactionFilterValue::String(recipient.to_string()),
+        },
+        // TODO: refine the query later
+        // TransactionFilterItem {
+        //     field: "transfer.sender".to_string(),
+        //     op: TransactionFilterOp::Eq,
+        //     value: TransactionFilterValue::String(sender.to_string()),
+        // },
+        // TransactionFilterItem {
+        //     field: "transfer.amount".to_string(),
+        //     op: TransactionFilterOp::Gte,
+        //     value: TransactionFilterValue::String(amt),
+        // },
+    ];
+
+    NeutronMsg::register_interchain_query(
+        QueryPayload::TX(query_data),
+        connection_id.to_string(),
+        update_period,
+    )
 }

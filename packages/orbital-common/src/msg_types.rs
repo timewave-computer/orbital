@@ -4,10 +4,8 @@ use cw_utils::Duration;
 
 #[cw_serde]
 pub struct OrbitalAuctionInstantiateMsg {
-    pub src_domain: String,
-    pub dest_domain: String,
-    pub offer_denom: String,
-    pub ask_denom: String,
+    // route describes the denoms & domains involved
+    pub route_config: RouteConfig,
     // auction batch size (offer denom amount)
     pub batch_size: Uint128,
     // auction phase configurations
@@ -19,4 +17,12 @@ pub struct OrbitalAuctionInstantiateMsg {
     pub cleanup_window_duration: Duration, // amount of tokens required to be posted as a slashable bond
     // in order to participate in the auction
     pub solver_bond: Coin,
+}
+
+#[cw_serde]
+pub struct RouteConfig {
+    pub src_domain: String,
+    pub dest_domain: String,
+    pub offer_denom: String,
+    pub ask_denom: String,
 }

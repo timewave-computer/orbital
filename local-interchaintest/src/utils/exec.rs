@@ -8,8 +8,11 @@ use localic_utils::{
     JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
 };
 use log::info;
-use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
-use orbital_core::{msg::ExecuteMsg, orbital_domain::UncheckedOrbitalDomainConfig};
+use orbital_common::msg_types::{OrbitalAuctionInstantiateMsg, RouteConfig};
+use orbital_core::{
+    msg::{ExecuteMsg, SubmitIntentMsg},
+    orbital_domain::UncheckedOrbitalDomainConfig,
+};
 
 use crate::{utils::misc::NEUTRON_IBC_GAS_FLAG, ACC0_KEY};
 
@@ -63,6 +66,32 @@ pub fn register_icq_balances_query(
     )
 }
 
+pub fn submit_intent(
+    test_ctx: &TestContext,
+    orbital_core: String,
+    acc_key: &str,
+    route_config: RouteConfig,
+    amount: Uint128,
+) -> Result<TransactionResponse, LocalError> {
+    info!("submitting user intent: {:?}", route_config);
+
+    let submit_intent_msg = SubmitIntentMsg {
+        route_config,
+        amount,
+    };
+
+    contract_execute(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core,
+        acc_key,
+        &serde_json::to_string(&ExecuteMsg::SubmitIntent(submit_intent_msg))
+            .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
+        "--amount 20000000untrn --gas 50000000",
+    )
+}
+
 pub fn register_new_auction(
     test_ctx: &TestContext,
     orbital_core: String,
@@ -75,10 +104,12 @@ pub fn register_new_auction(
     );
 
     let register_auction_msg = ExecuteMsg::RegisterNewAuction(OrbitalAuctionInstantiateMsg {
-        src_domain: GAIA_CHAIN_NAME.to_string(),
-        dest_domain: JUNO_CHAIN_NAME.to_string(),
-        offer_denom: GAIA_CHAIN_DENOM.to_string(),
-        ask_denom: JUNO_CHAIN_DENOM.to_string(),
+        route_config: RouteConfig {
+            src_domain: GAIA_CHAIN_NAME.to_string(),
+            dest_domain: JUNO_CHAIN_NAME.to_string(),
+            offer_denom: GAIA_CHAIN_DENOM.to_string(),
+            ask_denom: JUNO_CHAIN_DENOM.to_string(),
+        },
         batch_size: Uint128::new(1000),
         auction_duration: Duration::Time(30),
         filling_window_duration: Duration::Time(30),

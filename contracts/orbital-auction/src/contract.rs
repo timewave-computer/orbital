@@ -9,7 +9,7 @@ use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
 };
-use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
+use orbital_common::{intent::UserIntent, msg_types::OrbitalAuctionInstantiateMsg};
 
 use crate::{
     admin,
@@ -18,8 +18,8 @@ use crate::{
     solver,
     state::{
         AuctionConfig, AuctionPhase, AuctionPhaseConfig, AuctionRound, Batch, Bid,
-        RoundPhaseExpirations, RouteConfig, UserIntent, ACTIVE_AUCTION, AUCTION_ARCHIVE,
-        AUCTION_CONFIG, ORBITAL_CORE, ORDERBOOK, POSTED_BONDS,
+        RoundPhaseExpirations, ACTIVE_AUCTION, AUCTION_ARCHIVE, AUCTION_CONFIG, ORBITAL_CORE,
+        ORDERBOOK, POSTED_BONDS,
     },
 };
 
@@ -48,12 +48,7 @@ pub fn instantiate(
     let auction_config = AuctionConfig {
         batch_size: msg.batch_size,
         auction_phases: auction_phase_config,
-        route_config: RouteConfig {
-            src_domain: msg.src_domain,
-            dest_domain: msg.dest_domain,
-            offer_denom: msg.offer_denom,
-            ask_denom: msg.ask_denom,
-        },
+        route_config: msg.route_config,
         solver_bond: msg.solver_bond,
     };
 

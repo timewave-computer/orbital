@@ -1,7 +1,8 @@
 pub(crate) mod admin {
     use cosmwasm_std::{
-        ensure, instantiate2_address, to_json_binary, Addr, BlockInfo, CodeInfoResponse, CosmosMsg,
-        Env, MessageInfo, Response, StdError, StdResult, Uint64, WasmMsg,
+        ensure, instantiate2_address, to_json_binary, to_json_string, Addr, BlockInfo,
+        CodeInfoResponse, CosmosMsg, Env, MessageInfo, Response, StdError, StdResult, Uint64,
+        WasmMsg,
     };
     use cw_ownable::{assert_owner, update_ownership, Action};
     use neutron_sdk::{bindings::msg::NeutronMsg, NeutronResult};
@@ -13,7 +14,7 @@ pub(crate) mod admin {
         orbital_domain::UncheckedOrbitalDomainConfig,
         state::{
             OrbitalAuctionConfig, ORBITAL_AUCTIONS, ORBITAL_AUCTION_CODE_ID, ORBITAL_AUCTION_NONCE,
-            ORBITAL_DOMAINS,
+            ORBITAL_DOMAINS, ORBITAL_ROUTE_TO_AUCTION_ID,
         },
         utils::ClearingIcaIdentifier,
     };
@@ -74,36 +75,40 @@ pub(crate) mod admin {
 
         let src_domain_ica_identifier = ClearingIcaIdentifier::Auction {
             auction_id: auction_id.u64(),
-            domain: instantiate_msg.src_domain.to_string(),
+            domain: instantiate_msg.route_config.src_domain.to_string(),
         }
         .to_str_identifier();
         let dest_domain_ica_identifier = ClearingIcaIdentifier::Auction {
             auction_id: auction_id.u64(),
-            domain: instantiate_msg.dest_domain.to_string(),
+            domain: instantiate_msg.route_config.dest_domain.to_string(),
         }
         .to_str_identifier();
         let instantiate_src_clearing_acc_msg = get_auction_clearing_ica_registration_msg(
             &deps,
             &info,
-            instantiate_msg.src_domain.to_string(),
+            instantiate_msg.route_config.src_domain.to_string(),
             src_domain_ica_identifier.to_string(),
         )?;
         let instantiate_dest_clearing_acc_msg = get_auction_clearing_ica_registration_msg(
             &deps,
             &info,
-            instantiate_msg.dest_domain.to_string(),
+            instantiate_msg.route_config.dest_domain.to_string(),
             dest_domain_ica_identifier.to_string(),
         )?;
-
+        ORBITAL_ROUTE_TO_AUCTION_ID.save(
+            deps.storage,
+            to_json_string(&instantiate_msg.route_config)?,
+            &auction_id,
+        )?;
         ORBITAL_AUCTION_NONCE.save(deps.storage, &auction_id.checked_add(Uint64::one())?)?;
         ORBITAL_AUCTIONS.save(
             deps.storage,
             auction_id.u64(),
             &OrbitalAuctionConfig {
-                src_domain: instantiate_msg.src_domain.to_string(),
+                src_domain: instantiate_msg.route_config.src_domain.to_string(),
                 src_clearing_acc_id: src_domain_ica_identifier,
                 src_clearing_acc_addr: None,
-                dest_domain: instantiate_msg.dest_domain.to_string(),
+                dest_domain: instantiate_msg.route_config.dest_domain.to_string(),
                 dest_clearing_acc_id: dest_domain_ica_identifier,
                 dest_clearing_acc_addr: None,
                 orbital_auction_instantiate_msg: instantiate_msg,

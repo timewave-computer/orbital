@@ -4,8 +4,8 @@ use crate::{
     msg::{GetTransfersAmountResponse, RecipientTxsResponse},
     state::{
         ClearingAccountConfig, OrbitalAuctionConfig, OrbitalDomainConfig, UserConfig,
-        ORBITAL_AUCTIONS, ORBITAL_AUCTION_CODE_ID, ORBITAL_AUCTION_NONCE, RECIPIENT_TXS, TRANSFERS,
-        USER_NONCE,
+        ORBITAL_AUCTIONS, ORBITAL_AUCTION_CODE_ID, ORBITAL_AUCTION_NONCE, RECIPIENT_TXS,
+        REPLY_DEBUG_LOG, TRANSFERS, USER_NONCE,
     },
     user_logic::user,
     utils::{ClearingIcaIdentifier, OpenAckVersion},
@@ -15,7 +15,7 @@ use crate::{
     state::{CLEARING_ACCOUNTS, ORBITAL_DOMAINS, USER_CONFIGS},
 };
 
-use cosmwasm_std::entry_point;
+use cosmwasm_std::{entry_point, to_json_string};
 use cosmwasm_std::{
     to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
     StdResult, Uint64,
@@ -24,7 +24,10 @@ use cw2::set_contract_version;
 use cw_ownable::{get_ownership, initialize_owner};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    interchain_queries::v047::queries::{query_balance, BalanceResponse},
+    interchain_queries::{
+        v045::new_register_transfers_query_msg,
+        v047::queries::{query_balance, BalanceResponse},
+    },
     sudo::msg::SudoMsg,
     NeutronError, NeutronResult,
 };
@@ -80,6 +83,8 @@ pub fn execute(
         ExecuteMsg::UserWithdrawFunds { domain, coin, dest } => {
             user::try_withdraw_from_remote_domain(deps, info, domain, coin, dest)
         }
+        // user action to submit an intent
+        ExecuteMsg::SubmitIntent(msg) => user::try_submit_intent(deps, env, info, msg),
         ExecuteMsg::RegisterBalancesQuery {
             connection_id,
             update_period,
@@ -113,6 +118,7 @@ pub fn query(deps: QueryDeps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::AuctionClearingAccountAddress { id, domain } => {
             to_json_binary(&query_auction_clearing_account(deps, id, domain)?)
         }
+        QueryMsg::ReplyDebugLog {} => to_json_binary(&REPLY_DEBUG_LOG.may_load(deps.storage)?),
     }
 }
 
@@ -179,8 +185,18 @@ fn query_user_config(deps: QueryDeps, user: String) -> StdResult<UserConfig> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn reply(_deps: ExecuteDeps, _env: Env, _msg: Reply) -> StdResult<Response<NeutronMsg>> {
-    Err(StdError::generic_err("unimplemented!()"))
+pub fn reply(deps: ExecuteDeps, _env: Env, msg: Reply) -> StdResult<Response<NeutronMsg>> {
+    match REPLY_DEBUG_LOG.may_load(deps.storage)? {
+        Some(mut log) => {
+            log.push(to_json_string(&msg)?);
+            REPLY_DEBUG_LOG.save(deps.storage, &log)?;
+        }
+        None => {
+            let log = vec![to_json_string(&msg)?];
+            REPLY_DEBUG_LOG.save(deps.storage, &log)?;
+        }
+    }
+    Ok(Response::default())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -277,11 +293,23 @@ fn sudo_open_ack(
                     }
                 },
             )?;
+
+            // with the clearing account ready, we register an ICQ query for txs where the
+            // destination is the clearing account address. this will be used to assert deposits.
+            let icq_msg = new_register_transfers_query_msg(
+                clearing_account_config.controller_connection_id,
+                clearing_account_config.addr,
+                5,
+                None,
+            )
+            .map_err(|e| StdError::generic_err(format!("Failed to create ICQ msg: {}", e)))?;
+
             let mut resp = Response::new()
                 .add_attribute("action", "handle_open_ack")
                 .add_attribute("clearing_ica_type", "auction")
                 .add_attribute("auction_id", auction_id.to_string())
-                .add_attribute("domain", domain);
+                .add_attribute("domain", domain)
+                .add_message(icq_msg);
 
             // if both clearing accounts are prepared, we can instantiate the auction
             if associated_orbital_auction.prepared_clearing_accounts() {

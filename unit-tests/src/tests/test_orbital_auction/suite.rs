@@ -4,9 +4,12 @@ use cw_utils::Duration;
 use cw_utils::Expiration::AtTime;
 use orbital_auction::{
     msg::{ExecuteMsg, QueryMsg},
-    state::{AuctionConfig, AuctionPhase, AuctionRound, UserIntent},
+    state::{AuctionConfig, AuctionPhase, AuctionRound},
 };
-use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
+use orbital_common::{
+    intent::UserIntent,
+    msg_types::{OrbitalAuctionInstantiateMsg, RouteConfig},
+};
 
 use crate::testing_utils::{
     base_suite_builder::SuiteBuilder,
@@ -26,11 +29,12 @@ impl Default for OrbitalAuctionBuilder {
         Self {
             builder,
             instantiate_msg: OrbitalAuctionInstantiateMsg {
-                src_domain: GAIA_DOMAIN.to_string(),
-                dest_domain: OSMOSIS_DOMAIN.to_string(),
-                offer_denom: DENOM_ATOM.to_string(),
-                ask_denom: DENOM_OSMO.to_string(),
-
+                route_config: RouteConfig {
+                    src_domain: GAIA_DOMAIN.to_string(),
+                    dest_domain: OSMOSIS_DOMAIN.to_string(),
+                    offer_denom: DENOM_ATOM.to_string(),
+                    ask_denom: DENOM_OSMO.to_string(),
+                },
                 batch_size: Uint128::new(10_000_000),
 
                 auction_duration: Duration::Time(180),

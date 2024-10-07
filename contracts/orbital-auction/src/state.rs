@@ -2,6 +2,7 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, BlockInfo, Coin, StdError, StdResult, Storage, Uint128, Uint64};
 use cw_storage_plus::{Deque, Item, Map};
 use cw_utils::{Duration, Expiration};
+use orbital_common::{intent::UserIntent, msg_types::RouteConfig};
 
 // authorized orbital-core address
 pub(crate) const ORBITAL_CORE: Item<Addr> = Item::new("orbital_core");
@@ -23,38 +24,6 @@ pub(crate) const POSTED_BONDS: Map<String, Coin> = Map::new("posted_bonds");
 // included in the auction, order is split and the remainder is re-enqueued,
 // maintaining the priority.
 pub(crate) const ORDERBOOK: Deque<UserIntent> = Deque::new("orderbook");
-
-// base definition of an order. will likely change.
-#[cw_serde]
-pub struct UserIntent {
-    pub user: String,
-    pub amount: Uint128,
-    pub offer_domain: String,
-    pub ask_domain: String,
-}
-
-impl UserIntent {
-    /// splits the order into two orders, one with the given amount and the remainder.
-    /// returns an error if the amount exceeds the order amount. if it doesn't, returns
-    /// a tuple in the form of (new_order, remainder).
-    pub fn split_order(&self, amount: Uint128) -> StdResult<(UserIntent, UserIntent)> {
-        let new_order = UserIntent {
-            user: self.user.clone(),
-            amount,
-            offer_domain: self.offer_domain.clone(),
-            ask_domain: self.ask_domain.clone(),
-        };
-
-        let remainder = UserIntent {
-            user: self.user.clone(),
-            amount: self.amount.checked_sub(amount)?,
-            offer_domain: self.offer_domain.clone(),
-            ask_domain: self.ask_domain.clone(),
-        };
-
-        Ok((new_order, remainder))
-    }
-}
 
 #[cw_serde]
 pub struct AuctionConfig {
@@ -252,12 +221,4 @@ pub struct Bid {
     pub solver: Addr,
     pub amount: Uint128,
     pub bid_block: BlockInfo,
-}
-
-#[cw_serde]
-pub struct RouteConfig {
-    pub src_domain: String,
-    pub dest_domain: String,
-    pub offer_denom: String,
-    pub ask_denom: String,
 }

@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Coin, Uint64};
+use cosmwasm_std::{Coin, Uint128, Uint64};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
-use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
+use orbital_common::msg_types::{OrbitalAuctionInstantiateMsg, RouteConfig};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,9 @@ pub enum ExecuteMsg {
     /// register user to orbital
     RegisterUser {},
     /// register user to a specific domain
-    RegisterUserDomain { domain: String },
+    RegisterUserDomain {
+        domain: String,
+    },
     /// user action to withdraw funds from their clearing account
     UserWithdrawFunds {
         // domain from which to withdraw funds
@@ -38,7 +40,7 @@ pub enum ExecuteMsg {
         // target address to send funds to
         dest: String,
     },
-
+    SubmitIntent(SubmitIntentMsg),
     // ICQ related messages
     RegisterBalancesQuery {
         connection_id: String,
@@ -52,6 +54,12 @@ pub enum ExecuteMsg {
         recipient: String,
         min_height: Option<u64>,
     },
+}
+
+#[cw_serde]
+pub struct SubmitIntentMsg {
+    pub route_config: RouteConfig,
+    pub amount: Uint128,
 }
 
 #[cw_ownable_query]
@@ -81,6 +89,9 @@ pub enum QueryMsg {
 
     #[returns(crate::state::OrbitalAuctionConfig)]
     Auction { id: Uint64 },
+
+    #[returns(Vec<String>)]
+    ReplyDebugLog {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

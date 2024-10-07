@@ -37,6 +37,28 @@ pub fn query_user_clearing_acc_addr_on_domain(
     Ok(user_clearing_acc)
 }
 
+pub fn query_reply_debug_log(
+    test_ctx: &TestContext,
+    orbital_core: String,
+) -> Result<Vec<String>, LocalError> {
+    let debug_log_response = contract_query(
+        test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME),
+        &orbital_core,
+        &serde_json::to_string(&QueryMsg::ReplyDebugLog {})
+            .map_err(|e| LocalError::Custom { msg: e.to_string() })?,
+    )["data"]
+        .clone();
+
+    let debug_log: Vec<String> = serde_json::from_value(debug_log_response)
+        .map_err(|e| LocalError::Custom { msg: e.to_string() })?;
+
+    info!("reply debug log: {:?}", debug_log);
+
+    Ok(debug_log)
+}
+
 pub fn query_auction_clearing_acc_addr_on_domain(
     test_ctx: &TestContext,
     orbital_core: String,

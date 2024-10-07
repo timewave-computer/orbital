@@ -5,6 +5,8 @@ use orbital_common::msg_types::OrbitalAuctionInstantiateMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+pub const REPLY_DEBUG_LOG: Item<Vec<String>> = Item::new("reply_debug_log");
+
 /// code id of the orbital auction contract
 pub(crate) const ORBITAL_AUCTION_CODE_ID: Item<Uint64> = Item::new("code_id");
 
@@ -13,6 +15,9 @@ pub(crate) const ORBITAL_AUCTION_NONCE: Item<Uint64> = Item::new("auction_nonce"
 
 /// registered orbital auctions
 pub(crate) const ORBITAL_AUCTIONS: Map<u64, OrbitalAuctionConfig> = Map::new("auctions");
+
+/// map of stringified RouteConfigs to associated auction IDs
+pub(crate) const ORBITAL_ROUTE_TO_AUCTION_ID: Map<String, Uint64> = Map::new("route_to_auction_id");
 
 /// keeping track of registered user IDs which get incremented
 /// with each new registration. it's needed to generate unique

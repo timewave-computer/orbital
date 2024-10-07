@@ -1,10 +1,11 @@
 use cosmwasm_std::{ensure, Env, MessageInfo, Response};
 use neutron_sdk::{bindings::msg::NeutronMsg, NeutronResult};
+use orbital_common::intent::UserIntent;
 
 use crate::{
     contract::ExecuteDeps,
     error::ContractError,
-    state::{UserIntent, ACTIVE_AUCTION, ORBITAL_CORE, ORDERBOOK},
+    state::{ACTIVE_AUCTION, ORBITAL_CORE, ORDERBOOK},
 };
 
 /// admin-gated action to include a (validated) user intent into the orderbook.

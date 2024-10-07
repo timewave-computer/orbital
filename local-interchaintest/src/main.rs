@@ -1,22 +1,23 @@
-use cosmwasm_std::{coin, coins, Uint64};
+use cosmwasm_std::{coin, coins, Uint128, Uint64};
 use localic_std::modules::{bank::get_balance, cosmwasm::contract_instantiate};
 use localic_utils::{
     ConfigChainBuilder, TestContextBuilder, GAIA_CHAIN_DENOM, GAIA_CHAIN_NAME, JUNO_CHAIN_DENOM,
-    JUNO_CHAIN_NAME, NEUTRON_CHAIN_NAME,
+    JUNO_CHAIN_NAME, NEUTRON_CHAIN_DENOM, NEUTRON_CHAIN_NAME,
 };
 use log::info;
+use orbital_common::msg_types::RouteConfig;
 
 use std::{env, error::Error, time::Duration};
 use utils::{
     exec::{
         admin_register_domain, register_icq_balances_query, register_icq_transfers_query,
-        register_new_auction, user_register_orbital_core, user_register_to_new_domain,
-        user_withdraw_funds_from_domain,
+        register_new_auction, submit_intent, user_register_orbital_core,
+        user_register_to_new_domain, user_withdraw_funds_from_domain,
     },
     misc::{generate_icq_relayer_config, start_icq_relayer},
     query::{
         query_auction_clearing_acc_addr_on_domain, query_balance_query_id, query_icq_recipient_txs,
-        query_icq_transfer_amount, query_orbital_auction_by_id,
+        query_icq_transfer_amount, query_orbital_auction_by_id, query_reply_debug_log,
         query_user_clearing_acc_addr_on_domain,
     },
 };
@@ -116,6 +117,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     info!("orbital core: {}", orbital_core.address);
+    info!("funding orbital core with some neutron...");
+
+    let transfer_ntrn_coins_str = coins(1_000_000, NEUTRON_CHAIN_DENOM)
+        .iter()
+        .map(|coin| format!("{}{}", coin.amount, coin.denom))
+        .collect::<Vec<String>>()
+        .join(",");
+
+    let neutron_fee_coin = coin(50_000, NEUTRON_CHAIN_DENOM);
+    test_ctx
+            .get_request_builder()
+            .get_request_builder(NEUTRON_CHAIN_NAME)
+            .tx(&format!(
+                "tx bank send {ACC0_KEY} {} {transfer_ntrn_coins_str} --fees={neutron_fee_coin} --output=json",
+                orbital_core.address,
+            ), true)?;
+    std::thread::sleep(Duration::from_secs(2));
 
     admin_register_domain(
         &test_ctx,
@@ -166,9 +184,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     std::thread::sleep(Duration::from_secs(5));
 
-    // query_user_config(&test_ctx, orbital_core.address.to_string(), ACC1_ADDR)?;
-
-    let _acc_1_gaia_addr = query_user_clearing_acc_addr_on_domain(
+    let acc_1_gaia_addr = query_user_clearing_acc_addr_on_domain(
         &test_ctx,
         orbital_core.address.to_string(),
         ACC1_ADDR,
@@ -230,19 +246,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         pre_transfer_balance
     );
 
-    let transfer_coins_str = coins(1_000_000, "ujuno")
+    let transfer_juno_coins_str = coins(1_000_000, JUNO_CHAIN_DENOM)
+        .iter()
+        .map(|coin| format!("{}{}", coin.amount, coin.denom))
+        .collect::<Vec<String>>()
+        .join(",");
+    let transfer_gaia_coins_str = coins(1_000_000, GAIA_CHAIN_DENOM)
         .iter()
         .map(|coin| format!("{}{}", coin.amount, coin.denom))
         .collect::<Vec<String>>()
         .join(",");
 
-    let fee_coin = coin(50_000, "ujuno");
+    let juno_fee_coin = coin(50_000, JUNO_CHAIN_DENOM);
+    let gaia_fee_coin = coin(50_000, GAIA_CHAIN_DENOM);
 
     test_ctx
         .get_request_builder()
         .get_request_builder(JUNO_CHAIN_NAME)
         .tx(&format!(
-            "tx bank send {ACC0_KEY} {acc_1_juno_addr} {transfer_coins_str} --fees={fee_coin} --output=json"
+            "tx bank send {ACC0_KEY} {acc_1_juno_addr} {transfer_juno_coins_str} --fees={juno_fee_coin} --output=json"
         ), true)?;
 
     info!("sleeping for 5...");
@@ -267,7 +289,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .get_request_builder()
         .get_request_builder(JUNO_CHAIN_NAME)
         .tx(&format!(
-            "tx bank send {ACC0_KEY} {acc_1_juno_addr} {transfer_coins_str} --fees={fee_coin} --output=json"
+            "tx bank send {ACC0_KEY} {acc_1_juno_addr} {transfer_juno_coins_str} --fees={juno_fee_coin} --output=json"
         ), true)?;
 
     info!("sleeping for 5...");
@@ -420,6 +442,34 @@ fn main() -> Result<(), Box<dyn Error>> {
         "clearing acc auction 1 juno: {:?}",
         clearing_acc_auction_1_juno
     );
+    info!("transferring some atom to user");
+    test_ctx
+        .get_request_builder()
+        .get_request_builder(GAIA_CHAIN_NAME)
+        .tx(&format!(
+            "tx bank send {ACC0_KEY} {acc_1_gaia_addr} {transfer_gaia_coins_str} --fees={gaia_fee_coin} --output=json"
+        ), true)?;
+
+    std::thread::sleep(Duration::from_secs(5));
+
+    let submit_intent_response = submit_intent(
+        &test_ctx,
+        orbital_core.address.to_string(),
+        ACC1_KEY,
+        RouteConfig {
+            src_domain: GAIA_CHAIN_NAME.to_string(),
+            dest_domain: JUNO_CHAIN_NAME.to_string(),
+            offer_denom: GAIA_CHAIN_DENOM.to_string(),
+            ask_denom: JUNO_CHAIN_DENOM.to_string(),
+        },
+        Uint128::new(1000),
+    )?;
+
+    info!("submit intent response: {:?}", submit_intent_response);
+
+    std::thread::sleep(Duration::from_secs(10));
+
+    query_reply_debug_log(&test_ctx, orbital_core.address.to_string())?;
 
     Ok(())
 }
