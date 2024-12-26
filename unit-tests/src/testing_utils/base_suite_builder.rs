@@ -2,9 +2,13 @@ use cosmwasm_std::{coin, coins, Addr, Coin};
 use cw_multi_test::{BasicAppBuilder, Executor, MockApiBech32, SimpleAddressGenerator, WasmKeeper};
 
 use super::{
-    consts::{ALL_DENOMS, CHAIN_PREFIX, DENOM_NTRN, FAUCET, NOTE, OWNER, USER_1},
+    consts::{
+        ALL_DENOMS, CHAIN_PREFIX, DENOM_ATOM, DENOM_NTRN, FAUCET, NOTE, OWNER, SOLVER, SOLVER_2,
+        USER_1,
+    },
     neutron_adapters::{
-        neutron_module::NeutronKeeper, neutron_type_contracts::orbital_core_contract,
+        neutron_module::NeutronKeeper,
+        neutron_type_contracts::{orbital_auction_contract, orbital_core_contract},
         stargate_module::StargateModule,
     },
     types::CustomApp,
@@ -36,7 +40,10 @@ pub struct SuiteBuilder {
     pub note: Addr,
     pub app: CustomApp,
     pub orbital_core_code_id: u64,
+    pub orbital_auction_code_id: u64,
     pub user_addr: Addr,
+    pub solver: Addr,
+    pub solver_2: Addr,
 }
 
 impl Default for SuiteBuilder {
@@ -61,12 +68,15 @@ impl Default for SuiteBuilder {
                     .unwrap();
             });
 
-        let code_id = app.store_code(orbital_core_contract());
+        let core_code_id = app.store_code(orbital_core_contract());
+        let auction_code_id = app.store_code(orbital_auction_contract());
 
         let owner_addr = app.api().addr_make(OWNER);
         let faucet_addr = app.api().addr_make(FAUCET);
         let note_addr = app.api().addr_make(NOTE);
         let user_addr = app.api().addr_make(USER_1);
+        let solver_addr = app.api().addr_make(SOLVER);
+        let solver_2_addr = app.api().addr_make(SOLVER_2);
 
         app.send_tokens(
             faucet_addr.clone(),
@@ -75,13 +85,44 @@ impl Default for SuiteBuilder {
         )
         .unwrap();
 
+        app.send_tokens(
+            faucet_addr.clone(),
+            solver_addr.clone(),
+            &[coin(1_000_000, DENOM_NTRN)],
+        )
+        .unwrap();
+
+        app.send_tokens(
+            faucet_addr.clone(),
+            solver_addr.clone(),
+            &[coin(10_000_000, DENOM_ATOM)],
+        )
+        .unwrap();
+
+        app.send_tokens(
+            faucet_addr.clone(),
+            solver_2_addr.clone(),
+            &[coin(1_000_000, DENOM_NTRN)],
+        )
+        .unwrap();
+
+        app.send_tokens(
+            faucet_addr.clone(),
+            solver_2_addr.clone(),
+            &[coin(10_000_000, DENOM_ATOM)],
+        )
+        .unwrap();
+
         Self {
             faucet: faucet_addr,
             admin: owner_addr,
             note: note_addr,
             app,
-            orbital_core_code_id: code_id,
+            orbital_core_code_id: core_code_id,
+            orbital_auction_code_id: auction_code_id,
             user_addr,
+            solver: solver_addr,
+            solver_2: solver_2_addr,
         }
     }
 }

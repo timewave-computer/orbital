@@ -12,6 +12,8 @@ pub const CHAIN_PREFIX: &str = "cosmos";
 pub const OWNER: &str = "owner";
 pub const NOTE: &str = "note";
 pub const USER_1: &str = "user_1";
+pub const SOLVER: &str = "solver";
+pub const SOLVER_2: &str = "solver_2";
 
 pub const GAIA_DOMAIN: &str = "gaia";
 pub const OSMOSIS_DOMAIN: &str = "osmosis";
